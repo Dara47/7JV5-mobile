@@ -64,6 +64,32 @@ class FirestoreService {
     await _db.collection('sessions').doc(sessionId).delete();
   }
 
+  // ── Package management ───────────────────────────────────────────────────
+
+  static Stream<List<PackageModel>> watchAllPackages() {
+    return _db.collection('packages').snapshots().map((s) {
+      final list = s.docs.map(PackageModel.fromDoc).toList();
+      list.sort((a, b) => a.studentName.compareTo(b.studentName));
+      return list;
+    });
+  }
+
+  static Future<void> addPackage(Map<String, dynamic> data) async {
+    await _db.collection('packages').add({...data, 'createdAt': FieldValue.serverTimestamp()});
+  }
+
+  static Future<void> updatePackageFields(String id, Map<String, dynamic> data) async {
+    await _db.collection('packages').doc(id).update({...data, 'updatedAt': FieldValue.serverTimestamp()});
+  }
+
+  static Future<void> adjustSessions(String id, {int totalDelta = 0, int remainingDelta = 0}) async {
+    await _db.collection('packages').doc(id).update({
+      if (totalDelta != 0) 'totalSessions': FieldValue.increment(totalDelta),
+      if (remainingDelta != 0) 'remainingSessions': FieldValue.increment(remainingDelta),
+      'updatedAt': FieldValue.serverTimestamp(),
+    });
+  }
+
   // ── User management ──────────────────────────────────────────────────────
 
   static Future<String> generateCode(String role) async {
