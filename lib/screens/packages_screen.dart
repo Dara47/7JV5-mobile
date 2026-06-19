@@ -120,7 +120,7 @@ class PackageCard extends StatelessWidget {
 
   void _showAdjustDialog(BuildContext context, {required bool isAdd}) {
     final ctrl = TextEditingController(text: '1');
-    showDialog(context: context, builder: (_) => AlertDialog(
+    showDialog(context: context, builder: (dialogCtx) => AlertDialog(
       title: Text(isAdd ? '➕ เพิ่มคาบ' : '➖ ลบคาบ'),
       content: Column(mainAxisSize: MainAxisSize.min, children: [
         Text(isAdd ? 'เพิ่มจำนวนคาบให้นักเรียน' : 'หักคาบที่เรียนไปแล้ว',
@@ -138,16 +138,23 @@ class PackageCard extends StatelessWidget {
         ),
       ]),
       actions: [
-        TextButton(onPressed: () => Navigator.pop(context), child: const Text('ยกเลิก')),
+        TextButton(onPressed: () => Navigator.pop(dialogCtx), child: const Text('ยกเลิก')),
         ElevatedButton(
           onPressed: () async {
             final n = int.tryParse(ctrl.text) ?? 1;
-            Navigator.pop(context);
-            if (isAdd) {
-              await FirestoreService.adjustSessions(pkg.id, totalDelta: n, remainingDelta: n);
-            } else {
-              if (pkg.remainingSessions <= 0) return;
-              await FirestoreService.adjustSessions(pkg.id, remainingDelta: -n);
+            if (n <= 0) return;
+            Navigator.pop(dialogCtx);
+            try {
+              if (isAdd) {
+                await FirestoreService.adjustSessions(pkg.id, totalDelta: n, remainingDelta: n);
+              } else {
+                final deduct = n.clamp(1, pkg.remainingSessions > 0 ? pkg.remainingSessions : n);
+                await FirestoreService.adjustSessions(pkg.id, remainingDelta: -deduct);
+              }
+            } catch (e) {
+              if (context.mounted) {
+                ScaffoldMessenger.of(context).showSnackBar(SnackBar(content: Text('เกิดข้อผิดพลาด: $e')));
+              }
             }
           },
           style: ElevatedButton.styleFrom(backgroundColor: isAdd ? Colors.green : Colors.orange, foregroundColor: Colors.white),
