@@ -206,3 +206,61 @@ class SessionModel {
     if (notes != null && notes!.isNotEmpty) 'notes': notes,
   };
 }
+
+class TeacherSlotModel {
+  final String teacherId;
+  final String teacherName;
+  final String teacherCode;
+  final String? scheduledDay;
+  final String? scheduledTime;
+  final String? scheduledEndTime;
+  final String? notes;
+
+  TeacherSlotModel({
+    required this.teacherId, required this.teacherName, required this.teacherCode,
+    this.scheduledDay, this.scheduledTime, this.scheduledEndTime, this.notes,
+  });
+
+  String get scheduleLabel {
+    if (scheduledDay == null) return 'ยังไม่ได้ตั้งเวลา';
+    final t = scheduledTime ?? '';
+    final e = scheduledEndTime != null ? '–$scheduledEndTime' : '';
+    return '$scheduledDay  $t$e';
+  }
+
+  bool get isCurrentlyTeaching {
+    if (scheduledDay == null || scheduledTime == null) return false;
+    final now = DateTime.now();
+    const dayMap = {'อา': 7, 'จ': 1, 'อ': 2, 'พ': 3, 'พฤ': 4, 'ศ': 5, 'ส': 6};
+    if (dayMap[scheduledDay] != now.weekday) return false;
+    try {
+      final sp = scheduledTime!.split(':');
+      final startM = int.parse(sp[0]) * 60 + int.parse(sp[1]);
+      final nowM = now.hour * 60 + now.minute;
+      int endM = startM + 60;
+      if (scheduledEndTime != null) {
+        final ep = scheduledEndTime!.split(':');
+        endM = int.parse(ep[0]) * 60 + int.parse(ep[1]);
+      }
+      return nowM >= startM && nowM < endM;
+    } catch (_) { return false; }
+  }
+
+  factory TeacherSlotModel.fromDoc(DocumentSnapshot doc) {
+    final d = doc.data() as Map<String, dynamic>;
+    return TeacherSlotModel(
+      teacherId: doc.id,
+      teacherName: d['teacherName'] ?? '', teacherCode: d['teacherCode'] ?? '',
+      scheduledDay: d['scheduledDay'], scheduledTime: d['scheduledTime'],
+      scheduledEndTime: d['scheduledEndTime'], notes: d['notes'],
+    );
+  }
+
+  Map<String, dynamic> toMap() => {
+    'teacherName': teacherName, 'teacherCode': teacherCode,
+    if (scheduledDay != null) 'scheduledDay': scheduledDay,
+    if (scheduledTime != null) 'scheduledTime': scheduledTime,
+    if (scheduledEndTime != null) 'scheduledEndTime': scheduledEndTime,
+    if (notes != null && notes!.isNotEmpty) 'notes': notes,
+  };
+}

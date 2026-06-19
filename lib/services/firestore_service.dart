@@ -117,4 +117,28 @@ class FirestoreService {
   static Future<void> deleteUser(String id) async {
     await _db.collection('users').doc(id).delete();
   }
+
+  // ── Teacher slots ─────────────────────────────────────────────────────────
+
+  static Stream<TeacherSlotModel?> watchTeacherSlot(String teacherId) {
+    return _db.collection('teacherSlots').doc(teacherId).snapshots().map((doc) {
+      if (!doc.exists) return null;
+      return TeacherSlotModel.fromDoc(doc);
+    });
+  }
+
+  static Stream<List<PackageModel>> watchPackagesForTeacher(String teacherId) {
+    return _db.collection('packages').where('teacherId', isEqualTo: teacherId)
+        .snapshots().map((s) => s.docs.map(PackageModel.fromDoc).toList());
+  }
+
+  static Future<void> saveTeacherSlot(String teacherId, Map<String, dynamic> data) async {
+    await _db.collection('teacherSlots').doc(teacherId).set({
+      ...data, 'updatedAt': FieldValue.serverTimestamp(),
+    }, SetOptions(merge: true));
+  }
+
+  static Future<void> deleteTeacherSlot(String teacherId) async {
+    await _db.collection('teacherSlots').doc(teacherId).delete();
+  }
 }
