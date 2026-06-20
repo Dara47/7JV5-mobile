@@ -142,6 +142,10 @@ class FirestoreService {
     });
   }
 
+  static Future<void> deletePackage(String id) async {
+    await _db.collection('packages').doc(id).delete();
+  }
+
   static Future<void> addPackage(Map<String, dynamic> data) async {
     await _db.collection('packages').add({...data, 'createdAt': FieldValue.serverTimestamp()});
   }

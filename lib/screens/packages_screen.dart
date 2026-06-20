@@ -141,7 +141,7 @@ class PackageCard extends StatelessWidget {
       actions: [
         TextButton(onPressed: () => Navigator.pop(context), child: const Text('ยกเลิก')),
         TextButton(
-          onPressed: () async { Navigator.pop(context); await FirestoreService.updateUser(pkg.id, {}); },
+          onPressed: () async { Navigator.pop(context); await FirestoreService.deletePackage(pkg.id); },
           child: const Text('ลบ', style: TextStyle(color: Colors.red)),
         ),
       ],
