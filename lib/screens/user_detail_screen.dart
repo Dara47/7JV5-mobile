@@ -3,7 +3,6 @@ import '../models/models.dart';
 import '../services/firestore_service.dart';
 import '../widgets/session_table.dart';
 import '../widgets/summary_footer.dart';
-import 'session_form_screen.dart';
 
 class UserDetailScreen extends StatelessWidget {
   final String userId;
@@ -49,12 +48,6 @@ class _SessionsTab extends StatelessWidget {
   final String role;
   const _SessionsTab({required this.userId, required this.role});
 
-  void _openForm(BuildContext context, {SessionModel? existing}) {
-    Navigator.push(context, MaterialPageRoute(
-      builder: (_) => SessionFormScreen(userId: userId, role: role, existing: existing),
-    ));
-  }
-
   void _confirmDelete(BuildContext context, SessionModel session) {
     showDialog(
       context: context,
@@ -79,14 +72,6 @@ class _SessionsTab extends StatelessWidget {
   Widget build(BuildContext context) {
     return Scaffold(
       backgroundColor: Colors.transparent,
-      floatingActionButton: FloatingActionButton.extended(
-        heroTag: 'add_session',
-        onPressed: () => _openForm(context),
-        backgroundColor: const Color(0xFF1565C0),
-        foregroundColor: Colors.white,
-        icon: const Icon(Icons.add),
-        label: const Text('เพิ่มคาบ'),
-      ),
       body: StreamBuilder<List<SessionModel>>(
         stream: FirestoreService.watchSessionsForUser(userId, role),
         builder: (context, snap) {
@@ -100,20 +85,13 @@ class _SessionsTab extends StatelessWidget {
                 Icon(Icons.event_note, size: 64, color: Colors.grey.shade300),
                 const SizedBox(height: 8),
                 const Text('ยังไม่มีคาบเรียน', style: TextStyle(color: Colors.grey)),
-                const SizedBox(height: 16),
-                ElevatedButton.icon(
-                  onPressed: () => _openForm(context),
-                  icon: const Icon(Icons.add),
-                  label: const Text('เพิ่มคาบแรก'),
-                  style: ElevatedButton.styleFrom(backgroundColor: const Color(0xFF1565C0), foregroundColor: Colors.white),
-                ),
               ]),
             );
           }
           return Column(children: [
             Expanded(child: SessionTable(
               sessions: sessions,
-              onEdit: (s) => _openForm(context, existing: s),
+              onEdit: null,
               onDelete: (s) => _confirmDelete(context, s),
             )),
             SummaryFooter(sessions: sessions),

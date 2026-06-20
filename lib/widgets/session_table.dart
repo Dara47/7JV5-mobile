@@ -3,7 +3,7 @@ import '../models/models.dart';
 
 class SessionTable extends StatelessWidget {
   final List<SessionModel> sessions;
-  final void Function(SessionModel) onEdit;
+  final void Function(SessionModel)? onEdit;
   final void Function(SessionModel) onDelete;
 
   const SessionTable({super.key, required this.sessions, required this.onEdit, required this.onDelete});
@@ -105,11 +105,11 @@ class SessionTable extends StatelessWidget {
                     child: Text(SessionModel.statusLabel(s.status), style: TextStyle(fontSize: 10, color: _statusColor(s.status), fontWeight: FontWeight.w600), textAlign: TextAlign.center),
                   )),
 
-                  _cell(_widths[8], IconButton(
+                  if (onEdit != null) _cell(_widths[8], IconButton(
                     padding: EdgeInsets.zero,
                     icon: const Icon(Icons.edit_outlined, size: 18, color: Color(0xFF1565C0)),
-                    onPressed: () => onEdit(s),
-                  )),
+                    onPressed: () => onEdit!(s),
+                  )) else _cell(_widths[8], const SizedBox()),
                   _cell(_widths[9], IconButton(
                     padding: EdgeInsets.zero,
                     icon: const Icon(Icons.delete_outline, size: 18, color: Colors.red),

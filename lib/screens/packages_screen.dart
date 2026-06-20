@@ -4,7 +4,9 @@ import '../services/firestore_service.dart';
 import 'package_form_dialog.dart';
 
 class PackagesScreen extends StatefulWidget {
-  const PackagesScreen({super.key});
+  final String? filterStudentId;
+  final String? filterStudentName;
+  const PackagesScreen({super.key, this.filterStudentId, this.filterStudentName});
   @override
   State<PackagesScreen> createState() => _PackagesScreenState();
 }
@@ -28,9 +30,11 @@ class _PackagesScreenState extends State<PackagesScreen> {
 
   @override
   Widget build(BuildContext context) {
+    final isFiltered = widget.filterStudentId != null;
+
     return Scaffold(
       appBar: AppBar(
-        title: const Text('จัดการคาบเรียน'),
+        title: Text(isFiltered ? widget.filterStudentName ?? 'คาบเรียน' : 'จัดการคาบเรียน'),
         backgroundColor: const Color(0xFF1565C0),
         foregroundColor: Colors.white,
       ),
@@ -43,7 +47,7 @@ class _PackagesScreenState extends State<PackagesScreen> {
         label: const Text('เพิ่มคาบ'),
       ),
       body: Column(children: [
-        Padding(
+        if (!isFiltered) Padding(
           padding: const EdgeInsets.fromLTRB(12, 12, 12, 4),
           child: TextField(
             controller: _searchCtrl,
@@ -62,13 +66,15 @@ class _PackagesScreenState extends State<PackagesScreen> {
         ),
         Expanded(
           child: StreamBuilder<List<PackageModel>>(
-            stream: FirestoreService.watchAllPackages(),
+            stream: isFiltered
+                ? FirestoreService.watchPackagesForUser(widget.filterStudentId!, 'student')
+                : FirestoreService.watchAllPackages(),
             builder: (context, snap) {
               if (snap.connectionState == ConnectionState.waiting) {
                 return const Center(child: CircularProgressIndicator());
               }
               final all = snap.data ?? [];
-              final list = _search.isEmpty ? all : all.where((p) =>
+              final list = (isFiltered || _search.isEmpty) ? all : all.where((p) =>
                 p.studentName.toLowerCase().contains(_search) ||
                 p.teacherName.toLowerCase().contains(_search) ||
                 p.studentCode.toLowerCase().contains(_search) ||

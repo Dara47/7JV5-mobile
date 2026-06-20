@@ -3,6 +3,7 @@ import '../models/models.dart';
 import '../services/firestore_service.dart';
 import 'user_form_screen.dart';
 import 'user_detail_screen.dart';
+import 'packages_screen.dart';
 
 class _StudentStatusBadge extends StatelessWidget {
   final String userId;
@@ -236,7 +237,9 @@ class _UserList extends StatelessWidget {
                     onSelected: (v) {
                       if (v == 'edit') onEdit(user: u);
                       if (v == 'detail') Navigator.push(context, MaterialPageRoute(
-                          builder: (_) => UserDetailScreen(userId: u.id, userName: u.name, userCode: u.code, role: u.role)));
+                          builder: (_) => role == 'student'
+                              ? PackagesScreen(filterStudentId: u.id, filterStudentName: u.name)
+                              : UserDetailScreen(userId: u.id, userName: u.name, userCode: u.code, role: u.role)));
                       if (v == 'delete') _confirmDelete(context, u);
                     },
                     itemBuilder: (_) => [
@@ -247,7 +250,9 @@ class _UserList extends StatelessWidget {
                   ),
                 ]),
                 onTap: () => Navigator.push(context, MaterialPageRoute(
-                    builder: (_) => UserDetailScreen(userId: u.id, userName: u.name, userCode: u.code, role: u.role))),
+                    builder: (_) => role == 'student'
+                        ? PackagesScreen(filterStudentId: u.id, filterStudentName: u.name)
+                        : UserDetailScreen(userId: u.id, userName: u.name, userCode: u.code, role: u.role))),
               ),
             );
           },
