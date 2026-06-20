@@ -146,15 +146,32 @@ class _UserList extends StatelessWidget {
       context: context,
       builder: (_) => AlertDialog(
         title: const Text('ลบผู้ใช้'),
-        content: Text('ลบ "${u.name}" (${u.code})?'),
+        content: Column(mainAxisSize: MainAxisSize.min, crossAxisAlignment: CrossAxisAlignment.start, children: [
+          Text('ลบ "${u.name}" (${u.code})?'),
+          const SizedBox(height: 10),
+          Container(
+            padding: const EdgeInsets.all(10),
+            decoration: BoxDecoration(color: Colors.red.shade50, borderRadius: BorderRadius.circular(8)),
+            child: const Column(crossAxisAlignment: CrossAxisAlignment.start, children: [
+              Text('ข้อมูลที่จะถูกลบ:', style: TextStyle(fontSize: 12, fontWeight: FontWeight.bold, color: Colors.red)),
+              SizedBox(height: 4),
+              Text('• ข้อมูลผู้ใช้', style: TextStyle(fontSize: 12, color: Colors.black87)),
+              Text('• แพ็กเกจทั้งหมด', style: TextStyle(fontSize: 12, color: Colors.black87)),
+              Text('• คาบเรียนที่ยังไม่เสร็จ', style: TextStyle(fontSize: 12, color: Colors.black87)),
+              SizedBox(height: 4),
+              Text('* ประวัติรายงานยังคงอยู่', style: TextStyle(fontSize: 11, color: Colors.green, fontStyle: FontStyle.italic)),
+            ]),
+          ),
+        ]),
         actions: [
           TextButton(onPressed: () => Navigator.pop(context), child: const Text('ยกเลิก')),
-          TextButton(
+          ElevatedButton(
             onPressed: () async {
               Navigator.pop(context);
-              await FirestoreService.deleteUser(u.id);
+              await FirestoreService.cascadeDeleteUser(u.id, u.role);
             },
-            child: const Text('ลบ', style: TextStyle(color: Colors.red)),
+            style: ElevatedButton.styleFrom(backgroundColor: Colors.red, foregroundColor: Colors.white),
+            child: const Text('ลบทั้งหมด'),
           ),
         ],
       ),

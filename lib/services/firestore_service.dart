@@ -201,6 +201,36 @@ class FirestoreService {
     await _db.collection('users').doc(id).delete();
   }
 
+  static Future<void> cascadeDeleteUser(String userId, String role) async {
+    final batch = _db.batch();
+
+    // Delete user
+    batch.delete(_db.collection('users').doc(userId));
+
+    // Delete packages
+    final pkgField = role == 'student' ? 'studentId' : 'teacherId';
+    final pkgs = await _db.collection('packages').where(pkgField, isEqualTo: userId).get();
+    for (final doc in pkgs.docs) {
+      batch.delete(doc.reference);
+    }
+
+    // Delete non-completed sessions (keep completed → รายงาน)
+    final sessionField = role == 'student' ? 'studentId' : 'teacherId';
+    final sessions = await _db.collection('sessions').where(sessionField, isEqualTo: userId).get();
+    for (final doc in sessions.docs) {
+      if ((doc.data()['status'] as String? ?? '') != 'completed') {
+        batch.delete(doc.reference);
+      }
+    }
+
+    // Delete teacher slot (teacher only)
+    if (role == 'teacher') {
+      batch.delete(_db.collection('teacherSlots').doc(userId));
+    }
+
+    await batch.commit();
+  }
+
   // ── Teacher slots ─────────────────────────────────────────────────────────
 
   static Stream<TeacherSlotModel?> watchTeacherSlot(String teacherId) {
