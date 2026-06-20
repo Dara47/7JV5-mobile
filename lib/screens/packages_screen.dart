@@ -123,7 +123,7 @@ class PackageCard extends StatelessWidget {
     showDialog(context: context, builder: (dialogCtx) => AlertDialog(
       title: Text(isAdd ? '➕ เพิ่มคาบ' : '➖ ลบคาบ'),
       content: Column(mainAxisSize: MainAxisSize.min, children: [
-        Text(isAdd ? 'เพิ่มจำนวนคาบให้นักเรียน' : 'หักคาบที่เรียนไปแล้ว',
+        Text(isAdd ? 'เพิ่มจำนวนคาบในคอร์ส (รวมทั้งหมด)' : 'ลดจำนวนคาบในคอร์ส (รวมทั้งหมด)',
             style: const TextStyle(color: Colors.grey, fontSize: 13)),
         const SizedBox(height: 12),
         TextField(
@@ -149,7 +149,7 @@ class PackageCard extends StatelessWidget {
                 await FirestoreService.adjustSessions(pkg.id, totalDelta: n, remainingDelta: n);
               } else {
                 final deduct = n.clamp(1, pkg.remainingSessions > 0 ? pkg.remainingSessions : n);
-                await FirestoreService.adjustSessions(pkg.id, remainingDelta: -deduct);
+                await FirestoreService.adjustSessions(pkg.id, totalDelta: -deduct, remainingDelta: -deduct);
               }
             } catch (e) {
               if (context.mounted) {
