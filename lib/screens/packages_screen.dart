@@ -342,6 +342,14 @@ class PackageCard extends StatelessWidget {
                 ]),
               ),
             ),
+            if (pkg.notes != null && pkg.notes!.isNotEmpty) ...[
+              const SizedBox(height: 6),
+              Row(crossAxisAlignment: CrossAxisAlignment.start, children: [
+                const Icon(Icons.notes, size: 14, color: Colors.grey),
+                const SizedBox(width: 6),
+                Expanded(child: Text(pkg.notes!, style: const TextStyle(fontSize: 12, color: Colors.black54))),
+              ]),
+            ],
             const SizedBox(height: 12),
 
             // Session counts
