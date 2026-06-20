@@ -196,27 +196,54 @@ class _TeacherCard extends StatelessWidget {
                     ]),
                     const SizedBox(height: 8),
 
-                    // Schedule row
+                    // Schedule slots
                     GestureDetector(
                       onTap: () => showTeacherSlotForm(context, teacher: teacher, existing: slot),
                       child: Container(
-                        padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 7),
+                        width: double.infinity,
+                        padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 8),
                         decoration: BoxDecoration(
-                          color: slot != null ? const Color(0xFFE8F5E9) : Colors.grey.shade100,
+                          color: (slot != null && slot.slots.isNotEmpty) ? const Color(0xFFE8F5E9) : Colors.grey.shade100,
                           borderRadius: BorderRadius.circular(8),
-                          border: Border.all(color: slot != null ? Colors.green.shade300 : Colors.grey.shade300),
+                          border: Border.all(
+                            color: (slot != null && slot.slots.isNotEmpty) ? Colors.green.shade300 : Colors.grey.shade300,
+                          ),
                         ),
-                        child: Row(children: [
-                          Icon(Icons.calendar_today, size: 14, color: slot != null ? const Color(0xFF2E7D32) : Colors.grey),
-                          const SizedBox(width: 6),
-                          Expanded(child: Text(
-                            slot?.scheduleLabel ?? 'แตะเพื่อตั้งวัน/เวลา',
-                            style: TextStyle(fontSize: 13, color: slot != null ? const Color(0xFF2E7D32) : Colors.grey, fontWeight: FontWeight.w600),
-                          )),
-                          Icon(Icons.edit_calendar, size: 14, color: slot != null ? const Color(0xFF2E7D32) : Colors.grey),
-                          const SizedBox(width: 4),
-                          Text(slot != null ? 'แก้ไข' : 'ตั้งค่า', style: TextStyle(fontSize: 11, color: slot != null ? const Color(0xFF2E7D32) : Colors.grey)),
-                        ]),
+                        child: (slot != null && slot.slots.isNotEmpty)
+                            ? Column(crossAxisAlignment: CrossAxisAlignment.start, children: [
+                                Row(children: [
+                                  Icon(Icons.calendar_month, size: 14, color: Colors.green.shade700),
+                                  const SizedBox(width: 6),
+                                  Text('${slot.slots.length} ช่วงเวลา',
+                                      style: TextStyle(fontSize: 12, color: Colors.green.shade700, fontWeight: FontWeight.w600)),
+                                  const Spacer(),
+                                  Icon(Icons.edit_calendar, size: 14, color: Colors.green.shade600),
+                                  const SizedBox(width: 4),
+                                  Text('แก้ไข', style: TextStyle(fontSize: 11, color: Colors.green.shade600)),
+                                ]),
+                                const SizedBox(height: 6),
+                                Wrap(
+                                  spacing: 6, runSpacing: 6,
+                                  children: slot.slots.map((s) => Container(
+                                    padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 4),
+                                    decoration: BoxDecoration(
+                                      color: const Color(0xFF2E7D32),
+                                      borderRadius: BorderRadius.circular(6),
+                                    ),
+                                    child: Text('${s.day}  ${s.startTime}–${s.endTime}',
+                                        style: const TextStyle(fontSize: 12, color: Colors.white, fontWeight: FontWeight.w600)),
+                                  )).toList(),
+                                ),
+                              ])
+                            : Row(children: [
+                                const Icon(Icons.calendar_today, size: 14, color: Colors.grey),
+                                const SizedBox(width: 6),
+                                const Expanded(child: Text('แตะเพื่อตั้งวัน/เวลา',
+                                    style: TextStyle(fontSize: 13, color: Colors.grey))),
+                                const Icon(Icons.add_circle_outline, size: 14, color: Colors.grey),
+                                const SizedBox(width: 4),
+                                Text('ตั้งค่า', style: TextStyle(fontSize: 11, color: Colors.grey.shade600)),
+                              ]),
                       ),
                     ),
                     if (slot?.notes != null && slot!.notes!.isNotEmpty) ...[

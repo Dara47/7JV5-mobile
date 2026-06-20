@@ -291,6 +291,18 @@ class FirestoreService {
     }, SetOptions(merge: true));
   }
 
+  static Future<void> updateTeacherSlots(
+      String teacherId, String teacherName, String teacherCode,
+      List<SlotItem> slots, {String? notes}) async {
+    await _db.collection('teacherSlots').doc(teacherId).set({
+      'teacherName': teacherName,
+      'teacherCode': teacherCode,
+      'slots': slots.map((s) => s.toMap()).toList(),
+      if (notes != null && notes.isNotEmpty) 'notes': notes,
+      'updatedAt': FieldValue.serverTimestamp(),
+    });
+  }
+
   static Future<void> deleteTeacherSlot(String teacherId) async {
     await _db.collection('teacherSlots').doc(teacherId).delete();
   }
