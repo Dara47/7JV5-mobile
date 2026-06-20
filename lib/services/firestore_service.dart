@@ -60,7 +60,7 @@ class FirestoreService {
       final now = today;
       final list = s.docs.map(SessionModel.fromDoc).where((session) {
         // include past dates always, for today filter by endTime
-        if (session.date < todayStr) return true;
+        if (session.date.compareTo(todayStr) < 0) return true;
         try {
           final ep = session.endTime.split(':');
           final endMinutes = int.parse(ep[0]) * 60 + int.parse(ep[1]);

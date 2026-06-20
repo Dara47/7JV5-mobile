@@ -143,7 +143,7 @@ class _CutSessionScreenState extends State<CutSessionScreen> {
             Expanded(
               child: sessions.isEmpty
                   ? Center(child: Column(mainAxisSize: MainAxisSize.min, children: [
-                      Icon(Icons.scissors, size: 56, color: Colors.grey.shade300),
+                      Icon(Icons.content_cut, size: 56, color: Colors.grey.shade300),
                       const SizedBox(height: 8),
                       Text(_filterDate != null ? 'ไม่มีรายการในวันที่เลือก' : 'ไม่มีคาบที่รอตัด',
                           style: const TextStyle(color: Colors.grey)),
