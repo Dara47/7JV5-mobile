@@ -1,11 +1,63 @@
 import 'package:flutter/material.dart';
-import 'package:firebase_auth/firebase_auth.dart';
 import '../models/models.dart';
 import '../services/firestore_service.dart';
-import 'packages_screen.dart';
 
 class ReportsScreen extends StatelessWidget {
   const ReportsScreen({super.key});
+
+  String _thaiDay(String date) {
+    try {
+      final dt = DateTime.parse(date);
+      const days = ['จ', 'อ', 'พ', 'พฤ', 'ศ', 'ส', 'อา'];
+      return days[dt.weekday - 1];
+    } catch (_) { return ''; }
+  }
+
+  String _shortDate(String date) {
+    if (date.length < 10) return date;
+    return '${date.substring(8)}/${date.substring(5, 7)}/${date.substring(0, 4)}';
+  }
+
+  void _confirmDeleteOne(BuildContext context, SessionModel s) {
+    showDialog(
+      context: context,
+      builder: (_) => AlertDialog(
+        title: const Text('ลบรายการ'),
+        content: Text('ลบคาบ ${s.studentName} วันที่ ${_shortDate(s.date)} ${s.startTime}?'),
+        actions: [
+          TextButton(onPressed: () => Navigator.pop(context), child: const Text('ยกเลิก')),
+          TextButton(
+            onPressed: () async {
+              Navigator.pop(context);
+              await FirestoreService.deleteSession(s.id);
+            },
+            child: const Text('ลบ', style: TextStyle(color: Colors.red)),
+          ),
+        ],
+      ),
+    );
+  }
+
+  void _confirmDeleteAll(BuildContext context, int count) {
+    showDialog(
+      context: context,
+      builder: (_) => AlertDialog(
+        title: const Text('ลบทั้งหมด'),
+        content: Text('ยืนยันลบ $count รายการที่เรียน/สอนเสร็จแล้วทั้งหมด?'),
+        actions: [
+          TextButton(onPressed: () => Navigator.pop(context), child: const Text('ยกเลิก')),
+          ElevatedButton(
+            onPressed: () async {
+              Navigator.pop(context);
+              await FirestoreService.deleteAllCompletedSessions();
+            },
+            style: ElevatedButton.styleFrom(backgroundColor: Colors.red, foregroundColor: Colors.white),
+            child: const Text('ลบทั้งหมด'),
+          ),
+        ],
+      ),
+    );
+  }
 
   @override
   Widget build(BuildContext context) {
@@ -14,118 +66,117 @@ class ReportsScreen extends StatelessWidget {
         title: const Text('รายงาน'),
         backgroundColor: const Color(0xFF1565C0),
         foregroundColor: Colors.white,
-        actions: [
-          IconButton(
-            icon: const Icon(Icons.logout),
-            tooltip: 'ออกจากระบบ',
-            onPressed: () async {
-              final ok = await showDialog<bool>(context: context, builder: (_) => AlertDialog(
-                title: const Text('ออกจากระบบ'),
-                content: const Text('ยืนยันออกจากระบบ?'),
-                actions: [
-                  TextButton(onPressed: () => Navigator.pop(context, false), child: const Text('ยกเลิก')),
-                  TextButton(onPressed: () => Navigator.pop(context, true), child: const Text('ออก', style: TextStyle(color: Colors.red))),
-                ],
-              ));
-              if (ok == true) FirebaseAuth.instance.signOut();
-            },
-          ),
-        ],
       ),
-      body: StreamBuilder<List<PackageModel>>(
-        stream: FirestoreService.watchAllPackages(),
+      body: StreamBuilder<List<SessionModel>>(
+        stream: FirestoreService.watchCompletedSessions(),
         builder: (context, snap) {
           if (snap.connectionState == ConnectionState.waiting) {
             return const Center(child: CircularProgressIndicator());
           }
-          final all = snap.data ?? [];
-          final expired = all.where((p) => p.isExpired).toList();
-          final low = all.where((p) => p.isLowBalance).toList();
-          final active = all.where((p) => p.isActive).toList();
+          final sessions = snap.data ?? [];
 
-          return ListView(
-            padding: const EdgeInsets.all(12),
-            children: [
-              // Summary cards
-              Row(children: [
-                _SummaryCard(label: 'ใช้งานปกติ', value: '${active.length}', color: Colors.green),
-                const SizedBox(width: 8),
-                _SummaryCard(label: 'ใกล้หมดคาบ', value: '${low.length}', color: Colors.orange),
-                const SizedBox(width: 8),
-                _SummaryCard(label: 'หมดคาบ', value: '${expired.length}', color: Colors.red),
+          if (sessions.isEmpty) {
+            return const Center(
+              child: Column(mainAxisSize: MainAxisSize.min, children: [
+                Icon(Icons.check_circle_outline, size: 64, color: Colors.green),
+                SizedBox(height: 8),
+                Text('ยังไม่มีคาบที่เรียน/สอนเสร็จแล้ว', style: TextStyle(color: Colors.grey)),
               ]),
-              const SizedBox(height: 16),
+            );
+          }
 
-              if (expired.isNotEmpty) ...[
-                _SectionHeader(title: 'หมดคาบแล้ว (${expired.length})', color: Colors.red),
-                const SizedBox(height: 8),
-                ...expired.map((p) => Padding(
-                  padding: const EdgeInsets.only(bottom: 10),
-                  child: PackageCard(pkg: p, onEdit: () {}, viewerRole: 'admin'),
-                )),
-                const SizedBox(height: 8),
-              ],
-
-              if (low.isNotEmpty) ...[
-                _SectionHeader(title: 'ใกล้หมดคาบ (${low.length})', color: Colors.orange),
-                const SizedBox(height: 8),
-                ...low.map((p) => Padding(
-                  padding: const EdgeInsets.only(bottom: 10),
-                  child: PackageCard(pkg: p, onEdit: () {}, viewerRole: 'admin'),
-                )),
-              ],
-
-              if (expired.isEmpty && low.isEmpty)
-                const Center(
-                  child: Padding(
-                    padding: EdgeInsets.all(40),
-                    child: Column(mainAxisSize: MainAxisSize.min, children: [
-                      Icon(Icons.check_circle_outline, size: 64, color: Colors.green),
-                      SizedBox(height: 8),
-                      Text('ทุกคาบเรียนอยู่ในเกณฑ์ดี', style: TextStyle(color: Colors.grey)),
-                    ]),
-                  ),
+          return Column(children: [
+            // Header bar
+            Container(
+              padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 10),
+              color: Colors.green.shade50,
+              child: Row(children: [
+                Icon(Icons.check_circle, size: 18, color: Colors.green.shade700),
+                const SizedBox(width: 8),
+                Text('เรียน/สอนเสร็จแล้ว ${sessions.length} รายการ',
+                    style: TextStyle(fontWeight: FontWeight.w600, color: Colors.green.shade700)),
+                const Spacer(),
+                TextButton.icon(
+                  onPressed: () => _confirmDeleteAll(context, sessions.length),
+                  icon: const Icon(Icons.delete_sweep, size: 18),
+                  label: const Text('ลบทั้งหมด', style: TextStyle(fontSize: 13)),
+                  style: TextButton.styleFrom(foregroundColor: Colors.red),
                 ),
-            ],
-          );
+              ]),
+            ),
+
+            // List
+            Expanded(
+              child: ListView.separated(
+                padding: const EdgeInsets.fromLTRB(12, 8, 12, 24),
+                itemCount: sessions.length,
+                separatorBuilder: (_, __) => const SizedBox(height: 6),
+                itemBuilder: (_, i) {
+                  final s = sessions[i];
+                  return Card(
+                    margin: EdgeInsets.zero,
+                    shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(12)),
+                    elevation: 1,
+                    child: Padding(
+                      padding: const EdgeInsets.symmetric(horizontal: 14, vertical: 10),
+                      child: Row(children: [
+                        // Number
+                        Container(
+                          width: 28, height: 28,
+                          decoration: BoxDecoration(color: Colors.green.shade50, shape: BoxShape.circle),
+                          child: Center(child: Text('${i + 1}',
+                              style: TextStyle(fontSize: 11, fontWeight: FontWeight.bold, color: Colors.green.shade700))),
+                        ),
+                        const SizedBox(width: 10),
+
+                        // Info
+                        Expanded(child: Column(crossAxisAlignment: CrossAxisAlignment.start, children: [
+                          Row(children: [
+                            const Icon(Icons.school_outlined, size: 14, color: Color(0xFF1565C0)),
+                            const SizedBox(width: 4),
+                            Text(s.studentName, style: const TextStyle(fontWeight: FontWeight.w600, fontSize: 14)),
+                          ]),
+                          const SizedBox(height: 2),
+                          Row(children: [
+                            const Icon(Icons.person_outlined, size: 14, color: Color(0xFF2E7D32)),
+                            const SizedBox(width: 4),
+                            Text(s.teacherName, style: const TextStyle(fontSize: 12, color: Colors.black87)),
+                          ]),
+                          const SizedBox(height: 4),
+                          Row(children: [
+                            Container(
+                              padding: const EdgeInsets.symmetric(horizontal: 6, vertical: 1),
+                              decoration: BoxDecoration(color: const Color(0xFF1565C0), borderRadius: BorderRadius.circular(4)),
+                              child: Text(_thaiDay(s.date), style: const TextStyle(fontSize: 10, color: Colors.white, fontWeight: FontWeight.bold)),
+                            ),
+                            const SizedBox(width: 6),
+                            Text(_shortDate(s.date), style: const TextStyle(fontSize: 12, color: Colors.grey)),
+                            const SizedBox(width: 8),
+                            const Icon(Icons.access_time, size: 12, color: Colors.grey),
+                            const SizedBox(width: 2),
+                            Text(s.timeRange, style: const TextStyle(fontSize: 12, color: Colors.grey)),
+                            if (s.language != null) ...[
+                              const SizedBox(width: 8),
+                              Text(s.language!, style: const TextStyle(fontSize: 11, color: Color(0xFF1565C0))),
+                            ],
+                          ]),
+                        ])),
+
+                        // Delete button
+                        IconButton(
+                          icon: const Icon(Icons.delete_outline, color: Colors.red, size: 22),
+                          onPressed: () => _confirmDeleteOne(context, s),
+                          tooltip: 'ลบรายการนี้',
+                        ),
+                      ]),
+                    ),
+                  );
+                },
+              ),
+            ),
+          ]);
         },
       ),
     );
   }
-}
-
-class _SummaryCard extends StatelessWidget {
-  final String label;
-  final String value;
-  final Color color;
-  const _SummaryCard({required this.label, required this.value, required this.color});
-
-  @override
-  Widget build(BuildContext context) => Expanded(
-    child: Container(
-      padding: const EdgeInsets.symmetric(vertical: 14),
-      decoration: BoxDecoration(
-        color: color.withAlpha(20),
-        borderRadius: BorderRadius.circular(12),
-        border: Border.all(color: color.withAlpha(60)),
-      ),
-      child: Column(children: [
-        Text(value, style: TextStyle(fontSize: 26, fontWeight: FontWeight.bold, color: color)),
-        Text(label, style: const TextStyle(fontSize: 11, color: Colors.grey)),
-      ]),
-    ),
-  );
-}
-
-class _SectionHeader extends StatelessWidget {
-  final String title;
-  final Color color;
-  const _SectionHeader({required this.title, required this.color});
-
-  @override
-  Widget build(BuildContext context) => Container(
-    padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 6),
-    decoration: BoxDecoration(color: color.withAlpha(20), borderRadius: BorderRadius.circular(8)),
-    child: Text(title, style: TextStyle(fontWeight: FontWeight.bold, color: color)),
-  );
 }

@@ -49,6 +49,29 @@ class FirestoreService {
     });
   }
 
+  static Stream<List<SessionModel>> watchCompletedSessions() {
+    return _db.collection('sessions')
+        .where('status', isEqualTo: 'completed')
+        .snapshots()
+        .map((s) {
+      final list = s.docs.map(SessionModel.fromDoc).toList();
+      list.sort((a, b) {
+        final d = b.date.compareTo(a.date);
+        return d != 0 ? d : b.startTime.compareTo(a.startTime);
+      });
+      return list;
+    });
+  }
+
+  static Future<void> deleteAllCompletedSessions() async {
+    final snap = await _db.collection('sessions').where('status', isEqualTo: 'completed').get();
+    final batch = _db.batch();
+    for (final doc in snap.docs) {
+      batch.delete(doc.reference);
+    }
+    await batch.commit();
+  }
+
   static Future<void> addSession(Map<String, dynamic> data) async {
     await _db.collection('sessions').add({
       ...data, 'createdAt': FieldValue.serverTimestamp(),
