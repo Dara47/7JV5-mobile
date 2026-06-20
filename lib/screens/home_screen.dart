@@ -6,6 +6,7 @@ import 'packages_screen.dart';
 import 'teacher_schedule_screen.dart';
 import 'reports_screen.dart';
 import 'cut_session_screen.dart';
+import 'leave_request_screen.dart';
 
 class HomeScreen extends StatefulWidget {
   final AppUser appUser;
@@ -25,6 +26,7 @@ class _HomeScreenState extends State<HomeScreen> {
         const PackagesScreen(),
         const CutSessionScreen(),
         const TeacherScheduleScreen(),
+        LeaveRequestScreen(appUser: u),
         const ReportsScreen(),
       ];
     }
@@ -32,11 +34,13 @@ class _HomeScreenState extends State<HomeScreen> {
       return [
         PackagesScreen(filterTeacherId: u.uid, filterTeacherName: u.name),
         TeacherScheduleScreen(filterTeacherId: u.uid),
+        LeaveRequestScreen(appUser: u),
       ];
     }
     // student
     return [
       PackagesScreen(filterStudentId: u.uid, filterStudentName: u.name),
+      LeaveRequestScreen(appUser: u),
     ];
   }
 
@@ -48,6 +52,7 @@ class _HomeScreenState extends State<HomeScreen> {
         NavigationDestination(icon: Icon(Icons.inventory_2_outlined), selectedIcon: Icon(Icons.inventory_2), label: 'คาบเรียน'),
         NavigationDestination(icon: Icon(Icons.content_cut_outlined), selectedIcon: Icon(Icons.content_cut), label: 'ตัดคาบ'),
         NavigationDestination(icon: Icon(Icons.person_pin_outlined), selectedIcon: Icon(Icons.person_pin), label: 'เวลาครู'),
+        NavigationDestination(icon: Icon(Icons.event_busy_outlined), selectedIcon: Icon(Icons.event_busy), label: 'ใบลา'),
         NavigationDestination(icon: Icon(Icons.bar_chart_outlined), selectedIcon: Icon(Icons.bar_chart), label: 'รายงาน'),
       ];
     }
@@ -55,10 +60,12 @@ class _HomeScreenState extends State<HomeScreen> {
       return const [
         NavigationDestination(icon: Icon(Icons.inventory_2_outlined), selectedIcon: Icon(Icons.inventory_2), label: 'คาบเรียน'),
         NavigationDestination(icon: Icon(Icons.person_pin_outlined), selectedIcon: Icon(Icons.person_pin), label: 'ตารางสอน'),
+        NavigationDestination(icon: Icon(Icons.event_busy_outlined), selectedIcon: Icon(Icons.event_busy), label: 'ใบลา'),
       ];
     }
     return const [
       NavigationDestination(icon: Icon(Icons.inventory_2_outlined), selectedIcon: Icon(Icons.inventory_2), label: 'คาบเรียน'),
+      NavigationDestination(icon: Icon(Icons.event_busy_outlined), selectedIcon: Icon(Icons.event_busy), label: 'ใบลา'),
     ];
   }
 

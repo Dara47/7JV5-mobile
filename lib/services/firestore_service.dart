@@ -231,6 +231,46 @@ class FirestoreService {
     await batch.commit();
   }
 
+  // ── Leave Requests ───────────────────────────────────────────────────────
+
+  static Stream<List<LeaveRequestModel>> watchLeaveRequests() {
+    return _db.collection('leaveRequests').snapshots().map((s) {
+      final list = s.docs.map(LeaveRequestModel.fromDoc).toList();
+      list.sort((a, b) {
+        if (a.isPending != b.isPending) return a.isPending ? -1 : 1;
+        return b.date.compareTo(a.date);
+      });
+      return list;
+    });
+  }
+
+  static Stream<List<LeaveRequestModel>> watchMyLeaveRequests(String userId) {
+    return _db.collection('leaveRequests')
+        .where('userId', isEqualTo: userId)
+        .snapshots()
+        .map((s) {
+      final list = s.docs.map(LeaveRequestModel.fromDoc).toList();
+      list.sort((a, b) => b.date.compareTo(a.date));
+      return list;
+    });
+  }
+
+  static Future<void> addLeaveRequest(Map<String, dynamic> data) async {
+    await _db.collection('leaveRequests').add({...data, 'createdAt': FieldValue.serverTimestamp()});
+  }
+
+  static Future<void> updateLeaveStatus(String id, String status, {String? adminNote}) async {
+    await _db.collection('leaveRequests').doc(id).update({
+      'status': status,
+      if (adminNote != null && adminNote.isNotEmpty) 'adminNote': adminNote,
+      'updatedAt': FieldValue.serverTimestamp(),
+    });
+  }
+
+  static Future<void> deleteLeaveRequest(String id) async {
+    await _db.collection('leaveRequests').doc(id).delete();
+  }
+
   // ── Teacher slots ─────────────────────────────────────────────────────────
 
   static Stream<TeacherSlotModel?> watchTeacherSlot(String teacherId) {

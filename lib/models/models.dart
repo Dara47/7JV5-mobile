@@ -221,6 +221,68 @@ class SessionModel {
   };
 }
 
+class LeaveRequestModel {
+  final String id;
+  final String userId;
+  final String userName;
+  final String userCode;
+  final String userRole;
+  final String date;
+  final String reason;
+  final String status; // 'pending', 'approved', 'rejected'
+  final String? adminNote;
+
+  LeaveRequestModel({
+    required this.id, required this.userId, required this.userName,
+    required this.userCode, required this.userRole, required this.date,
+    required this.reason, required this.status, this.adminNote,
+  });
+
+  bool get isPending => status == 'pending';
+  bool get isApproved => status == 'approved';
+  bool get isRejected => status == 'rejected';
+
+  String get statusLabel {
+    switch (status) {
+      case 'pending': return 'รอพิจารณา';
+      case 'approved': return 'อนุมัติ';
+      case 'rejected': return 'ปฏิเสธ';
+      default: return status;
+    }
+  }
+
+  Color get statusColor {
+    switch (status) {
+      case 'pending': return const Color(0xFFF57C00);
+      case 'approved': return const Color(0xFF2E7D32);
+      case 'rejected': return const Color(0xFFC62828);
+      default: return Colors.grey;
+    }
+  }
+
+  String get roleLabel => userRole == 'teacher' ? 'ครู' : 'นักเรียน';
+
+  String get shortDate {
+    if (date.length < 10) return date;
+    return '${date.substring(8)}/${date.substring(5, 7)}/${date.substring(0, 4)}';
+  }
+
+  factory LeaveRequestModel.fromDoc(DocumentSnapshot doc) {
+    final d = doc.data() as Map<String, dynamic>;
+    return LeaveRequestModel(
+      id: doc.id,
+      userId: d['userId'] ?? '',
+      userName: d['userName'] ?? '',
+      userCode: d['userCode'] ?? '',
+      userRole: d['userRole'] ?? '',
+      date: d['date'] ?? '',
+      reason: d['reason'] ?? '',
+      status: d['status'] ?? 'pending',
+      adminNote: d['adminNote'],
+    );
+  }
+}
+
 class TeacherSlotModel {
   final String teacherId;
   final String teacherName;
