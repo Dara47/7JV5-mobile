@@ -212,34 +212,42 @@ class _PackageFormSheetState extends State<_PackageFormSheet> {
                         const SizedBox(height: 8),
                         if (_loadingSlot)
                           const Center(child: SizedBox(height: 24, width: 24, child: CircularProgressIndicator(strokeWidth: 2)))
-                        else if (_teacherSlot != null && _teacherSlot!.scheduledDay != null)
-                          GestureDetector(
-                            onTap: () => setState(() {
-                              _scheduledDay = _teacherSlot!.scheduledDay;
-                              if (_teacherSlot!.scheduledTime != null) _startTime = _parseTime(_teacherSlot!.scheduledTime!);
-                              if (_teacherSlot!.scheduledEndTime != null) _endTime = _parseTime(_teacherSlot!.scheduledEndTime!);
-                            }),
-                            child: Container(
-                              padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 10),
-                              decoration: BoxDecoration(
-                                color: const Color(0xFFE8F5E9),
-                                borderRadius: BorderRadius.circular(10),
-                                border: Border.all(color: Colors.green.shade300),
-                              ),
-                              child: Row(children: [
-                                const Icon(Icons.schedule, size: 16, color: Color(0xFF2E7D32)),
-                                const SizedBox(width: 8),
-                                Expanded(child: Column(crossAxisAlignment: CrossAxisAlignment.start, children: [
-                                  const Text('เวลาว่างของครู', style: TextStyle(fontSize: 11, color: Colors.grey)),
-                                  Text(_teacherSlot!.scheduleLabel, style: const TextStyle(fontSize: 14, fontWeight: FontWeight.w600, color: Color(0xFF2E7D32))),
-                                ])),
-                                Container(
-                                  padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 4),
-                                  decoration: BoxDecoration(color: const Color(0xFF2E7D32), borderRadius: BorderRadius.circular(20)),
-                                  child: const Text('กดเพื่อใช้', style: TextStyle(fontSize: 11, color: Colors.white)),
-                                ),
-                              ]),
+                        else if (_teacherSlot != null && _teacherSlot!.slots.isNotEmpty)
+                          Container(
+                            padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 10),
+                            decoration: BoxDecoration(
+                              color: const Color(0xFFE8F5E9),
+                              borderRadius: BorderRadius.circular(10),
+                              border: Border.all(color: Colors.green.shade300),
                             ),
+                            child: Column(crossAxisAlignment: CrossAxisAlignment.start, children: [
+                              const Row(children: [
+                                Icon(Icons.schedule, size: 14, color: Color(0xFF2E7D32)),
+                                SizedBox(width: 6),
+                                Text('เวลาว่างของครู — กดเลือกช่วงเวลา',
+                                    style: TextStyle(fontSize: 11, color: Color(0xFF2E7D32), fontWeight: FontWeight.w600)),
+                              ]),
+                              const SizedBox(height: 8),
+                              Wrap(
+                                spacing: 6, runSpacing: 6,
+                                children: _teacherSlot!.slots.map((s) => GestureDetector(
+                                  onTap: () => setState(() {
+                                    _scheduledDay = s.day;
+                                    _startTime = _parseTime(s.startTime);
+                                    _endTime = _parseTime(s.endTime);
+                                  }),
+                                  child: Container(
+                                    padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 6),
+                                    decoration: BoxDecoration(
+                                      color: const Color(0xFF2E7D32),
+                                      borderRadius: BorderRadius.circular(8),
+                                    ),
+                                    child: Text('${s.day}  ${s.startTime}–${s.endTime}',
+                                        style: const TextStyle(fontSize: 12, color: Colors.white, fontWeight: FontWeight.w600)),
+                                  ),
+                                )).toList(),
+                              ),
+                            ]),
                           )
                         else
                           Container(
