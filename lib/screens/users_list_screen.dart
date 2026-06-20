@@ -4,6 +4,51 @@ import '../services/firestore_service.dart';
 import 'user_form_screen.dart';
 import 'user_detail_screen.dart';
 
+class _StudentStatusBadge extends StatelessWidget {
+  final String userId;
+  final bool isActive;
+  const _StudentStatusBadge({required this.userId, required this.isActive});
+
+  @override
+  Widget build(BuildContext context) {
+    if (!isActive) {
+      return Container(
+        padding: const EdgeInsets.symmetric(horizontal: 7, vertical: 2),
+        decoration: BoxDecoration(color: Colors.grey.shade100, borderRadius: BorderRadius.circular(10)),
+        child: Text('หยุด', style: TextStyle(fontSize: 11, color: Colors.grey.shade600)),
+      );
+    }
+    return StreamBuilder<List<PackageModel>>(
+      stream: FirestoreService.watchPackagesForUser(userId, 'student'),
+      builder: (context, snap) {
+        final pkgs = snap.data ?? [];
+        final hasExpired = pkgs.isNotEmpty && pkgs.any((p) => p.remainingSessions == 0);
+        final isLow = !hasExpired && pkgs.any((p) => p.isLowBalance);
+
+        if (hasExpired) {
+          return Container(
+            padding: const EdgeInsets.symmetric(horizontal: 7, vertical: 2),
+            decoration: BoxDecoration(color: Colors.red.shade50, borderRadius: BorderRadius.circular(10)),
+            child: Text('หมดคาบ', style: TextStyle(fontSize: 11, color: Colors.red.shade700, fontWeight: FontWeight.bold)),
+          );
+        }
+        if (isLow) {
+          return Container(
+            padding: const EdgeInsets.symmetric(horizontal: 7, vertical: 2),
+            decoration: BoxDecoration(color: Colors.orange.shade50, borderRadius: BorderRadius.circular(10)),
+            child: Text('ใกล้หมด', style: TextStyle(fontSize: 11, color: Colors.orange.shade700, fontWeight: FontWeight.bold)),
+          );
+        }
+        return Container(
+          padding: const EdgeInsets.symmetric(horizontal: 7, vertical: 2),
+          decoration: BoxDecoration(color: Colors.green.shade50, borderRadius: BorderRadius.circular(10)),
+          child: Text('ใช้งาน', style: TextStyle(fontSize: 11, color: Colors.green.shade700)),
+        );
+      },
+    );
+  }
+}
+
 class UsersListScreen extends StatefulWidget {
   const UsersListScreen({super.key});
   @override
@@ -175,15 +220,17 @@ class _UserList extends StatelessWidget {
                   ],
                 ]),
                 trailing: Row(mainAxisSize: MainAxisSize.min, children: [
-                  Container(
-                    padding: const EdgeInsets.symmetric(horizontal: 7, vertical: 2),
-                    decoration: BoxDecoration(
-                      color: u.isActive ? Colors.green.shade50 : Colors.grey.shade100,
-                      borderRadius: BorderRadius.circular(10),
-                    ),
-                    child: Text(u.isActive ? 'ใช้งาน' : 'หยุด',
-                        style: TextStyle(fontSize: 11, color: u.isActive ? Colors.green.shade700 : Colors.grey)),
-                  ),
+                  role == 'student'
+                    ? _StudentStatusBadge(userId: u.id, isActive: u.isActive)
+                    : Container(
+                        padding: const EdgeInsets.symmetric(horizontal: 7, vertical: 2),
+                        decoration: BoxDecoration(
+                          color: u.isActive ? Colors.green.shade50 : Colors.grey.shade100,
+                          borderRadius: BorderRadius.circular(10),
+                        ),
+                        child: Text(u.isActive ? 'ใช้งาน' : 'หยุด',
+                            style: TextStyle(fontSize: 11, color: u.isActive ? Colors.green.shade700 : Colors.grey)),
+                      ),
                   PopupMenuButton<String>(
                     icon: const Icon(Icons.more_vert, size: 20, color: Colors.grey),
                     onSelected: (v) {
