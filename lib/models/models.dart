@@ -53,6 +53,7 @@ class PackageModel {
   final String? scheduledTime;     // '16:00'
   final String? scheduledEndTime;  // '17:00'
   final String? notes;
+  final String? lastCutDate;       // 'YYYY-MM-DD' of last cut
 
   PackageModel({
     required this.id, required this.studentId, required this.teacherId,
@@ -60,6 +61,7 @@ class PackageModel {
     required this.teacherCode, required this.totalSessions,
     required this.remainingSessions, required this.status,
     this.scheduledDay, this.scheduledTime, this.scheduledEndTime, this.notes,
+    this.lastCutDate,
   });
 
   int get usedSessions => totalSessions - remainingSessions;
@@ -116,6 +118,7 @@ class PackageModel {
       status: d['status'] ?? 'active',
       scheduledDay: d['scheduledDay'], scheduledTime: d['scheduledTime'],
       scheduledEndTime: d['scheduledEndTime'], notes: d['notes'],
+      lastCutDate: d['lastCutDate'],
     );
   }
 

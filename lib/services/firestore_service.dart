@@ -53,6 +53,7 @@ class FirestoreService {
     final now = DateTime.now();
     const thaiDays = {1: 'จ', 2: 'อ', 3: 'พ', 4: 'พฤ', 5: 'ศ', 6: 'ส', 7: 'อา'};
     final todayDay = thaiDays[now.weekday]!;
+    final todayStr = now.toIso8601String().substring(0, 10);
     final nowMinutes = now.hour * 60 + now.minute;
 
     return _db.collection('packages')
@@ -60,8 +61,10 @@ class FirestoreService {
         .snapshots()
         .map((s) {
       return s.docs.map(PackageModel.fromDoc).where((pkg) {
-        if (pkg.remainingSessions <= 0) return false;
         if (pkg.scheduledEndTime == null) return false;
+        // show if already cut today OR still has sessions to cut
+        final cutToday = pkg.lastCutDate == todayStr;
+        if (!cutToday && pkg.remainingSessions <= 0) return false;
         try {
           final ep = pkg.scheduledEndTime!.split(':');
           final endM = int.parse(ep[0]) * 60 + int.parse(ep[1]);
@@ -90,6 +93,7 @@ class FirestoreService {
     });
     await _db.collection('packages').doc(pkg.id).update({
       'remainingSessions': FieldValue.increment(-1),
+      'lastCutDate': today,
       'updatedAt': FieldValue.serverTimestamp(),
     });
   }

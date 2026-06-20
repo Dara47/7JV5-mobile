@@ -56,6 +56,8 @@ class CutSessionScreen extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
+    final todayStr = DateTime.now().toIso8601String().substring(0, 10);
+
     return Scaffold(
       appBar: AppBar(
         title: const Text('ตัดคาบเรียน'),
@@ -182,21 +184,32 @@ class CutSessionScreen extends StatelessWidget {
                                 ]),
                               ),
 
-                              // Cut button
+                              // Cut button or done badge
                               const SizedBox(width: 8),
-                              InkWell(
-                                onTap: () => _confirmCut(context, pkg),
-                                borderRadius: BorderRadius.circular(8),
-                                child: Container(
-                                  padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 8),
-                                  decoration: BoxDecoration(
-                                    color: const Color(0xFF6A1B9A),
-                                    borderRadius: BorderRadius.circular(8),
-                                  ),
-                                  child: const Text('✂ ตัดคาบ',
-                                      style: TextStyle(fontSize: 12, color: Colors.white, fontWeight: FontWeight.w600)),
-                                ),
-                              ),
+                              pkg.lastCutDate == todayStr
+                                  ? Container(
+                                      padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 8),
+                                      decoration: BoxDecoration(
+                                        color: Colors.green.shade50,
+                                        borderRadius: BorderRadius.circular(8),
+                                        border: Border.all(color: Colors.green.shade300),
+                                      ),
+                                      child: Text('✓ ตัดคาบแล้ว',
+                                          style: TextStyle(fontSize: 12, color: Colors.green.shade700, fontWeight: FontWeight.w600)),
+                                    )
+                                  : InkWell(
+                                      onTap: () => _confirmCut(context, pkg),
+                                      borderRadius: BorderRadius.circular(8),
+                                      child: Container(
+                                        padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 8),
+                                        decoration: BoxDecoration(
+                                          color: const Color(0xFF6A1B9A),
+                                          borderRadius: BorderRadius.circular(8),
+                                        ),
+                                        child: const Text('✂ ตัดคาบ',
+                                            style: TextStyle(fontSize: 12, color: Colors.white, fontWeight: FontWeight.w600)),
+                                      ),
+                                    ),
                             ]),
                           ),
                         );
