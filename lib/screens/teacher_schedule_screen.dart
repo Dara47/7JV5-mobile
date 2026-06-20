@@ -219,6 +219,14 @@ class _TeacherCard extends StatelessWidget {
                         ]),
                       ),
                     ),
+                    if (slot?.notes != null && slot!.notes!.isNotEmpty) ...[
+                      const SizedBox(height: 6),
+                      Row(crossAxisAlignment: CrossAxisAlignment.start, children: [
+                        const Icon(Icons.notes, size: 14, color: Colors.grey),
+                        const SizedBox(width: 6),
+                        Expanded(child: Text(slot.notes!, style: const TextStyle(fontSize: 12, color: Colors.black54))),
+                      ]),
+                    ],
                     const SizedBox(height: 10),
 
                     // Students
