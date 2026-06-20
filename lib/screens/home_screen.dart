@@ -79,13 +79,17 @@ class _HomeScreenState extends State<HomeScreen> {
 
     return Scaffold(
       body: IndexedStack(index: _selectedIndex, children: screens),
-      bottomNavigationBar: destinations.length > 1
-          ? NavigationBar(
+      bottomNavigationBar: Column(
+        mainAxisSize: MainAxisSize.min,
+        children: [
+          if (destinations.length > 1)
+            NavigationBar(
               selectedIndex: _selectedIndex,
               onDestinationSelected: (i) => setState(() => _selectedIndex = i),
               destinations: destinations,
             )
-          : _SingleTabBar(
+          else
+            _SingleTabBar(
               label: destinations.first.label,
               onLogout: () async {
                 final ok = await showDialog<bool>(context: context, builder: (_) => AlertDialog(
@@ -99,6 +103,15 @@ class _HomeScreenState extends State<HomeScreen> {
                 if (ok == true) FirebaseAuth.instance.signOut();
               },
             ),
+          Container(
+            color: Colors.white,
+            padding: const EdgeInsets.only(bottom: 4, top: 2),
+            child: const Text('Version 5.1.0',
+                textAlign: TextAlign.center,
+                style: TextStyle(fontSize: 10, color: Colors.grey)),
+          ),
+        ],
+      ),
     );
   }
 }
