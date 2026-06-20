@@ -1,6 +1,17 @@
 import 'package:flutter/material.dart';
 import 'package:cloud_firestore/cloud_firestore.dart';
 
+class AppUser {
+  final String uid;
+  final String role;
+  final String name;
+  final String code;
+  AppUser({required this.uid, required this.role, required this.name, required this.code});
+  bool get isAdmin => role == 'admin';
+  bool get isTeacher => role == 'teacher';
+  bool get isStudent => role == 'student';
+}
+
 class UserModel {
   final String id;
   final String code;

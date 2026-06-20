@@ -11,6 +11,13 @@ class FirestoreService {
       ..sort((a, b) => a.code.compareTo(b.code)));
   }
 
+  static Future<AppUser> getAppUser(String uid) async {
+    final doc = await _db.collection('users').doc(uid).get();
+    if (!doc.exists) return AppUser(uid: uid, role: 'admin', name: 'Admin', code: 'A000');
+    final d = doc.data()!;
+    return AppUser(uid: uid, role: d['role'] ?? 'admin', name: d['name'] ?? '', code: d['code'] ?? '');
+  }
+
   static Future<UserModel?> getUser(String id) async {
     final doc = await _db.collection('users').doc(id).get();
     if (!doc.exists) return null;

@@ -2,7 +2,6 @@ import 'package:flutter/material.dart';
 import '../models/models.dart';
 import '../services/firestore_service.dart';
 import 'user_form_screen.dart';
-import 'user_detail_screen.dart';
 import 'packages_screen.dart';
 
 class _StudentStatusBadge extends StatelessWidget {

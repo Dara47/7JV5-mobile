@@ -4,7 +4,8 @@ import '../services/firestore_service.dart';
 import 'teacher_slot_form_dialog.dart';
 
 class TeacherScheduleScreen extends StatefulWidget {
-  const TeacherScheduleScreen({super.key});
+  final String? filterTeacherId;
+  const TeacherScheduleScreen({super.key, this.filterTeacherId});
   @override
   State<TeacherScheduleScreen> createState() => _TeacherScheduleScreenState();
 }
@@ -24,6 +25,30 @@ class _TeacherScheduleScreenState extends State<TeacherScheduleScreen> {
 
   @override
   Widget build(BuildContext context) {
+    // Teacher view: show only their own card
+    if (widget.filterTeacherId != null) {
+      return Scaffold(
+        appBar: AppBar(
+          title: const Text('ตารางสอนของฉัน'),
+          backgroundColor: const Color(0xFF2E7D32),
+          foregroundColor: Colors.white,
+        ),
+        body: StreamBuilder<UserModel?>(
+          stream: Stream.fromFuture(FirestoreService.getUser(widget.filterTeacherId!)),
+          builder: (context, snap) {
+            if (!snap.hasData) return const Center(child: CircularProgressIndicator());
+            final teacher = snap.data;
+            if (teacher == null) return const Center(child: Text('ไม่พบข้อมูลครู'));
+            return ListView(
+              padding: const EdgeInsets.all(12),
+              children: [_TeacherCard(teacher: teacher)],
+            );
+          },
+        ),
+      );
+    }
+
+    // Admin view: show all teachers
     return Scaffold(
       appBar: AppBar(
         title: const Text('เวลาว่างครู'),

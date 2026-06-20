@@ -2,6 +2,8 @@ import 'package:flutter/material.dart';
 import 'package:firebase_core/firebase_core.dart';
 import 'package:firebase_auth/firebase_auth.dart';
 import 'firebase_options.dart';
+import 'models/models.dart';
+import 'services/firestore_service.dart';
 import 'screens/login_screen.dart';
 import 'screens/home_screen.dart';
 
@@ -30,7 +32,17 @@ class JV5App extends StatelessWidget {
           if (snap.connectionState == ConnectionState.waiting) {
             return const Scaffold(body: Center(child: CircularProgressIndicator()));
           }
-          if (snap.hasData) return const HomeScreen();
+          if (snap.hasData) {
+            return FutureBuilder<AppUser>(
+              future: FirestoreService.getAppUser(snap.data!.uid),
+              builder: (context, userSnap) {
+                if (!userSnap.hasData) {
+                  return const Scaffold(body: Center(child: CircularProgressIndicator()));
+                }
+                return HomeScreen(appUser: userSnap.data!);
+              },
+            );
+          }
           return const LoginScreen();
         },
       ),
