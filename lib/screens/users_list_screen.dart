@@ -239,7 +239,7 @@ class _UserList extends StatelessWidget {
                       if (v == 'detail') Navigator.push(context, MaterialPageRoute(
                           builder: (_) => role == 'student'
                               ? PackagesScreen(filterStudentId: u.id, filterStudentName: u.name)
-                              : UserDetailScreen(userId: u.id, userName: u.name, userCode: u.code, role: u.role)));
+                              : PackagesScreen(filterTeacherId: u.id, filterTeacherName: u.name)));
                       if (v == 'delete') _confirmDelete(context, u);
                     },
                     itemBuilder: (_) => [
@@ -252,7 +252,7 @@ class _UserList extends StatelessWidget {
                 onTap: () => Navigator.push(context, MaterialPageRoute(
                     builder: (_) => role == 'student'
                         ? PackagesScreen(filterStudentId: u.id, filterStudentName: u.name)
-                        : UserDetailScreen(userId: u.id, userName: u.name, userCode: u.code, role: u.role))),
+                        : PackagesScreen(filterTeacherId: u.id, filterTeacherName: u.name))),
               ),
             );
           },

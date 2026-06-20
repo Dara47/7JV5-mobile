@@ -6,7 +6,9 @@ import 'package_form_dialog.dart';
 class PackagesScreen extends StatefulWidget {
   final String? filterStudentId;
   final String? filterStudentName;
-  const PackagesScreen({super.key, this.filterStudentId, this.filterStudentName});
+  final String? filterTeacherId;
+  final String? filterTeacherName;
+  const PackagesScreen({super.key, this.filterStudentId, this.filterStudentName, this.filterTeacherId, this.filterTeacherName});
   @override
   State<PackagesScreen> createState() => _PackagesScreenState();
 }
@@ -30,11 +32,19 @@ class _PackagesScreenState extends State<PackagesScreen> {
 
   @override
   Widget build(BuildContext context) {
-    final isFiltered = widget.filterStudentId != null;
+    final isStudentFilter = widget.filterStudentId != null;
+    final isTeacherFilter = widget.filterTeacherId != null;
+    final isFiltered = isStudentFilter || isTeacherFilter;
+    final viewerRole = isTeacherFilter ? 'teacher' : 'student';
+    final filterTitle = isStudentFilter
+        ? (widget.filterStudentName ?? 'คาบเรียน')
+        : isTeacherFilter
+            ? (widget.filterTeacherName ?? 'ตารางสอน')
+            : 'จัดการคาบเรียน';
 
     return Scaffold(
       appBar: AppBar(
-        title: Text(isFiltered ? widget.filterStudentName ?? 'คาบเรียน' : 'จัดการคาบเรียน'),
+        title: Text(filterTitle),
         backgroundColor: const Color(0xFF1565C0),
         foregroundColor: Colors.white,
       ),
@@ -66,9 +76,11 @@ class _PackagesScreenState extends State<PackagesScreen> {
         ),
         Expanded(
           child: StreamBuilder<List<PackageModel>>(
-            stream: isFiltered
+            stream: isStudentFilter
                 ? FirestoreService.watchPackagesForUser(widget.filterStudentId!, 'student')
-                : FirestoreService.watchAllPackages(),
+                : isTeacherFilter
+                    ? FirestoreService.watchPackagesForUser(widget.filterTeacherId!, 'teacher')
+                    : FirestoreService.watchAllPackages(),
             builder: (context, snap) {
               if (snap.connectionState == ConnectionState.waiting) {
                 return const Center(child: CircularProgressIndicator());
@@ -93,7 +105,7 @@ class _PackagesScreenState extends State<PackagesScreen> {
                 padding: const EdgeInsets.fromLTRB(12, 8, 12, 80),
                 itemCount: list.length,
                 separatorBuilder: (_, __) => const SizedBox(height: 10),
-                itemBuilder: (_, i) => PackageCard(pkg: list[i], onEdit: () => _openForm(pkg: list[i])),
+                itemBuilder: (_, i) => PackageCard(pkg: list[i], onEdit: () => _openForm(pkg: list[i]), viewerRole: viewerRole),
               );
             },
           ),
@@ -108,7 +120,19 @@ class _PackagesScreenState extends State<PackagesScreen> {
 class PackageCard extends StatelessWidget {
   final PackageModel pkg;
   final VoidCallback onEdit;
-  const PackageCard({super.key, required this.pkg, required this.onEdit});
+  final String viewerRole;
+  const PackageCard({super.key, required this.pkg, required this.onEdit, this.viewerRole = 'admin'});
+
+  String get _statusLabel {
+    if (viewerRole == 'teacher') {
+      if (pkg.isExpired) return 'สอนเสร็จแล้ว';
+      if (pkg.isLowBalance) return 'ใกล้เสร็จ';
+      if (pkg.isCurrentlyInSession) return 'กำลังสอน';
+      return 'รอสอน';
+    }
+    if (pkg.isCurrentlyInSession) return 'กำลังเรียน';
+    return pkg.statusLabel;
+  }
 
   void _confirmDelete(BuildContext context) {
     showDialog(context: context, builder: (_) => AlertDialog(
@@ -243,10 +267,6 @@ class PackageCard extends StatelessWidget {
   Widget build(BuildContext context) {
     final pct = pkg.totalSessions > 0 ? (pkg.remainingSessions / pkg.totalSessions).clamp(0.0, 1.0) : 0.0;
 
-    // Auto status considering live session
-    String liveStatus = '';
-    if (pkg.isCurrentlyInSession) liveStatus = '🟠 กำลังเรียน';
-
     return Card(
       elevation: 2,
       shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(14)),
@@ -264,7 +284,7 @@ class PackageCard extends StatelessWidget {
               padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 3),
               decoration: BoxDecoration(color: pkg.statusColor, borderRadius: BorderRadius.circular(20)),
               child: Text(
-                liveStatus.isNotEmpty ? liveStatus : pkg.statusLabel,
+                _statusLabel,
                 style: const TextStyle(color: Colors.white, fontSize: 12, fontWeight: FontWeight.bold),
               ),
             ),
@@ -282,17 +302,25 @@ class PackageCard extends StatelessWidget {
           crossAxisAlignment: CrossAxisAlignment.start,
           children: [
             // Student + Teacher
+            // Primary person (student when teacher views, teacher when student/admin views)
             Row(children: [
-              const Icon(Icons.school_outlined, size: 16, color: Color(0xFF1565C0)),
+              Icon(viewerRole == 'teacher' ? Icons.school_outlined : Icons.school_outlined,
+                  size: 16, color: const Color(0xFF1565C0)),
               const SizedBox(width: 6),
-              Expanded(child: Text('${pkg.studentName}  ', style: const TextStyle(fontWeight: FontWeight.bold, fontSize: 15))),
-              Text(pkg.studentCode, style: const TextStyle(color: Color(0xFF1565C0), fontWeight: FontWeight.w600, fontSize: 13)),
+              Expanded(child: Text(
+                viewerRole == 'teacher' ? pkg.studentName : pkg.studentName,
+                style: const TextStyle(fontWeight: FontWeight.bold, fontSize: 15))),
+              Text(
+                viewerRole == 'teacher' ? pkg.studentCode : pkg.studentCode,
+                style: const TextStyle(color: Color(0xFF1565C0), fontWeight: FontWeight.w600, fontSize: 13)),
             ]),
             const SizedBox(height: 4),
             Row(children: [
               const Icon(Icons.person_outlined, size: 16, color: Color(0xFF2E7D32)),
               const SizedBox(width: 6),
-              Expanded(child: Text(pkg.teacherName, style: const TextStyle(fontSize: 14, color: Colors.black87))),
+              Expanded(child: Text(
+                viewerRole == 'teacher' ? 'ครู: ${pkg.teacherName}' : pkg.teacherName,
+                style: const TextStyle(fontSize: 14, color: Colors.black87))),
               Text(pkg.teacherCode, style: const TextStyle(color: Color(0xFF2E7D32), fontSize: 13)),
             ]),
             const SizedBox(height: 8),
@@ -318,11 +346,11 @@ class PackageCard extends StatelessWidget {
 
             // Session counts
             Row(children: [
-              _CountBox(label: 'รวมทั้งหมด', value: '${pkg.totalSessions}', color: Colors.blueGrey),
+              _CountBox(label: 'จำนวนคาบ', value: '${pkg.totalSessions}', color: Colors.blueGrey),
               const SizedBox(width: 8),
-              _CountBox(label: 'เรียนแล้ว', value: '${pkg.usedSessions}', color: Colors.green),
+              _CountBox(label: viewerRole == 'teacher' ? 'สอนแล้ว' : 'เรียนแล้ว', value: '${pkg.usedSessions}', color: Colors.green),
               const SizedBox(width: 8),
-              _CountBox(label: 'เหลือ', value: '${pkg.remainingSessions}', color: pkg.statusColor, bold: true),
+              _CountBox(label: 'คงเหลือ', value: '${pkg.remainingSessions}', color: pkg.statusColor, bold: true),
             ]),
             const SizedBox(height: 8),
 
