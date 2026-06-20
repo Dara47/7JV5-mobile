@@ -49,39 +49,46 @@ class FirestoreService {
     });
   }
 
-  static Stream<List<SessionModel>> watchPendingCutSessions() {
-    final today = DateTime.now();
-    final todayStr = today.toIso8601String().substring(0, 10);
-    return _db.collection('sessions')
-        .where('status', isEqualTo: 'scheduled')
-        .where('date', isLessThanOrEqualTo: todayStr)
+  static Stream<List<PackageModel>> watchPendingCutPackages() {
+    final now = DateTime.now();
+    const thaiDays = {1: 'จ', 2: 'อ', 3: 'พ', 4: 'พฤ', 5: 'ศ', 6: 'ส', 7: 'อา'};
+    final todayDay = thaiDays[now.weekday]!;
+    final nowMinutes = now.hour * 60 + now.minute;
+
+    return _db.collection('packages')
+        .where('scheduledDay', isEqualTo: todayDay)
         .snapshots()
         .map((s) {
-      final now = today;
-      final list = s.docs.map(SessionModel.fromDoc).where((session) {
-        // include past dates always, for today filter by endTime
-        if (session.date.compareTo(todayStr) < 0) return true;
+      return s.docs.map(PackageModel.fromDoc).where((pkg) {
+        if (pkg.remainingSessions <= 0) return false;
+        if (pkg.scheduledEndTime == null) return false;
         try {
-          final ep = session.endTime.split(':');
-          final endMinutes = int.parse(ep[0]) * 60 + int.parse(ep[1]);
-          final nowMinutes = now.hour * 60 + now.minute;
-          return nowMinutes >= endMinutes;
+          final ep = pkg.scheduledEndTime!.split(':');
+          final endM = int.parse(ep[0]) * 60 + int.parse(ep[1]);
+          return nowMinutes >= endM;
         } catch (_) { return false; }
-      }).toList();
-      list.sort((a, b) {
-        final d = b.date.compareTo(a.date);
-        return d != 0 ? d : b.startTime.compareTo(a.startTime);
-      });
-      return list;
+      }).toList()
+        ..sort((a, b) => (a.scheduledTime ?? '').compareTo(b.scheduledTime ?? ''));
     });
   }
 
-  static Future<void> cutSession(String sessionId, String packageId) async {
-    await _db.collection('sessions').doc(sessionId).update({
+  static Future<void> cutPackageSession(PackageModel pkg) async {
+    final today = DateTime.now().toIso8601String().substring(0, 10);
+    await _db.collection('sessions').add({
+      'packageId': pkg.id,
+      'studentId': pkg.studentId,
+      'teacherId': pkg.teacherId,
+      'studentName': pkg.studentName,
+      'teacherName': pkg.teacherName,
+      'date': today,
+      'startTime': pkg.scheduledTime ?? '',
+      'endTime': pkg.scheduledEndTime ?? '',
       'status': 'completed',
-      'updatedAt': FieldValue.serverTimestamp(),
+      'isLate': false,
+      'isAbsent': false,
+      'createdAt': FieldValue.serverTimestamp(),
     });
-    await _db.collection('packages').doc(packageId).update({
+    await _db.collection('packages').doc(pkg.id).update({
       'remainingSessions': FieldValue.increment(-1),
       'updatedAt': FieldValue.serverTimestamp(),
     });
