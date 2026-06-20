@@ -5,6 +5,7 @@ import 'users_list_screen.dart';
 import 'packages_screen.dart';
 import 'teacher_schedule_screen.dart';
 import 'reports_screen.dart';
+import 'cut_session_screen.dart';
 
 class HomeScreen extends StatefulWidget {
   final AppUser appUser;
@@ -22,6 +23,7 @@ class _HomeScreenState extends State<HomeScreen> {
       return [
         const UsersListScreen(),
         const PackagesScreen(),
+        const CutSessionScreen(),
         const TeacherScheduleScreen(),
         const ReportsScreen(),
       ];
@@ -44,6 +46,7 @@ class _HomeScreenState extends State<HomeScreen> {
       return const [
         NavigationDestination(icon: Icon(Icons.people_outline), selectedIcon: Icon(Icons.people), label: 'ผู้ใช้'),
         NavigationDestination(icon: Icon(Icons.inventory_2_outlined), selectedIcon: Icon(Icons.inventory_2), label: 'คาบเรียน'),
+        NavigationDestination(icon: Icon(Icons.content_cut_outlined), selectedIcon: Icon(Icons.content_cut), label: 'ตัดคาบ'),
         NavigationDestination(icon: Icon(Icons.person_pin_outlined), selectedIcon: Icon(Icons.person_pin), label: 'เวลาครู'),
         NavigationDestination(icon: Icon(Icons.bar_chart_outlined), selectedIcon: Icon(Icons.bar_chart), label: 'รายงาน'),
       ];

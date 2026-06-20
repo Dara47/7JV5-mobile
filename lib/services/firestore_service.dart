@@ -49,6 +49,44 @@ class FirestoreService {
     });
   }
 
+  static Stream<List<SessionModel>> watchPendingCutSessions() {
+    final today = DateTime.now();
+    final todayStr = today.toIso8601String().substring(0, 10);
+    return _db.collection('sessions')
+        .where('status', isEqualTo: 'scheduled')
+        .where('date', isLessThanOrEqualTo: todayStr)
+        .snapshots()
+        .map((s) {
+      final now = today;
+      final list = s.docs.map(SessionModel.fromDoc).where((session) {
+        // include past dates always, for today filter by endTime
+        if (session.date < todayStr) return true;
+        try {
+          final ep = session.endTime.split(':');
+          final endMinutes = int.parse(ep[0]) * 60 + int.parse(ep[1]);
+          final nowMinutes = now.hour * 60 + now.minute;
+          return nowMinutes >= endMinutes;
+        } catch (_) { return false; }
+      }).toList();
+      list.sort((a, b) {
+        final d = b.date.compareTo(a.date);
+        return d != 0 ? d : b.startTime.compareTo(a.startTime);
+      });
+      return list;
+    });
+  }
+
+  static Future<void> cutSession(String sessionId, String packageId) async {
+    await _db.collection('sessions').doc(sessionId).update({
+      'status': 'completed',
+      'updatedAt': FieldValue.serverTimestamp(),
+    });
+    await _db.collection('packages').doc(packageId).update({
+      'remainingSessions': FieldValue.increment(-1),
+      'updatedAt': FieldValue.serverTimestamp(),
+    });
+  }
+
   static Stream<List<SessionModel>> watchCompletedSessions() {
     return _db.collection('sessions')
         .where('status', isEqualTo: 'completed')
