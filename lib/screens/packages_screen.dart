@@ -269,7 +269,7 @@ class PackageCard extends StatelessWidget {
   }
 
   void _showReport(BuildContext context) {
-    Navigator.push(context, MaterialPageRoute(builder: (_) => _PackageReportScreen(pkg: pkg)));
+    Navigator.push(context, MaterialPageRoute(builder: (_) => PackageReportScreen(pkg: pkg)));
   }
 
   TimeOfDay _parseTime(String t) {
@@ -523,9 +523,9 @@ class _TimeTile extends StatelessWidget {
 
 // ── Package Report Screen ────────────────────────────────────────────────────
 
-class _PackageReportScreen extends StatelessWidget {
+class PackageReportScreen extends StatelessWidget {
   final PackageModel pkg;
-  const _PackageReportScreen({required this.pkg});
+  const PackageReportScreen({super.key, required this.pkg});
 
   @override
   Widget build(BuildContext context) {
