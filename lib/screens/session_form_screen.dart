@@ -1,6 +1,7 @@
 ﻿import 'package:flutter/material.dart';
 import '../models/models.dart';
 import '../services/firestore_service.dart';
+import '../utils/date_format.dart';
 
 class SessionFormScreen extends StatefulWidget {
   final String userId;
@@ -84,14 +85,9 @@ class _SessionFormScreenState extends State<SessionFormScreen> {
   }
 
   String _fmt2(int n) => n.toString().padLeft(2, '0');
-  String get _timeStr => '${_fmt2(_startTime.hour)}:${_fmt2(_startTime.minute)} – ${_fmt2(_endTime.hour)}:${_fmt2(_endTime.minute)}';
+  String get _timeStr => '${_fmt2(_startTime.hour)}:${_fmt2(_startTime.minute)} - ${_fmt2(_endTime.hour)}:${_fmt2(_endTime.minute)} น.';
 
-  String get _dateStr {
-    const thDays = ['จ', 'อ', 'พ', 'พฤ', 'ศ', 'ส', 'อา'];
-    const thMonths = ['', 'ม.ค.', 'ก.พ.', 'มี.ค.', 'เม.ย.', 'พ.ค.', 'มิ.ย.', 'ก.ค.', 'ส.ค.', 'ก.ย.', 'ต.ค.', 'พ.ย.', 'ธ.ค.'];
-    final day = thDays[_date.weekday - 1];
-    return '$day ${_date.day} ${thMonths[_date.month]} ${_date.year + 543}';
-  }
+  String get _dateStr => thaiDateFull(_date);
 
   Future<void> _pickDate() async {
     final d = await showDatePicker(

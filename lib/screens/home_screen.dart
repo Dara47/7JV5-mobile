@@ -8,7 +8,6 @@ import 'reports_screen.dart';
 import 'cut_session_screen.dart';
 import 'leave_request_screen.dart';
 import 'settings_screen.dart';
-import 'payroll_screen.dart';
 import 'teacher_dashboard_screen.dart';
 import 'student_dashboard_screen.dart';
 
@@ -22,32 +21,35 @@ class HomeScreen extends StatefulWidget {
 
 class _HomeScreenState extends State<HomeScreen> {
   int _selectedIndex = 0;
+  int _refreshKey = 0;
+
+  void _refresh() => setState(() => _refreshKey++);
 
   List<Widget> get _screens {
     final u = widget.appUser;
+    final k = _refreshKey;
     if (u.isAdmin) {
       return [
-        const UsersListScreen(),
-        const PackagesScreen(),
-        const CutSessionScreen(),
-        const TeacherScheduleScreen(),
-        LeaveRequestScreen(appUser: u),
-        const ReportsScreen(),
-        const SettingsScreen(),
-        const PayrollScreen(),
+        UsersListScreen(key: ValueKey('users_$k')),
+        PackagesScreen(key: ValueKey('packages_$k')),
+        CutSessionScreen(key: ValueKey('cut_$k')),
+        TeacherScheduleScreen(key: ValueKey('schedule_$k')),
+        LeaveRequestScreen(key: ValueKey('leave_$k'), appUser: u),
+        ReportsScreen(key: ValueKey('reports_$k')),
+        SettingsScreen(key: ValueKey('settings_$k')),
       ];
     }
     if (u.isTeacher) {
       return [
-        TeacherDashboardScreen(appUser: u),
-        TeacherScheduleScreen(filterTeacherId: u.uid),
-        LeaveRequestScreen(appUser: u),
+        TeacherDashboardScreen(key: ValueKey('tdash_$k'), appUser: u),
+        TeacherScheduleScreen(key: ValueKey('tschedule_$k'), filterTeacherId: u.uid),
+        LeaveRequestScreen(key: ValueKey('tleave_$k'), appUser: u),
       ];
     }
     // student
     return [
-      StudentDashboardScreen(appUser: u),
-      LeaveRequestScreen(appUser: u),
+      StudentDashboardScreen(key: ValueKey('sdash_$k'), appUser: u),
+      LeaveRequestScreen(key: ValueKey('sleave_$k'), appUser: u),
     ];
   }
 
@@ -62,7 +64,6 @@ class _HomeScreenState extends State<HomeScreen> {
         NavigationDestination(icon: Icon(Icons.event_busy_outlined), selectedIcon: Icon(Icons.event_busy), label: 'ใบลา'),
         NavigationDestination(icon: Icon(Icons.bar_chart_outlined), selectedIcon: Icon(Icons.bar_chart), label: 'รายงาน'),
         NavigationDestination(icon: Icon(Icons.settings_outlined), selectedIcon: Icon(Icons.settings), label: 'ตั้งค่า'),
-        NavigationDestination(icon: Icon(Icons.account_balance_wallet_outlined), selectedIcon: Icon(Icons.account_balance_wallet), label: 'บัญชี'),
       ];
     }
     if (u.isTeacher) {
@@ -91,14 +92,28 @@ class _HomeScreenState extends State<HomeScreen> {
         mainAxisSize: MainAxisSize.min,
         children: [
           if (destinations.length > 1)
-            NavigationBar(
-              selectedIndex: _selectedIndex,
-              onDestinationSelected: (i) => setState(() => _selectedIndex = i),
-              destinations: destinations,
+            Stack(
+              alignment: Alignment.centerRight,
+              children: [
+                NavigationBar(
+                  selectedIndex: _selectedIndex,
+                  onDestinationSelected: (i) => setState(() => _selectedIndex = i),
+                  destinations: destinations,
+                ),
+                Padding(
+                  padding: const EdgeInsets.only(right: 4),
+                  child: IconButton(
+                    icon: const Icon(Icons.refresh, color: Colors.grey),
+                    tooltip: 'รีเฟรชข้อมูล',
+                    onPressed: _refresh,
+                  ),
+                ),
+              ],
             )
           else
             _SingleTabBar(
               label: destinations.first.label,
+              onRefresh: _refresh,
               onLogout: () async {
                 final ok = await showDialog<bool>(context: context, builder: (_) => AlertDialog(
                   title: const Text('ออกจากระบบ'),
@@ -149,8 +164,9 @@ class _HomeScreenState extends State<HomeScreen> {
 
 class _SingleTabBar extends StatelessWidget {
   final String label;
+  final VoidCallback onRefresh;
   final VoidCallback onLogout;
-  const _SingleTabBar({required this.label, required this.onLogout});
+  const _SingleTabBar({required this.label, required this.onRefresh, required this.onLogout});
 
   @override
   Widget build(BuildContext context) => SafeArea(
@@ -165,7 +181,10 @@ class _SingleTabBar extends StatelessWidget {
           padding: const EdgeInsets.only(left: 16),
           child: Text(label, style: const TextStyle(fontWeight: FontWeight.w600, color: Color(0xFFF97316))),
         ),
-        IconButton(icon: const Icon(Icons.logout, color: Colors.grey), onPressed: onLogout),
+        Row(children: [
+          IconButton(icon: const Icon(Icons.refresh, color: Colors.grey), tooltip: 'รีเฟรชข้อมูล', onPressed: onRefresh),
+          IconButton(icon: const Icon(Icons.logout, color: Colors.grey), onPressed: onLogout),
+        ]),
       ]),
     ),
   );

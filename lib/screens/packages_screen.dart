@@ -519,15 +519,25 @@ class _TeacherGroupView extends StatelessWidget {
   final List<PackageModel> packages;
   const _TeacherGroupView({required this.packages});
 
-  static const _dayOrder = ['จันทร์', 'อังคาร', 'พุธ', 'พฤหัสบดี', 'ศุกร์', 'เสาร์', 'อาทิตย์'];
+  // ใช้ตัวย่อตรงกับที่เก็บใน Firestore (PackageModel.days)
+  static const _dayOrder = ['อา', 'จ', 'อ', 'พ', 'พฤ', 'ศ', 'ส'];
   static const _dayWeekday = {
-    'จันทร์':    DateTime.monday,
-    'อังคาร':    DateTime.tuesday,
-    'พุธ':       DateTime.wednesday,
-    'พฤหัสบดี':  DateTime.thursday,
-    'ศุกร์':     DateTime.friday,
-    'เสาร์':     DateTime.saturday,
-    'อาทิตย์':   DateTime.sunday,
+    'จ':  DateTime.monday,
+    'อ':  DateTime.tuesday,
+    'พ':  DateTime.wednesday,
+    'พฤ': DateTime.thursday,
+    'ศ':  DateTime.friday,
+    'ส':  DateTime.saturday,
+    'อา': DateTime.sunday,
+  };
+  static const _dayFull = {
+    'จ':  'จันทร์',
+    'อ':  'อังคาร',
+    'พ':  'พุธ',
+    'พฤ': 'พฤหัสบดี',
+    'ศ':  'ศุกร์',
+    'ส':  'เสาร์',
+    'อา': 'อาทิตย์',
   };
 
   DateTime _nextDate(String day) {
@@ -543,7 +553,7 @@ class _TeacherGroupView extends StatelessWidget {
     final d = _nextDate(day);
     final dd = d.day.toString().padLeft(2, '0');
     final mm = d.month.toString().padLeft(2, '0');
-    return '${day}ที่ $dd/$mm/${d.year}';
+    return '${_dayFull[day]}ที่ $dd/$mm/${d.year}';
   }
 
   @override

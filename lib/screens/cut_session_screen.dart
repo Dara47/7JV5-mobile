@@ -1,20 +1,16 @@
 ﻿import 'package:flutter/material.dart';
 import '../models/models.dart';
 import '../services/firestore_service.dart';
+import '../utils/date_format.dart';
 
 class CutSessionScreen extends StatelessWidget {
   const CutSessionScreen({super.key});
 
-  String _todayLabel() {
-    final now = DateTime.now();
-    const thaiDays = {1: 'จ', 2: 'อ', 3: 'พ', 4: 'พฤ', 5: 'ศ', 6: 'ส', 7: 'อา'};
-    final day = thaiDays[now.weekday] ?? '';
-    return 'วัน$day ${now.day.toString().padLeft(2, '0')}/${now.month.toString().padLeft(2, '0')}/${now.year}';
-  }
+  String _todayLabel() => thaiDateFull(DateTime.now());
 
   void _confirmCut(BuildContext context, PackageModel pkg) {
     final now = DateTime.now();
-    final dateStr = '${now.day.toString().padLeft(2, '0')}/${now.month.toString().padLeft(2, '0')}/${now.year}';
+    final dateStr = thaiDateFull(now);
     showDialog(
       context: context,
       builder: (_) => AlertDialog(
@@ -22,8 +18,7 @@ class CutSessionScreen extends StatelessWidget {
         content: Column(mainAxisSize: MainAxisSize.min, crossAxisAlignment: CrossAxisAlignment.start, children: [
           Text('นักเรียน: ${pkg.studentName}'),
           Text('ครู: ${pkg.teacherName}'),
-          Text('วันที่: $dateStr'),
-          Text('เวลา: ${pkg.scheduledTime ?? ''} – ${pkg.scheduledEndTime ?? ''}'),
+          Text(thaiDateTimeFull(now, startTime: pkg.scheduledTime, endTime: pkg.scheduledEndTime)),
           const SizedBox(height: 8),
           const Text('ยืนยันตัดคาบ? ระบบจะ:\n• บันทึกผลการเรียน\n• หักคาบที่เหลือ 1 คาบ',
               style: TextStyle(fontSize: 13, color: Colors.grey)),

@@ -84,6 +84,21 @@ class _PackageFormSheetState extends State<_PackageFormSheet> {
         p.scheduledEndTime == s.endTime);
   }
 
+  bool _isSlotPast(SlotItem s) {
+    final now = DateTime.now();
+    const dayMap = {'อา': 7, 'จ': 1, 'อ': 2, 'พ': 3, 'พฤ': 4, 'ศ': 5, 'ส': 6};
+    if (dayMap[s.day] != now.weekday) return false;
+    try {
+      final ref = s.endTime.isNotEmpty ? s.endTime : s.startTime;
+      final p = ref.split(':');
+      final slotEndMinutes = int.parse(p[0]) * 60 + int.parse(p[1]);
+      final nowMinutes = now.hour * 60 + now.minute;
+      return nowMinutes >= slotEndMinutes;
+    } catch (_) {
+      return false;
+    }
+  }
+
   Future<void> _loadUsers() async {
     final db = FirebaseFirestore.instance;
     final sSnap = await db.collection('users').where('role', isEqualTo: 'student').get();
@@ -266,8 +281,10 @@ class _PackageFormSheetState extends State<_PackageFormSheet> {
                                 spacing: 6, runSpacing: 6,
                                 children: _teacherSlot!.slots.map((s) {
                                   final taken = _isSlotTaken(s);
+                                  final past = _isSlotPast(s);
+                                  final disabled = taken || past;
                                   return GestureDetector(
-                                    onTap: taken ? null : () => setState(() {
+                                    onTap: disabled ? null : () => setState(() {
                                       _scheduledDay = s.day;
                                       _startTime = _parseTime(s.startTime);
                                       _endTime = _parseTime(s.endTime);
@@ -275,18 +292,35 @@ class _PackageFormSheetState extends State<_PackageFormSheet> {
                                     child: Container(
                                       padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 6),
                                       decoration: BoxDecoration(
-                                        color: taken ? Colors.grey.shade300 : const Color(0xFF2E7D32),
+                                        color: taken
+                                            ? Colors.grey.shade300
+                                            : past
+                                                ? Colors.orange.shade100
+                                                : const Color(0xFF2E7D32),
                                         borderRadius: BorderRadius.circular(8),
+                                        border: past && !taken
+                                            ? Border.all(color: Colors.orange.shade300)
+                                            : null,
                                       ),
                                       child: Row(mainAxisSize: MainAxisSize.min, children: [
-                                        if (taken) const Padding(
-                                          padding: EdgeInsets.only(right: 4),
-                                          child: Icon(Icons.block, size: 12, color: Colors.grey),
-                                        ),
+                                        if (taken)
+                                          const Padding(
+                                            padding: EdgeInsets.only(right: 4),
+                                            child: Icon(Icons.block, size: 12, color: Colors.grey),
+                                          )
+                                        else if (past)
+                                          const Padding(
+                                            padding: EdgeInsets.only(right: 4),
+                                            child: Icon(Icons.history, size: 12, color: Colors.orange),
+                                          ),
                                         Text('${s.day}  ${s.startTime}–${s.endTime}',
                                             style: TextStyle(
                                               fontSize: 12,
-                                              color: taken ? Colors.grey.shade600 : Colors.white,
+                                              color: taken
+                                                  ? Colors.grey.shade600
+                                                  : past
+                                                      ? Colors.orange.shade700
+                                                      : Colors.white,
                                               fontWeight: FontWeight.w600,
                                               decoration: taken ? TextDecoration.lineThrough : null,
                                             )),

@@ -1,6 +1,7 @@
 ﻿import 'package:flutter/material.dart';
 import 'package:firebase_auth/firebase_auth.dart';
 import '../services/firestore_service.dart';
+import 'payroll_screen.dart';
 
 class SettingsScreen extends StatefulWidget {
   const SettingsScreen({super.key});
@@ -123,6 +124,25 @@ class _SettingsScreenState extends State<SettingsScreen> {
                   style: ElevatedButton.styleFrom(
                     backgroundColor: const Color(0xFF37474F),
                     foregroundColor: Colors.white,
+                    shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(12)),
+                  ),
+                ),
+              ),
+              const SizedBox(height: 20),
+
+              // ── บัญชีค่าจ้าง ─────────────────────────────────────────
+              const Divider(),
+              const SizedBox(height: 8),
+              _SectionHeader(icon: Icons.account_balance_wallet_outlined, label: 'บัญชีค่าจ้าง', color: const Color(0xFFF97316)),
+              const SizedBox(height: 8),
+              SizedBox(
+                height: 52,
+                child: OutlinedButton.icon(
+                  onPressed: () => Navigator.push(context, MaterialPageRoute(builder: (_) => const PayrollScreen())),
+                  icon: const Icon(Icons.account_balance_wallet_outlined, color: Color(0xFFF97316)),
+                  label: const Text('เปิดหน้าบัญชีค่าจ้าง', style: TextStyle(fontSize: 16, fontWeight: FontWeight.bold, color: Color(0xFFF97316))),
+                  style: OutlinedButton.styleFrom(
+                    side: const BorderSide(color: Color(0xFFF97316)),
                     shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(12)),
                   ),
                 ),
