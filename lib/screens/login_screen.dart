@@ -1,3 +1,4 @@
+import 'dart:math' as math;
 import 'package:flutter/material.dart';
 import 'package:firebase_auth/firebase_auth.dart';
 import '../services/firestore_service.dart';
@@ -109,29 +110,67 @@ class _HeroPanel extends StatelessWidget {
     return Container(
       decoration: const BoxDecoration(
         gradient: LinearGradient(
-          begin: Alignment.topLeft,
-          end: Alignment.bottomRight,
-          colors: [Color(0xFF0D47A1), Color(0xFF1565C0), Color(0xFF1E88E5)],
+          begin: Alignment.topCenter,
+          end: Alignment.bottomCenter,
+          colors: [Color(0xFFFFB300), Color(0xFFF97316), Color(0xFFE65100)],
         ),
       ),
       child: Stack(children: [
-        // Decorative bubbles
-        Positioned(top: -70, right: 20,   child: _Bubble(220, 0.07)),
-        Positioned(bottom: -60, left: -30, child: _Bubble(240, 0.06)),
-        Positioned(top: 80,    left: 30,   child: _Bubble(70,  0.10)),
-        Positioned.fill(child: Align(alignment: Alignment.center, child: _Bubble(380, 0.04))),
-        // Content
+        // ── Dot grids ─────────────────────────────────────────
+        const Positioned(top: 18,  left: 36,  child: _DotGrid(4, 4)),
+        if (showFeatures)
+          const Positioned(bottom: 210, right: 14, child: _DotGrid(3, 5)),
+
+        // ── Background circles ────────────────────────────────
+        Positioned(top: -55, right: -30, child: _Bubble(220, 0.13)),
+        Positioned(top: 70,  left:  8,   child: _Bubble(65,  0.10)),
+        if (showFeatures) ...[
+          Positioned(bottom: 140, left: -65, child: _OutlineCircle(185)),
+          Positioned(top: 195,   right:  2,  child: _Bubble(42,  0.08)),
+        ],
+
+        // ── Floating word chips ───────────────────────────────
+        const Positioned(top: 22,  left: 14, child: _WordChip('Aa')),
+        if (showFeatures) ...[
+          Positioned(top: 138, right: 22,   child: _ChatDotBubble()),
+          const Positioned(top: 268, left: 22,  child: _WordChip('Hello')),
+          const Positioned(top: 358, right: 28, child: _WordChip('Hi!')),
+          const Positioned(bottom: 218, left: 14,  child: _WordChip('Learn')),
+          const Positioned(bottom: 192, right: 14, child: _WordChip('English')),
+        ],
+
+        // ── Small geometric accents ───────────────────────────
+        if (showFeatures) ...[
+          Positioned(top: 192, right: 78,  child: _Diamond()),
+          Positioned(bottom: 288, left: 88, child: _Diamond()),
+          Positioned(top: 438, right: 58,
+              child: _Bubble(10, 0.35)),
+          Positioned(top: 308, left: 104,
+              child: _Bubble(8, 0.40)),
+        ],
+
+        // ── Skyline silhouette ────────────────────────────────
+        if (showFeatures)
+          Positioned(
+            bottom: 0, left: 0, right: 0,
+            child: SizedBox(
+              height: 185,
+              child: CustomPaint(painter: _SkylinePainter()),
+            ),
+          ),
+
+        // ── Center logo + title ───────────────────────────────
         SafeArea(
           child: Center(
             child: Padding(
-              padding: const EdgeInsets.symmetric(horizontal: 36, vertical: 24),
+              padding: EdgeInsets.fromLTRB(36, 24, 36, showFeatures ? 200 : 24),
               child: Column(mainAxisSize: MainAxisSize.min, children: [
                 Container(
                   width: 96, height: 96,
                   decoration: BoxDecoration(
                     shape: BoxShape.circle,
-                    color: Colors.white.withOpacity(0.15),
-                    border: Border.all(color: Colors.white.withOpacity(0.30), width: 2),
+                    color: Colors.white.withOpacity(0.18),
+                    border: Border.all(color: Colors.white.withOpacity(0.35), width: 2),
                   ),
                   child: const Icon(Icons.school_rounded, size: 52, color: Colors.white),
                 ),
@@ -141,18 +180,8 @@ class _HeroPanel extends StatelessWidget {
                         color: Colors.white, letterSpacing: 0.5)),
                 const SizedBox(height: 6),
                 Text('ระบบจัดการโรงเรียน',
-                    style: TextStyle(fontSize: 15, color: Colors.white.withOpacity(0.80),
-                        letterSpacing: 0.3)),
-                if (showFeatures) ...[
-                  const SizedBox(height: 44),
-                  const _FeaturePill(Icons.people_outline,         'จัดการนักเรียนและครู'),
-                  const SizedBox(height: 12),
-                  const _FeaturePill(Icons.calendar_month_outlined, 'ตารางเรียนออนไลน์'),
-                  const SizedBox(height: 12),
-                  const _FeaturePill(Icons.content_cut_outlined,    'ตัดและติดตามคาบเรียน'),
-                  const SizedBox(height: 12),
-                  const _FeaturePill(Icons.bar_chart_outlined,      'รายงานสรุปผล'),
-                ],
+                    style: TextStyle(fontSize: 15,
+                        color: Colors.white.withOpacity(0.85), letterSpacing: 0.3)),
               ]),
             ),
           ),
@@ -161,6 +190,8 @@ class _HeroPanel extends StatelessWidget {
     );
   }
 }
+
+// ── Hero decorative widgets ───────────────────────────────────────────────────
 
 class _Bubble extends StatelessWidget {
   final double size;
@@ -175,25 +206,223 @@ class _Bubble extends StatelessWidget {
   );
 }
 
-class _FeaturePill extends StatelessWidget {
-  final IconData icon;
-  final String label;
-  const _FeaturePill(this.icon, this.label);
+class _OutlineCircle extends StatelessWidget {
+  final double size;
+  const _OutlineCircle(this.size);
   @override
   Widget build(BuildContext context) => Container(
-    padding: const EdgeInsets.symmetric(horizontal: 18, vertical: 11),
+    width: size, height: size,
     decoration: BoxDecoration(
-      color: Colors.white.withOpacity(0.12),
-      borderRadius: BorderRadius.circular(32),
-      border: Border.all(color: Colors.white.withOpacity(0.22), width: 1),
+      shape: BoxShape.circle,
+      border: Border.all(color: Colors.white.withOpacity(0.14), width: 2),
+    ),
+  );
+}
+
+class _DotGrid extends StatelessWidget {
+  final int rows;
+  final int cols;
+  const _DotGrid(this.rows, this.cols);
+  @override
+  Widget build(BuildContext context) => Column(
+    mainAxisSize: MainAxisSize.min,
+    children: List.generate(rows, (r) => Padding(
+      padding: const EdgeInsets.only(bottom: 7),
+      child: Row(
+        mainAxisSize: MainAxisSize.min,
+        children: List.generate(cols, (c) => Padding(
+          padding: const EdgeInsets.only(right: 7),
+          child: Container(
+            width: 5, height: 5,
+            decoration: BoxDecoration(
+              shape: BoxShape.circle,
+              color: Colors.white.withOpacity(0.40),
+            ),
+          ),
+        )),
+      ),
+    )),
+  );
+}
+
+class _WordChip extends StatelessWidget {
+  final String text;
+  const _WordChip(this.text);
+  @override
+  Widget build(BuildContext context) => Container(
+    padding: const EdgeInsets.symmetric(horizontal: 14, vertical: 8),
+    decoration: BoxDecoration(
+      color: Colors.white.withOpacity(0.22),
+      borderRadius: BorderRadius.circular(24),
+      border: Border.all(color: Colors.white.withOpacity(0.28)),
+    ),
+    child: Text(text,
+        style: const TextStyle(color: Colors.white,
+            fontWeight: FontWeight.bold, fontSize: 14)),
+  );
+}
+
+class _ChatDotBubble extends StatelessWidget {
+  const _ChatDotBubble();
+  @override
+  Widget build(BuildContext context) => Container(
+    padding: const EdgeInsets.symmetric(horizontal: 14, vertical: 10),
+    decoration: BoxDecoration(
+      color: Colors.white.withOpacity(0.22),
+      borderRadius: BorderRadius.circular(20),
+      border: Border.all(color: Colors.white.withOpacity(0.28)),
     ),
     child: Row(mainAxisSize: MainAxisSize.min, children: [
-      Icon(icon, size: 16, color: Colors.white),
-      const SizedBox(width: 10),
-      Text(label, style: const TextStyle(color: Colors.white, fontSize: 13,
-          fontWeight: FontWeight.w500)),
+      _dot(), const SizedBox(width: 4),
+      _dot(), const SizedBox(width: 4),
+      _dot(),
     ]),
   );
+  Widget _dot() => Container(
+    width: 6, height: 6,
+    decoration: const BoxDecoration(shape: BoxShape.circle, color: Colors.white),
+  );
+}
+
+class _Diamond extends StatelessWidget {
+  const _Diamond();
+  @override
+  Widget build(BuildContext context) => Transform.rotate(
+    angle: math.pi / 4,
+    child: Container(
+      width: 12, height: 12,
+      decoration: BoxDecoration(
+        color: Colors.white.withOpacity(0.30),
+        borderRadius: BorderRadius.circular(2),
+      ),
+    ),
+  );
+}
+
+// ── Skyline CustomPainter ─────────────────────────────────────────────────────
+
+class _SkylinePainter extends CustomPainter {
+  @override
+  void paint(Canvas canvas, Size size) {
+    final fill = Paint()
+      ..color = Colors.white.withOpacity(0.13)
+      ..style = PaintingStyle.fill;
+    final line = Paint()
+      ..color = Colors.white.withOpacity(0.32)
+      ..style = PaintingStyle.stroke
+      ..strokeWidth = 1.4
+      ..strokeCap = StrokeCap.round
+      ..strokeJoin = StrokeJoin.round;
+
+    // Rolling hill ground
+    final hill = Path()
+      ..moveTo(0, size.height * 0.52)
+      ..quadraticBezierTo(size.width * 0.28, size.height * 0.28,
+          size.width * 0.54, size.height * 0.46)
+      ..quadraticBezierTo(size.width * 0.77, size.height * 0.60,
+          size.width, size.height * 0.44)
+      ..lineTo(size.width, size.height)
+      ..lineTo(0, size.height)
+      ..close();
+    canvas.drawPath(hill, fill);
+
+    _bigBen(canvas, fill, line,
+        size.width * 0.11, size.height * 0.94);
+    _ferrisWheel(canvas, line,
+        size.width * 0.33, size.height * 0.67, 26);
+    _towerBridge(canvas, fill, line,
+        size.width * 0.57, size.height * 0.91, size.width * 0.20);
+    _liberty(canvas, line,
+        size.width * 0.86, size.height * 0.73);
+  }
+
+  void _bigBen(Canvas canvas, Paint fill, Paint line, double x, double base) {
+    // Base plinth
+    final plinth = RRect.fromRectAndRadius(
+        Rect.fromLTWH(x - 16, base - 12, 32, 12), const Radius.circular(1));
+    canvas.drawRRect(plinth, fill);
+    canvas.drawRRect(plinth, line);
+    // Shaft
+    canvas.drawRect(Rect.fromLTWH(x - 10, base - 72, 20, 62), fill);
+    canvas.drawRect(Rect.fromLTWH(x - 10, base - 72, 20, 62), line);
+    // Clock box
+    canvas.drawRect(Rect.fromLTWH(x - 14, base - 88, 28, 18), fill);
+    canvas.drawRect(Rect.fromLTWH(x - 14, base - 88, 28, 18), line);
+    // Clock face
+    canvas.drawCircle(Offset(x, base - 79), 7, line);
+    // Spire
+    final spire = Path()
+      ..moveTo(x - 8, base - 88)
+      ..lineTo(x, base - 120)
+      ..lineTo(x + 8, base - 88)
+      ..close();
+    canvas.drawPath(spire, fill);
+    canvas.drawPath(spire, line);
+  }
+
+  void _ferrisWheel(Canvas canvas, Paint line,
+      double cx, double cy, double r) {
+    canvas.drawCircle(Offset(cx, cy), r, line);
+    canvas.drawCircle(Offset(cx, cy), 4, line);
+    for (int i = 0; i < 6; i++) {
+      final a = i * math.pi / 3;
+      canvas.drawLine(Offset(cx, cy),
+          Offset(cx + r * math.cos(a), cy + r * math.sin(a)), line);
+    }
+    canvas.drawLine(Offset(cx - r * 0.5, cy + r), Offset(cx, cy + r + 18), line);
+    canvas.drawLine(Offset(cx + r * 0.5, cy + r), Offset(cx, cy + r + 18), line);
+  }
+
+  void _towerBridge(Canvas canvas, Paint fill, Paint line,
+      double cx, double base, double span) {
+    final lx = cx - span / 2;
+    final rx = cx + span / 2;
+    _bridgeTower(canvas, fill, line, lx, base);
+    _bridgeTower(canvas, fill, line, rx, base);
+    canvas.drawLine(Offset(lx, base - 22), Offset(rx, base - 22), line);
+    canvas.drawLine(Offset(lx, base - 38), Offset(rx, base - 38), line);
+    canvas.drawLine(Offset(lx, base - 76), Offset(cx - span * 0.12, base - 38), line);
+    canvas.drawLine(Offset(rx, base - 76), Offset(cx + span * 0.12, base - 38), line);
+  }
+
+  void _bridgeTower(Canvas canvas, Paint fill, Paint line,
+      double x, double base) {
+    canvas.drawRect(Rect.fromLTWH(x - 9, base - 78, 18, 78), fill);
+    canvas.drawRect(Rect.fromLTWH(x - 9, base - 78, 18, 78), line);
+    canvas.drawRect(Rect.fromLTWH(x - 12, base - 90, 24, 14), fill);
+    canvas.drawRect(Rect.fromLTWH(x - 12, base - 90, 24, 14), line);
+    final sp = Path()
+      ..moveTo(x - 10, base - 90)
+      ..lineTo(x - 7, base - 106)
+      ..lineTo(x - 4, base - 90)
+      ..moveTo(x + 4, base - 90)
+      ..lineTo(x + 7, base - 106)
+      ..lineTo(x + 10, base - 90);
+    canvas.drawPath(sp, fill);
+    canvas.drawPath(sp, line);
+  }
+
+  void _liberty(Canvas canvas, Paint line, double x, double base) {
+    final robe = Path()
+      ..moveTo(x - 9, base)
+      ..lineTo(x - 14, base + 28)
+      ..lineTo(x + 14, base + 28)
+      ..lineTo(x + 9, base)
+      ..close();
+    canvas.drawPath(robe, line);
+    canvas.drawRect(Rect.fromLTWH(x - 7, base - 22, 14, 24), line);
+    canvas.drawCircle(Offset(x, base - 32), 10, line);
+    for (int i = -1; i <= 1; i++) {
+      canvas.drawLine(Offset(x + i * 5, base - 41),
+          Offset(x + i * 5, base - 54), line);
+    }
+    canvas.drawLine(Offset(x + 7, base - 14), Offset(x + 24, base - 30), line);
+    canvas.drawLine(Offset(x + 24, base - 30), Offset(x + 24, base - 45), line);
+    canvas.drawCircle(Offset(x + 24, base - 49), 5, line);
+  }
+
+  @override
+  bool shouldRepaint(_) => false;
 }
 
 // ── Wave clipper ──────────────────────────────────────────────────────────────
