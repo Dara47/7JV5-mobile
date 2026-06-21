@@ -18,6 +18,7 @@ class PackagesScreen extends StatefulWidget {
 class _PackagesScreenState extends State<PackagesScreen> {
   final _searchCtrl = TextEditingController();
   String _search = '';
+  bool _byTeacherView = false;
 
   @override
   void initState() {
@@ -52,6 +53,16 @@ class _PackagesScreenState extends State<PackagesScreen> {
         title: Text(filterTitle),
         backgroundColor: const Color(0xFFF97316),
         foregroundColor: Colors.white,
+        actions: [
+          if (!isFiltered)
+            TextButton.icon(
+              onPressed: () => setState(() => _byTeacherView = !_byTeacherView),
+              icon: Icon(_byTeacherView ? Icons.list_rounded : Icons.people_rounded,
+                  color: Colors.white, size: 18),
+              label: Text(_byTeacherView ? 'รายการ' : 'ตามครู',
+                  style: const TextStyle(color: Colors.white, fontSize: 13)),
+            ),
+        ],
       ),
       floatingActionButton: canEdit
           ? FloatingActionButton.extended(
@@ -106,6 +117,10 @@ class _PackagesScreenState extends State<PackagesScreen> {
                   Text(_search.isEmpty ? 'ยังไม่มีคาบเรียน' : 'ไม่พบผลการค้นหา',
                       style: const TextStyle(color: Colors.grey)),
                 ]));
+              }
+
+              if (_byTeacherView && !isFiltered) {
+                return _TeacherGroupView(packages: list);
               }
 
               return ListView.separated(
@@ -496,6 +511,160 @@ class _ActionBtn extends StatelessWidget {
       ),
     ),
   );
+}
+
+// ── Teacher-grouped view ──────────────────────────────────────────────────────
+
+class _TeacherGroupView extends StatelessWidget {
+  final List<PackageModel> packages;
+  const _TeacherGroupView({required this.packages});
+
+  static const _dayOrder = ['จันทร์', 'อังคาร', 'พุธ', 'พฤหัสบดี', 'ศุกร์', 'เสาร์', 'อาทิตย์'];
+  static const _dayWeekday = {
+    'จันทร์':    DateTime.monday,
+    'อังคาร':    DateTime.tuesday,
+    'พุธ':       DateTime.wednesday,
+    'พฤหัสบดี':  DateTime.thursday,
+    'ศุกร์':     DateTime.friday,
+    'เสาร์':     DateTime.saturday,
+    'อาทิตย์':   DateTime.sunday,
+  };
+
+  DateTime _nextDate(String day) {
+    final target = _dayWeekday[day]!;
+    final now = DateTime.now();
+    var diff = target - now.weekday;
+    if (diff < 0) diff += 7;
+    return now.add(Duration(days: diff));
+  }
+
+  String _formatDate(String? day) {
+    if (day == null || !_dayWeekday.containsKey(day)) return 'ยังไม่กำหนดวัน';
+    final d = _nextDate(day);
+    final dd = d.day.toString().padLeft(2, '0');
+    final mm = d.month.toString().padLeft(2, '0');
+    return '${day}ที่ $dd/$mm/${d.year}';
+  }
+
+  @override
+  Widget build(BuildContext context) {
+    // Group by teacherId
+    final grouped = <String, List<PackageModel>>{};
+    for (final pkg in packages) {
+      grouped.putIfAbsent(pkg.teacherId, () => []).add(pkg);
+    }
+
+    // Sort teachers by name
+    final teachers = grouped.entries.toList()
+      ..sort((a, b) => a.value.first.teacherName.compareTo(b.value.first.teacherName));
+
+    return ListView.separated(
+      padding: const EdgeInsets.fromLTRB(12, 8, 12, 80),
+      itemCount: teachers.length,
+      separatorBuilder: (_, __) => const SizedBox(height: 8),
+      itemBuilder: (_, i) {
+        final pkgs = teachers[i].value;
+        final teacherName = pkgs.first.teacherName;
+        final teacherCode = pkgs.first.teacherCode;
+
+        // Sort students by day order then time
+        final sorted = List<PackageModel>.from(pkgs)..sort((a, b) {
+          final ai = a.scheduledDay != null ? _dayOrder.indexOf(a.scheduledDay!) : 99;
+          final bi = b.scheduledDay != null ? _dayOrder.indexOf(b.scheduledDay!) : 99;
+          if (ai != bi) return ai.compareTo(bi);
+          return (a.scheduledTime ?? '').compareTo(b.scheduledTime ?? '');
+        });
+
+        return Card(
+          elevation: 2,
+          shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(14)),
+          child: ExpansionTile(
+            initiallyExpanded: true,
+            shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(14)),
+            collapsedShape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(14)),
+            leading: CircleAvatar(
+              backgroundColor: const Color(0xFFF97316).withAlpha(20),
+              child: const Icon(Icons.person_rounded, color: Color(0xFFF97316), size: 20),
+            ),
+            title: Text(teacherName,
+                style: const TextStyle(fontWeight: FontWeight.bold, fontSize: 15)),
+            subtitle: Row(children: [
+              Text(teacherCode,
+                  style: const TextStyle(color: Color(0xFF2E7D32), fontSize: 12, fontWeight: FontWeight.w600)),
+              const SizedBox(width: 8),
+              Text('${sorted.length} นักเรียน',
+                  style: const TextStyle(color: Colors.grey, fontSize: 12)),
+            ]),
+            children: sorted.asMap().entries.map((e) => _StudentScheduleRow(
+              index: e.key + 1,
+              pkg: e.value,
+              dateLabel: _formatDate(e.value.scheduledDay),
+            )).toList(),
+          ),
+        );
+      },
+    );
+  }
+}
+
+class _StudentScheduleRow extends StatelessWidget {
+  final int index;
+  final PackageModel pkg;
+  final String dateLabel;
+  const _StudentScheduleRow({required this.index, required this.pkg, required this.dateLabel});
+
+  @override
+  Widget build(BuildContext context) {
+    final timeLabel = pkg.scheduledTime != null
+        ? '${pkg.scheduledTime}${pkg.scheduledEndTime != null ? ' – ${pkg.scheduledEndTime}' : ''} น.'
+        : 'ยังไม่กำหนดเวลา';
+
+    return Container(
+      padding: const EdgeInsets.fromLTRB(16, 10, 16, 10),
+      decoration: BoxDecoration(
+        border: Border(top: BorderSide(color: Colors.grey.shade100)),
+      ),
+      child: Row(crossAxisAlignment: CrossAxisAlignment.start, children: [
+        // ── ลำดับ ────────────────────────────────────────────────────
+        Container(
+          width: 26, height: 26,
+          decoration: BoxDecoration(
+            color: const Color(0xFFF97316).withAlpha(20),
+            shape: BoxShape.circle,
+          ),
+          child: Center(child: Text('$index',
+              style: const TextStyle(fontSize: 12, fontWeight: FontWeight.bold,
+                  color: Color(0xFFF97316)))),
+        ),
+        const SizedBox(width: 12),
+        // ── ข้อมูลนักเรียน ──────────────────────────────────────────
+        Expanded(child: Column(crossAxisAlignment: CrossAxisAlignment.start, children: [
+          Row(children: [
+            const Icon(Icons.school_outlined, size: 14, color: Color(0xFF1565C0)),
+            const SizedBox(width: 4),
+            Expanded(child: Text(pkg.studentName,
+                style: const TextStyle(fontWeight: FontWeight.w600, fontSize: 14))),
+            Text(pkg.studentCode,
+                style: const TextStyle(color: Color(0xFF1565C0), fontSize: 12, fontWeight: FontWeight.w500)),
+          ]),
+          const SizedBox(height: 4),
+          Row(children: [
+            const Icon(Icons.calendar_today, size: 12, color: Color(0xFFF97316)),
+            const SizedBox(width: 4),
+            Text(dateLabel,
+                style: const TextStyle(fontSize: 12, color: Color(0xFFF97316))),
+          ]),
+          const SizedBox(height: 2),
+          Row(children: [
+            const Icon(Icons.access_time, size: 12, color: Colors.blueGrey),
+            const SizedBox(width: 4),
+            Text(timeLabel,
+                style: const TextStyle(fontSize: 12, color: Colors.blueGrey)),
+          ]),
+        ])),
+      ]),
+    );
+  }
 }
 
 class _TimeTile extends StatelessWidget {
