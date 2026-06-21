@@ -38,7 +38,6 @@ class _HomeScreenState extends State<HomeScreen> {
     if (u.isTeacher) {
       return [
         TeacherDashboardScreen(appUser: u),
-        TeacherScheduleScreen(filterTeacherId: u.uid),
         LeaveRequestScreen(appUser: u),
       ];
     }
@@ -65,7 +64,6 @@ class _HomeScreenState extends State<HomeScreen> {
     if (u.isTeacher) {
       return const [
         NavigationDestination(icon: Icon(Icons.dashboard_outlined), selectedIcon: Icon(Icons.dashboard), label: 'หน้าหลัก'),
-        NavigationDestination(icon: Icon(Icons.person_pin_outlined), selectedIcon: Icon(Icons.person_pin), label: 'ตารางสอน'),
         NavigationDestination(icon: Icon(Icons.event_busy_outlined), selectedIcon: Icon(Icons.event_busy), label: 'ใบลา'),
       ];
     }
