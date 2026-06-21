@@ -112,7 +112,7 @@ class _HeroPanel extends StatelessWidget {
         gradient: LinearGradient(
           begin: Alignment.topCenter,
           end: Alignment.bottomCenter,
-          colors: [Color(0xFFFFB300), Color(0xFFF97316), Color(0xFFE65100)],
+          colors: [Color(0xFFFFF8DC), Color(0xFFFFE082), Color(0xFFFFB300)],
         ),
       ),
       child: Stack(children: [
@@ -182,11 +182,11 @@ class _HeroPanel extends StatelessWidget {
                 const SizedBox(height: 12),
                 const Text('7J English',
                     style: TextStyle(fontSize: 34, fontWeight: FontWeight.w800,
-                        color: Colors.white, letterSpacing: 0.5)),
+                        color: Color(0xFF1A237E), letterSpacing: 0.5)),
                 const SizedBox(height: 6),
-                Text('ระบบจัดการโรงเรียน',
+                const Text('ระบบจัดการโรงเรียน',
                     style: TextStyle(fontSize: 15,
-                        color: Colors.white.withOpacity(0.85), letterSpacing: 0.3)),
+                        color: Color(0xFF3949AB), letterSpacing: 0.3)),
               ]),
             ),
           ),
@@ -241,7 +241,7 @@ class _DotGrid extends StatelessWidget {
             width: 5, height: 5,
             decoration: BoxDecoration(
               shape: BoxShape.circle,
-              color: Colors.white.withOpacity(0.40),
+              color: const Color(0xFFE65100).withOpacity(0.18),
             ),
           ),
         )),
@@ -257,12 +257,12 @@ class _WordChip extends StatelessWidget {
   Widget build(BuildContext context) => Container(
     padding: const EdgeInsets.symmetric(horizontal: 14, vertical: 8),
     decoration: BoxDecoration(
-      color: Colors.white.withOpacity(0.22),
+      color: const Color(0xFFFF8F00).withOpacity(0.22),
       borderRadius: BorderRadius.circular(24),
-      border: Border.all(color: Colors.white.withOpacity(0.28)),
+      border: Border.all(color: const Color(0xFFE65100).withOpacity(0.35)),
     ),
     child: Text(text,
-        style: const TextStyle(color: Colors.white,
+        style: const TextStyle(color: Color(0xFF7B3500),
             fontWeight: FontWeight.bold, fontSize: 14)),
   );
 }
@@ -273,9 +273,9 @@ class _ChatDotBubble extends StatelessWidget {
   Widget build(BuildContext context) => Container(
     padding: const EdgeInsets.symmetric(horizontal: 14, vertical: 10),
     decoration: BoxDecoration(
-      color: Colors.white.withOpacity(0.22),
+      color: const Color(0xFFFF8F00).withOpacity(0.22),
       borderRadius: BorderRadius.circular(20),
-      border: Border.all(color: Colors.white.withOpacity(0.28)),
+      border: Border.all(color: const Color(0xFFE65100).withOpacity(0.35)),
     ),
     child: Row(mainAxisSize: MainAxisSize.min, children: [
       _dot(), const SizedBox(width: 4),
@@ -285,7 +285,8 @@ class _ChatDotBubble extends StatelessWidget {
   );
   Widget _dot() => Container(
     width: 6, height: 6,
-    decoration: const BoxDecoration(shape: BoxShape.circle, color: Colors.white),
+    decoration: const BoxDecoration(
+        shape: BoxShape.circle, color: Color(0xFF7B3500)),
   );
 }
 
@@ -309,36 +310,107 @@ class _Diamond extends StatelessWidget {
 class _SkylinePainter extends CustomPainter {
   @override
   void paint(Canvas canvas, Size size) {
-    final fill = Paint()
-      ..color = Colors.white.withOpacity(0.13)
+    // Navy ground fill
+    final navyFill = Paint()
+      ..color = const Color(0xFF0D1B5E)
       ..style = PaintingStyle.fill;
-    final line = Paint()
-      ..color = Colors.white.withOpacity(0.32)
+    // Golden amber for landmarks
+    final goldFill = Paint()
+      ..color = const Color(0xFFFFB300)
+      ..style = PaintingStyle.fill;
+    final goldLine = Paint()
+      ..color = const Color(0xFFE65100)
       ..style = PaintingStyle.stroke
-      ..strokeWidth = 1.4
+      ..strokeWidth = 1.0
       ..strokeCap = StrokeCap.round
       ..strokeJoin = StrokeJoin.round;
+    // Navy leaves
+    final navyLeaf = Paint()
+      ..color = const Color(0xFF1A237E)
+      ..style = PaintingStyle.fill;
+    // Golden wave highlight
+    final waveGold = Paint()
+      ..color = const Color(0xFFFFB300).withOpacity(0.55)
+      ..style = PaintingStyle.fill;
 
-    // Rolling hill ground
-    final hill = Path()
-      ..moveTo(0, size.height * 0.52)
-      ..quadraticBezierTo(size.width * 0.28, size.height * 0.28,
-          size.width * 0.54, size.height * 0.46)
-      ..quadraticBezierTo(size.width * 0.77, size.height * 0.60,
-          size.width, size.height * 0.44)
+    // Main navy ground wave
+    final ground = Path()
+      ..moveTo(0, size.height * 0.44)
+      ..quadraticBezierTo(size.width * 0.26, size.height * 0.22,
+          size.width * 0.52, size.height * 0.38)
+      ..quadraticBezierTo(size.width * 0.76, size.height * 0.52,
+          size.width, size.height * 0.38)
       ..lineTo(size.width, size.height)
       ..lineTo(0, size.height)
       ..close();
-    canvas.drawPath(hill, fill);
+    canvas.drawPath(ground, navyFill);
 
-    _bigBen(canvas, fill, line,
-        size.width * 0.11, size.height * 0.94);
-    _ferrisWheel(canvas, line,
-        size.width * 0.33, size.height * 0.67, 26);
-    _towerBridge(canvas, fill, line,
-        size.width * 0.57, size.height * 0.91, size.width * 0.20);
-    _liberty(canvas, line,
-        size.width * 0.86, size.height * 0.73);
+    // Golden wave ribbon on top of navy
+    final wave = Path()
+      ..moveTo(0, size.height * 0.44)
+      ..quadraticBezierTo(size.width * 0.26, size.height * 0.22,
+          size.width * 0.52, size.height * 0.38)
+      ..quadraticBezierTo(size.width * 0.76, size.height * 0.52,
+          size.width, size.height * 0.38)
+      ..lineTo(size.width, size.height * 0.43)
+      ..quadraticBezierTo(size.width * 0.76, size.height * 0.57,
+          size.width * 0.52, size.height * 0.43)
+      ..quadraticBezierTo(size.width * 0.26, size.height * 0.27,
+          0, size.height * 0.49)
+      ..close();
+    canvas.drawPath(wave, waveGold);
+
+    // Landmarks (golden)
+    _bigBen(canvas, goldFill, goldLine,
+        size.width * 0.11, size.height * 0.92);
+    _ferrisWheel(canvas, goldLine,
+        size.width * 0.33, size.height * 0.65, 27);
+    _towerBridge(canvas, goldFill, goldLine,
+        size.width * 0.57, size.height * 0.89, size.width * 0.21);
+    _liberty(canvas, goldLine,
+        size.width * 0.86, size.height * 0.70);
+
+    // Leaf clusters at corners
+    _leafCluster(canvas, navyLeaf, size, true);
+    _leafCluster(canvas, navyLeaf, size, false);
+  }
+
+  void _leafCluster(Canvas canvas, Paint paint, Size size, bool isLeft) {
+    final bx = isLeft ? -10.0 : size.width + 10;
+    final by = size.height;
+    final angles = isLeft
+        ? [-0.6, -0.3, 0.0, 0.3, 0.6, -0.9, -1.2]
+        : [math.pi + 0.6, math.pi + 0.3, math.pi, math.pi - 0.3, math.pi - 0.6, math.pi + 0.9, math.pi + 1.2];
+    final offsets = [
+      Offset(bx + (isLeft ? 30 : -30), by - 30),
+      Offset(bx + (isLeft ? 50 : -50), by - 55),
+      Offset(bx + (isLeft ? 20 : -20), by - 65),
+      Offset(bx + (isLeft ? 45 : -45), by - 85),
+      Offset(bx + (isLeft ? 10 : -10), by - 95),
+      Offset(bx + (isLeft ? 60 : -60), by - 35),
+      Offset(bx + (isLeft ? 70 : -70), by - 70),
+    ];
+    for (int i = 0; i < offsets.length; i++) {
+      _leaf(canvas, paint, offsets[i], 42, angles[i % angles.length]);
+    }
+  }
+
+  void _leaf(Canvas canvas, Paint paint, Offset tip, double len, double angle) {
+    canvas.save();
+    canvas.translate(tip.dx, tip.dy);
+    canvas.rotate(angle);
+    final path = Path()
+      ..moveTo(0, 0)
+      ..cubicTo(-len * 0.28, -len * 0.30, -len * 0.42, -len * 0.65, 0, -len)
+      ..cubicTo(len * 0.42, -len * 0.65, len * 0.28, -len * 0.30, 0, 0);
+    canvas.drawPath(path, paint);
+    // Midrib
+    final midrib = Paint()
+      ..color = const Color(0xFF0D1B5E).withOpacity(0.25)
+      ..strokeWidth = 0.8
+      ..style = PaintingStyle.stroke;
+    canvas.drawLine(Offset.zero, Offset(0, -len * 0.85), midrib);
+    canvas.restore();
   }
 
   void _bigBen(Canvas canvas, Paint fill, Paint line, double x, double base) {
