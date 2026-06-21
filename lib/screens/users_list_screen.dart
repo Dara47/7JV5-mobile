@@ -277,28 +277,96 @@ class _UserList extends StatelessWidget {
                     builder: (ctx, pkgSnap) {
                       final pkgs = pkgSnap.data ?? [];
                       if (pkgs.isEmpty && u.totalAdded == 0 && u.totalRemoved == 0) return const SizedBox.shrink();
+
                       final total = pkgs.fold(0, (s, p) => s + p.totalSessions);
                       final hasAdj = u.totalAdded > 0 || u.totalRemoved > 0;
+
+                      // ── คำนวณสถานะการเรียน ──
+                      final now = DateTime.now();
+                      const dayMap = {'อา': 7, 'จ': 1, 'อ': 2, 'พ': 3, 'พฤ': 4, 'ศ': 5, 'ส': 6};
+                      final todayStr = '${now.year}-${now.month.toString().padLeft(2,'0')}-${now.day.toString().padLeft(2,'0')}';
+                      final hasSchedule = pkgs.any((p) => p.scheduledDay != null && p.scheduledTime != null);
+
+                      String learnLabel = 'ว่าง';
+                      Color learnColor = Colors.grey;
+                      bool needsCut = false;
+
+                      if (hasSchedule) {
+                        if (pkgs.any((p) => p.isCurrentlyInSession)) {
+                          learnLabel = 'กำลังเรียน';
+                          learnColor = Colors.green;
+                        } else {
+                          bool endedToday = false;
+                          for (final p in pkgs) {
+                            if (p.scheduledDay == null || p.scheduledTime == null) continue;
+                            if (dayMap[p.scheduledDay] != now.weekday) continue;
+                            try {
+                              final ep = (p.scheduledEndTime ?? p.scheduledTime!).split(':');
+                              final endM = int.parse(ep[0]) * 60 + int.parse(ep[1]);
+                              if (now.hour * 60 + now.minute >= endM) { endedToday = true; break; }
+                            } catch (_) {}
+                          }
+                          if (endedToday) {
+                            learnLabel = 'เรียนแล้ว';
+                            learnColor = Colors.blue;
+                          } else {
+                            learnLabel = 'รอเรียน';
+                            learnColor = Colors.amber.shade700;
+                          }
+                        }
+
+                        // ── รอตัดคาบ: วันตรง + เวลาผ่านแล้ว + ยังไม่ตัดวันนี้ ──
+                        for (final p in pkgs) {
+                          if (p.scheduledDay == null || p.scheduledTime == null) continue;
+                          if (dayMap[p.scheduledDay] != now.weekday) continue;
+                          if (p.remainingSessions <= 0) continue;
+                          if (p.lastCutDate == todayStr) continue;
+                          try {
+                            final ep = (p.scheduledEndTime ?? p.scheduledTime!).split(':');
+                            final endM = int.parse(ep[0]) * 60 + int.parse(ep[1]);
+                            if (now.hour * 60 + now.minute >= endM) { needsCut = true; break; }
+                          } catch (_) {}
+                        }
+                      }
+
                       return Padding(
                         padding: const EdgeInsets.fromLTRB(54, 0, 12, 10),
-                        child: Wrap(spacing: 6, crossAxisAlignment: WrapCrossAlignment.center, children: [
-                          Icon(Icons.book_outlined, size: 13, color: Colors.blue.shade300),
-                          Text('จำนวนคาบ:', style: TextStyle(fontSize: 12, color: Colors.grey.shade500)),
-                          Text('$total คาบ', style: const TextStyle(fontSize: 12, color: Color(0xFF1565C0), fontWeight: FontWeight.w600)),
-                          if (hasAdj) ...[
-                            if (u.totalAdded > 0)
-                              Container(
-                                padding: const EdgeInsets.symmetric(horizontal: 6, vertical: 1),
-                                decoration: BoxDecoration(color: Colors.green.shade50, borderRadius: BorderRadius.circular(6)),
-                                child: Text('+${u.totalAdded}', style: TextStyle(fontSize: 11, color: Colors.green.shade700, fontWeight: FontWeight.bold)),
-                              ),
-                            if (u.totalRemoved > 0)
-                              Container(
-                                padding: const EdgeInsets.symmetric(horizontal: 6, vertical: 1),
-                                decoration: BoxDecoration(color: Colors.red.shade50, borderRadius: BorderRadius.circular(6)),
-                                child: Text('-${u.totalRemoved}', style: TextStyle(fontSize: 11, color: Colors.red.shade600, fontWeight: FontWeight.bold)),
-                              ),
-                          ],
+                        child: Column(crossAxisAlignment: CrossAxisAlignment.start, children: [
+                          // แถว 1: จำนวนคาบ + +/- badges
+                          Wrap(spacing: 6, crossAxisAlignment: WrapCrossAlignment.center, children: [
+                            Icon(Icons.book_outlined, size: 13, color: Colors.blue.shade300),
+                            Text('จำนวนคาบ:', style: TextStyle(fontSize: 12, color: Colors.grey.shade500)),
+                            Text('$total คาบ', style: const TextStyle(fontSize: 12, color: Color(0xFF1565C0), fontWeight: FontWeight.w600)),
+                            if (hasAdj) ...[
+                              if (u.totalAdded > 0)
+                                Container(
+                                  padding: const EdgeInsets.symmetric(horizontal: 6, vertical: 1),
+                                  decoration: BoxDecoration(color: Colors.green.shade50, borderRadius: BorderRadius.circular(6)),
+                                  child: Text('+${u.totalAdded}', style: TextStyle(fontSize: 11, color: Colors.green.shade700, fontWeight: FontWeight.bold)),
+                                ),
+                              if (u.totalRemoved > 0)
+                                Container(
+                                  padding: const EdgeInsets.symmetric(horizontal: 6, vertical: 1),
+                                  decoration: BoxDecoration(color: Colors.red.shade50, borderRadius: BorderRadius.circular(6)),
+                                  child: Text('-${u.totalRemoved}', style: TextStyle(fontSize: 11, color: Colors.red.shade600, fontWeight: FontWeight.bold)),
+                                ),
+                            ],
+                          ]),
+                          const SizedBox(height: 4),
+                          // แถว 2: สถานะ dot + text
+                          Wrap(spacing: 12, crossAxisAlignment: WrapCrossAlignment.center, children: [
+                            Row(mainAxisSize: MainAxisSize.min, children: [
+                              Container(width: 7, height: 7, decoration: BoxDecoration(color: learnColor, shape: BoxShape.circle)),
+                              const SizedBox(width: 4),
+                              Text(learnLabel, style: TextStyle(fontSize: 11, color: learnColor, fontWeight: FontWeight.w600)),
+                            ]),
+                            if (needsCut)
+                              Row(mainAxisSize: MainAxisSize.min, children: [
+                                const Icon(Icons.warning_amber_rounded, size: 12, color: Colors.orange),
+                                const SizedBox(width: 3),
+                                Text('รอตัดคาบเรียน', style: TextStyle(fontSize: 11, color: Colors.orange.shade700, fontWeight: FontWeight.w600)),
+                              ]),
+                          ]),
                         ]),
                       );
                     },
