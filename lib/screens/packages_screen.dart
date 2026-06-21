@@ -4,7 +4,6 @@ import 'dart:html' as html;
 import '../models/models.dart';
 import '../services/firestore_service.dart';
 import 'package_form_dialog.dart';
-import 'teacher_schedule_screen.dart';
 
 class PackagesScreen extends StatefulWidget {
   final String? filterStudentId;
@@ -46,31 +45,25 @@ class _PackagesScreenState extends State<PackagesScreen> {
             ? (widget.filterTeacherName ?? 'ตารางสอน')
             : 'จัดการคาบเรียน';
 
+    // admin only: can add/edit packages
+    final canEdit = !isFiltered;
+
     return Scaffold(
       appBar: AppBar(
         title: Text(filterTitle),
         backgroundColor: const Color(0xFFF97316),
         foregroundColor: Colors.white,
       ),
-      floatingActionButton: isTeacherFilter
+      floatingActionButton: canEdit
           ? FloatingActionButton.extended(
-              heroTag: 'add_slot',
-              onPressed: () => Navigator.push(context, MaterialPageRoute(
-                builder: (_) => TeacherScheduleScreen(filterTeacherId: widget.filterTeacherId),
-              )),
-              backgroundColor: const Color(0xFF2E7D32),
-              foregroundColor: Colors.white,
-              icon: const Icon(Icons.schedule),
-              label: const Text('เพิ่มเวลาว่าง'),
-            )
-          : FloatingActionButton.extended(
               heroTag: 'add_pkg',
               onPressed: () => _openForm(),
               backgroundColor: const Color(0xFFF97316),
               foregroundColor: Colors.white,
               icon: const Icon(Icons.add),
               label: const Text('เพิ่มคาบ'),
-            ),
+            )
+          : null,
       body: Column(children: [
         if (!isFiltered) Padding(
           padding: const EdgeInsets.fromLTRB(12, 12, 12, 4),
@@ -125,6 +118,7 @@ class _PackagesScreenState extends State<PackagesScreen> {
                 onEdit: () => _openForm(pkg: list[i]),
                 viewerRole: viewerRole,
                 isStudentView: isStudentFilter,
+                canEdit: canEdit,
               ),
               );
             },
@@ -142,7 +136,8 @@ class PackageCard extends StatelessWidget {
   final VoidCallback onEdit;
   final String viewerRole;
   final bool isStudentView;
-  const PackageCard({super.key, required this.pkg, required this.onEdit, this.viewerRole = 'admin', this.isStudentView = false});
+  final bool canEdit;
+  const PackageCard({super.key, required this.pkg, required this.onEdit, this.viewerRole = 'admin', this.isStudentView = false, this.canEdit = true});
 
   String get _statusLabel {
     if (viewerRole == 'teacher') {
@@ -348,7 +343,7 @@ class PackageCard extends StatelessWidget {
 
             // Schedule row
             GestureDetector(
-              onTap: () => _showReschedule(context),
+              onTap: canEdit ? () => _showReschedule(context) : null,
               child: Container(
                 padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 6),
                 decoration: BoxDecoration(color: const Color(0xFFE3F2FD), borderRadius: BorderRadius.circular(8)),
@@ -356,10 +351,12 @@ class PackageCard extends StatelessWidget {
                   const Icon(Icons.calendar_today, size: 14, color: Color(0xFFF97316)),
                   const SizedBox(width: 6),
                   Text(pkg.scheduleLabel, style: const TextStyle(fontSize: 13, color: Color(0xFFF97316), fontWeight: FontWeight.w600)),
-                  const Spacer(),
-                  const Icon(Icons.edit_calendar, size: 14, color: Color(0xFFF97316)),
-                  const SizedBox(width: 4),
-                  const Text('ย้าย', style: TextStyle(fontSize: 11, color: Color(0xFFF97316))),
+                  if (canEdit) ...[
+                    const Spacer(),
+                    const Icon(Icons.edit_calendar, size: 14, color: Color(0xFFF97316)),
+                    const SizedBox(width: 4),
+                    const Text('ย้าย', style: TextStyle(fontSize: 11, color: Color(0xFFF97316))),
+                  ],
                 ]),
               ),
             ),
@@ -437,22 +434,23 @@ class PackageCard extends StatelessWidget {
           ],
         )),
 
-        // Action buttons row
-        Container(
-          decoration: BoxDecoration(
-            border: Border(top: BorderSide(color: Colors.grey.shade200)),
-            borderRadius: const BorderRadius.vertical(bottom: Radius.circular(14)),
+        // Action buttons row (admin only)
+        if (canEdit)
+          Container(
+            decoration: BoxDecoration(
+              border: Border(top: BorderSide(color: Colors.grey.shade200)),
+              borderRadius: const BorderRadius.vertical(bottom: Radius.circular(14)),
+            ),
+            child: Row(children: [
+              _ActionBtn(icon: Icons.remove_circle_outline, label: 'ลบคาบ', color: Colors.orange, onTap: () => _showAdjustDialog(context, isAdd: false)),
+              _vDivider(),
+              _ActionBtn(icon: Icons.add_circle_outline, label: 'เพิ่มคาบ', color: Colors.green, onTap: () => _showAdjustDialog(context, isAdd: true)),
+              _vDivider(),
+              _ActionBtn(icon: Icons.edit_outlined, label: 'Edit', color: const Color(0xFFF97316), onTap: onEdit),
+              _vDivider(),
+              _ActionBtn(icon: Icons.delete_outline, label: 'ลบ', color: Colors.red, onTap: () => _confirmDelete(context)),
+            ]),
           ),
-          child: Row(children: [
-            _ActionBtn(icon: Icons.remove_circle_outline, label: 'ลบคาบ', color: Colors.orange, onTap: () => _showAdjustDialog(context, isAdd: false)),
-            _vDivider(),
-            _ActionBtn(icon: Icons.add_circle_outline, label: 'เพิ่มคาบ', color: Colors.green, onTap: () => _showAdjustDialog(context, isAdd: true)),
-            _vDivider(),
-            _ActionBtn(icon: Icons.edit_outlined, label: 'Edit', color: const Color(0xFFF97316), onTap: onEdit),
-            _vDivider(),
-            _ActionBtn(icon: Icons.delete_outline, label: 'ลบ', color: Colors.red, onTap: () => _confirmDelete(context)),
-          ]),
-        ),
       ]),
     );
   }
