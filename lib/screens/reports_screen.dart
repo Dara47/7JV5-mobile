@@ -1,29 +1,21 @@
 ﻿import 'package:flutter/material.dart';
 import '../models/models.dart';
 import '../services/firestore_service.dart';
+import '../utils/date_format.dart';
 
 class ReportsScreen extends StatelessWidget {
   const ReportsScreen({super.key});
 
-  String _thaiDay(String date) {
-    try {
-      final dt = DateTime.parse(date);
-      const days = ['จ', 'อ', 'พ', 'พฤ', 'ศ', 'ส', 'อา'];
-      return days[dt.weekday - 1];
-    } catch (_) { return ''; }
-  }
-
-  String _shortDate(String date) {
-    if (date.length < 10) return date;
-    return '${date.substring(8)}/${date.substring(5, 7)}/${date.substring(0, 4)}';
-  }
+  String _fullDate(String date) => thaiDateFromStr(date);
+  String _fullDateTime(String date, String start, String end) =>
+      thaiDateTimeFromStr(date, startTime: start, endTime: end);
 
   void _confirmDeleteOne(BuildContext context, SessionModel s) {
     showDialog(
       context: context,
       builder: (_) => AlertDialog(
         title: const Text('ลบรายการ'),
-        content: Text('ลบคาบ ${s.studentName} วันที่ ${_shortDate(s.date)} ${s.startTime}?'),
+        content: Text('ลบคาบ ${s.studentName}\n${_fullDateTime(s.date, s.startTime, s.endTime)}'),
         actions: [
           TextButton(onPressed: () => Navigator.pop(context), child: const Text('ยกเลิก')),
           TextButton(
@@ -144,21 +136,13 @@ class ReportsScreen extends StatelessWidget {
                           ]),
                           const SizedBox(height: 4),
                           Row(children: [
-                            Container(
-                              padding: const EdgeInsets.symmetric(horizontal: 6, vertical: 1),
-                              decoration: BoxDecoration(color: const Color(0xFFF97316), borderRadius: BorderRadius.circular(4)),
-                              child: Text(_thaiDay(s.date), style: const TextStyle(fontSize: 10, color: Colors.white, fontWeight: FontWeight.bold)),
-                            ),
-                            const SizedBox(width: 6),
-                            Text(_shortDate(s.date), style: const TextStyle(fontSize: 12, color: Colors.grey)),
-                            const SizedBox(width: 8),
-                            const Icon(Icons.access_time, size: 12, color: Colors.grey),
-                            const SizedBox(width: 2),
-                            Text(s.timeRange, style: const TextStyle(fontSize: 12, color: Colors.grey)),
-                            if (s.language != null) ...[
-                              const SizedBox(width: 8),
-                              Text(s.language!, style: const TextStyle(fontSize: 11, color: Color(0xFFF97316))),
-                            ],
+                            const Icon(Icons.calendar_today, size: 12, color: Color(0xFFF97316)),
+                            const SizedBox(width: 4),
+                            Expanded(child: Text(
+                              '${_fullDate(s.date)}  ${s.startTime} - ${s.endTime} น.'
+                              '${s.language != null ? '  •  ${s.language}' : ''}',
+                              style: const TextStyle(fontSize: 12, color: Colors.grey),
+                            )),
                           ]),
                         ])),
 

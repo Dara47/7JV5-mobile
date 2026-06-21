@@ -29,6 +29,19 @@ String thaiDateTimeFull(DateTime d, {String? startTime, String? endTime}) {
   return '$date เวลา $time';
 }
 
+/// แปลง "2025-06-21" → "วันอาทิตย์ที่ 21/06/2569"
+String thaiDateFromStr(String dateStr) {
+  final d = parseDateStr(dateStr);
+  return d != null ? thaiDateFull(d) : dateStr;
+}
+
+/// แปลง "2025-06-21" → "วันอาทิตย์ที่ 21/06/2569 เวลา 09:00 - 09:40 น."
+String thaiDateTimeFromStr(String dateStr, {String? startTime, String? endTime}) {
+  final d = parseDateStr(dateStr);
+  if (d == null) return dateStr;
+  return thaiDateTimeFull(d, startTime: startTime, endTime: endTime);
+}
+
 /// แปลง "2025-06-21" → DateTime
 DateTime? parseDateStr(String s) {
   try { return DateTime.parse(s); } catch (_) { return null; }

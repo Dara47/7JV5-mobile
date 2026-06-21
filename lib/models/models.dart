@@ -1,5 +1,6 @@
 import 'package:flutter/material.dart';
 import 'package:cloud_firestore/cloud_firestore.dart';
+import '../utils/date_format.dart';
 
 class AppUser {
   final String uid;
@@ -269,10 +270,7 @@ class LeaveRequestModel {
 
   String get roleLabel => userRole == 'teacher' ? 'ครู' : 'นักเรียน';
 
-  String get shortDate {
-    if (date.length < 10) return date;
-    return '${date.substring(8)}/${date.substring(5, 7)}/${date.substring(0, 4)}';
-  }
+  String get shortDate => thaiDateFromStr(date);
 
   factory LeaveRequestModel.fromDoc(DocumentSnapshot doc) {
     final d = doc.data() as Map<String, dynamic>;

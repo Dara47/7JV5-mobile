@@ -3,6 +3,7 @@
 import 'dart:html' as html;
 import '../models/models.dart';
 import '../services/firestore_service.dart';
+import '../utils/date_format.dart';
 import 'package_form_dialog.dart';
 
 class PackagesScreen extends StatefulWidget {
@@ -752,7 +753,7 @@ class PackageReportScreen extends StatelessWidget {
                       backgroundColor: const Color(0xFFF97316).withAlpha(20),
                       child: Text('${i + 1}', style: const TextStyle(fontSize: 12, color: Color(0xFFF97316), fontWeight: FontWeight.bold)),
                     ),
-                    title: Text('${s.date}  ${s.startTime}–${s.endTime}'),
+                    title: Text(thaiDateTimeFromStr(s.date, startTime: s.startTime, endTime: s.endTime)),
                     subtitle: Text([
                       if (s.language != null) s.language!,
                       if (s.skill != null) s.skill!,

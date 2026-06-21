@@ -3,6 +3,7 @@ import '../models/models.dart';
 import '../services/firestore_service.dart';
 import '../widgets/session_table.dart';
 import '../widgets/summary_footer.dart';
+import '../utils/date_format.dart';
 
 class UserDetailScreen extends StatelessWidget {
   final String userId;
@@ -53,7 +54,7 @@ class _SessionsTab extends StatelessWidget {
       context: context,
       builder: (_) => AlertDialog(
         title: const Text('ลบคาบเรียน'),
-        content: Text('ยืนยันลบคาบ ${session.date} ${session.startTime}?'),
+        content: Text('ยืนยันลบคาบ\n${thaiDateTimeFromStr(session.date, startTime: session.startTime, endTime: session.endTime)}'),
         actions: [
           TextButton(onPressed: () => Navigator.pop(context), child: const Text('ยกเลิก')),
           TextButton(
