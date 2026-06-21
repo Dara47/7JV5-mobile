@@ -165,16 +165,21 @@ class _HeroPanel extends StatelessWidget {
             child: Padding(
               padding: EdgeInsets.fromLTRB(36, 24, 36, showFeatures ? 200 : 24),
               child: Column(mainAxisSize: MainAxisSize.min, children: [
-                Container(
-                  width: 96, height: 96,
-                  decoration: BoxDecoration(
-                    shape: BoxShape.circle,
-                    color: Colors.white.withOpacity(0.18),
-                    border: Border.all(color: Colors.white.withOpacity(0.35), width: 2),
+                Image.asset(
+                  'assets/images/logo.png',
+                  width: 130,
+                  height: 130,
+                  errorBuilder: (_, __, ___) => Container(
+                    width: 96, height: 96,
+                    decoration: BoxDecoration(
+                      shape: BoxShape.circle,
+                      color: Colors.white.withOpacity(0.18),
+                      border: Border.all(color: Colors.white.withOpacity(0.35), width: 2),
+                    ),
+                    child: const Icon(Icons.school_rounded, size: 52, color: Colors.white),
                   ),
-                  child: const Icon(Icons.school_rounded, size: 52, color: Colors.white),
                 ),
-                const SizedBox(height: 20),
+                const SizedBox(height: 12),
                 const Text('7J English',
                     style: TextStyle(fontSize: 34, fontWeight: FontWeight.w800,
                         color: Colors.white, letterSpacing: 0.5)),
