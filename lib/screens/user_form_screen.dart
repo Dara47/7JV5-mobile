@@ -89,7 +89,7 @@ class _UserFormScreenState extends State<UserFormScreen> {
       backgroundColor: const Color(0xFFF5F7FF),
       appBar: AppBar(
         title: Text(_isEdit ? 'แก้ไขข้อมูล' : 'เพิ่มผู้ใช้ใหม่'),
-        backgroundColor: const Color(0xFFB45309),
+        backgroundColor: const Color(0xFFEA580C),
         foregroundColor: Colors.white,
       ),
       body: Form(
@@ -103,7 +103,7 @@ class _UserFormScreenState extends State<UserFormScreen> {
             Expanded(child: _RoleCard(
               label: 'นักเรียน', icon: Icons.school_outlined,
               selected: _role == 'student',
-              color: const Color(0xFFB45309),
+              color: const Color(0xFFEA580C),
               onTap: _isEdit ? null : () {
                 setState(() => _role = 'student');
                 _fetchCode('student');
@@ -140,7 +140,7 @@ class _UserFormScreenState extends State<UserFormScreen> {
                   : Text(_generatedCode,
                       style: TextStyle(
                         fontSize: 18, fontWeight: FontWeight.bold, letterSpacing: 1.5,
-                        color: _role == 'student' ? const Color(0xFFB45309) : const Color(0xFF2E7D32),
+                        color: _role == 'student' ? const Color(0xFFEA580C) : const Color(0xFF2E7D32),
                       )),
               const Spacer(),
               Container(
@@ -228,7 +228,7 @@ class _UserFormScreenState extends State<UserFormScreen> {
                   : const Icon(Icons.check_circle_outline),
               label: Text(_isEdit ? 'บันทึกการแก้ไข' : 'เพิ่มผู้ใช้', style: const TextStyle(fontSize: 16, fontWeight: FontWeight.bold)),
               style: ElevatedButton.styleFrom(
-                backgroundColor: const Color(0xFFB45309),
+                backgroundColor: const Color(0xFFEA580C),
                 foregroundColor: Colors.white,
                 shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(12)),
                 disabledBackgroundColor: Colors.grey.shade300,
@@ -267,7 +267,7 @@ class _Field extends StatelessWidget {
         contentPadding: const EdgeInsets.symmetric(horizontal: 16, vertical: 14),
         border: OutlineInputBorder(borderRadius: BorderRadius.circular(12), borderSide: BorderSide(color: Colors.grey.shade300)),
         enabledBorder: OutlineInputBorder(borderRadius: BorderRadius.circular(12), borderSide: BorderSide(color: Colors.grey.shade300)),
-        focusedBorder: OutlineInputBorder(borderRadius: BorderRadius.circular(12), borderSide: const BorderSide(color: Color(0xFFB45309), width: 2)),
+        focusedBorder: OutlineInputBorder(borderRadius: BorderRadius.circular(12), borderSide: const BorderSide(color: Color(0xFFEA580C), width: 2)),
         errorBorder: OutlineInputBorder(borderRadius: BorderRadius.circular(12), borderSide: const BorderSide(color: Colors.red)),
       ),
     );

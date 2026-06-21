@@ -175,7 +175,7 @@ class _SessionFormScreenState extends State<SessionFormScreen> {
       backgroundColor: const Color(0xFFF8FAFF),
       appBar: AppBar(
         title: Text(_isEdit ? 'แก้ไขคาบเรียน' : 'เพิ่มคาบเรียน'),
-        backgroundColor: const Color(0xFFB45309),
+        backgroundColor: const Color(0xFFEA580C),
         foregroundColor: Colors.white,
         actions: [
           if (_saving)
@@ -238,7 +238,7 @@ class _SessionFormScreenState extends State<SessionFormScreen> {
                   Padding(
                     padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 12),
                     child: Row(children: [
-                      const Icon(Icons.timelapse, size: 20, color: Color(0xFFB45309)),
+                      const Icon(Icons.timelapse, size: 20, color: Color(0xFFEA580C)),
                       const SizedBox(width: 12),
                       const Text('ระยะเวลา', style: TextStyle(fontSize: 15)),
                       const Spacer(),
@@ -248,7 +248,7 @@ class _SessionFormScreenState extends State<SessionFormScreen> {
                           color: _durationMinutes > 0 ? const Color(0xFFE3F2FD) : Colors.grey.shade100,
                           borderRadius: BorderRadius.circular(20),
                         ),
-                        child: Text(_durationLabel, style: TextStyle(fontWeight: FontWeight.bold, color: _durationMinutes > 0 ? const Color(0xFFB45309) : Colors.grey)),
+                        child: Text(_durationLabel, style: TextStyle(fontWeight: FontWeight.bold, color: _durationMinutes > 0 ? const Color(0xFFEA580C) : Colors.grey)),
                       ),
                     ]),
                   ),
@@ -262,7 +262,7 @@ class _SessionFormScreenState extends State<SessionFormScreen> {
                   items: SessionModel.languages,
                   selected: _language,
                   onSelect: (v) => setState(() => _language = _language == v ? null : v),
-                  color: const Color(0xFFB45309),
+                  color: const Color(0xFFEA580C),
                 ),
                 const SizedBox(height: 16),
 
@@ -346,7 +346,7 @@ class _SessionFormScreenState extends State<SessionFormScreen> {
                     icon: const Icon(Icons.save_outlined),
                     label: Text(_isEdit ? 'อัปเดตคาบเรียน' : 'บันทึกคาบเรียน', style: const TextStyle(fontSize: 16)),
                     style: ElevatedButton.styleFrom(
-                      backgroundColor: const Color(0xFFB45309), foregroundColor: Colors.white,
+                      backgroundColor: const Color(0xFFEA580C), foregroundColor: Colors.white,
                       shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(12)),
                     ),
                   ),
@@ -383,9 +383,9 @@ class _SectionHeader extends StatelessWidget {
   const _SectionHeader({required this.icon, required this.label});
   @override
   Widget build(BuildContext context) => Row(children: [
-    Icon(icon, size: 18, color: const Color(0xFFB45309)),
+    Icon(icon, size: 18, color: const Color(0xFFEA580C)),
     const SizedBox(width: 6),
-    Text(label, style: const TextStyle(fontSize: 13, fontWeight: FontWeight.bold, color: Color(0xFFB45309))),
+    Text(label, style: const TextStyle(fontSize: 13, fontWeight: FontWeight.bold, color: Color(0xFFEA580C))),
   ]);
 }
 
@@ -413,11 +413,11 @@ class _PickerRow extends StatelessWidget {
     child: Padding(
       padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 12),
       child: Row(children: [
-        Icon(icon, size: 20, color: const Color(0xFFB45309)),
+        Icon(icon, size: 20, color: const Color(0xFFEA580C)),
         const SizedBox(width: 12),
         Text(label, style: const TextStyle(fontSize: 15)),
         const Spacer(),
-        trailing ?? Text(value, style: const TextStyle(fontSize: 15, fontWeight: FontWeight.w600, color: Color(0xFFB45309))),
+        trailing ?? Text(value, style: const TextStyle(fontSize: 15, fontWeight: FontWeight.w600, color: Color(0xFFEA580C))),
       ]),
     ),
   );
@@ -434,7 +434,7 @@ class _TimeChip extends StatelessWidget {
     child: Container(
       padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 6),
       decoration: BoxDecoration(color: const Color(0xFFE3F2FD), borderRadius: BorderRadius.circular(10)),
-      child: Text('$label:$sub', style: const TextStyle(fontSize: 16, fontWeight: FontWeight.bold, color: Color(0xFFB45309))),
+      child: Text('$label:$sub', style: const TextStyle(fontSize: 16, fontWeight: FontWeight.bold, color: Color(0xFFEA580C))),
     ),
   );
 }
@@ -487,11 +487,11 @@ class _PkgTile extends StatelessWidget {
       decoration: BoxDecoration(
         color: selected ? const Color(0xFFE3F2FD) : Colors.white,
         borderRadius: BorderRadius.circular(10),
-        border: Border.all(color: selected ? const Color(0xFFB45309) : Colors.grey.shade200, width: selected ? 2 : 1),
+        border: Border.all(color: selected ? const Color(0xFFEA580C) : Colors.grey.shade200, width: selected ? 2 : 1),
         boxShadow: [BoxShadow(color: Colors.black.withAlpha(10), blurRadius: 4)],
       ),
       child: Row(children: [
-        Icon(selected ? Icons.radio_button_checked : Icons.radio_button_unchecked, color: selected ? const Color(0xFFB45309) : Colors.grey),
+        Icon(selected ? Icons.radio_button_checked : Icons.radio_button_unchecked, color: selected ? const Color(0xFFEA580C) : Colors.grey),
         const SizedBox(width: 10),
         Expanded(child: Column(crossAxisAlignment: CrossAxisAlignment.start, children: [
           Text(viewerRole == 'student' ? 'ครู: ${pkg.teacherName}' : 'นักเรียน: ${pkg.studentName}', style: const TextStyle(fontWeight: FontWeight.w600, fontSize: 14)),

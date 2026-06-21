@@ -202,7 +202,7 @@ class _AdminLeaveCard extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
-    final roleColor = leave.userRole == 'teacher' ? const Color(0xFF2E7D32) : const Color(0xFFB45309);
+    final roleColor = leave.userRole == 'teacher' ? const Color(0xFF2E7D32) : const Color(0xFFEA580C);
     return Card(
       margin: EdgeInsets.zero,
       shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(12)),

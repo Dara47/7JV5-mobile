@@ -185,7 +185,7 @@ class _PackageFormSheetState extends State<_PackageFormSheet> {
         Padding(
           padding: const EdgeInsets.symmetric(horizontal: 20, vertical: 12),
           child: Row(children: [
-            Icon(_isEdit ? Icons.edit_outlined : Icons.add_circle_outline, color: const Color(0xFFB45309)),
+            Icon(_isEdit ? Icons.edit_outlined : Icons.add_circle_outline, color: const Color(0xFFEA580C)),
             const SizedBox(width: 10),
             Text(_isEdit ? 'แก้ไขคาบเรียน' : 'เพิ่มคาบเรียนใหม่',
                 style: const TextStyle(fontSize: 17, fontWeight: FontWeight.bold)),
@@ -213,7 +213,7 @@ class _PackageFormSheetState extends State<_PackageFormSheet> {
                         selected: _student,
                         hint: 'เลือกนักเรียน...',
                         enabled: !_isEdit && widget.preselectedStudentId == null,
-                        color: const Color(0xFFB45309),
+                        color: const Color(0xFFEA580C),
                         onChanged: (u) {
                           setState(() {
                             _student = u;
@@ -326,9 +326,9 @@ class _PackageFormSheetState extends State<_PackageFormSheet> {
                             duration: const Duration(milliseconds: 150),
                             width: 44, height: 44,
                             decoration: BoxDecoration(
-                              color: _scheduledDay == d ? const Color(0xFFB45309) : Colors.grey.shade100,
+                              color: _scheduledDay == d ? const Color(0xFFEA580C) : Colors.grey.shade100,
                               shape: BoxShape.circle,
-                              border: Border.all(color: _scheduledDay == d ? const Color(0xFFB45309) : Colors.grey.shade300),
+                              border: Border.all(color: _scheduledDay == d ? const Color(0xFFEA580C) : Colors.grey.shade300),
                             ),
                             child: Center(child: Text(d, style: TextStyle(
                               fontWeight: FontWeight.bold, fontSize: 13,
@@ -427,7 +427,7 @@ class _PackageFormSheetState extends State<_PackageFormSheet> {
                               : const Icon(Icons.check_circle_outline),
                           label: Text(_isEdit ? 'อัปเดต' : 'บันทึกคาบเรียน', style: const TextStyle(fontSize: 16, fontWeight: FontWeight.bold)),
                           style: ElevatedButton.styleFrom(
-                            backgroundColor: const Color(0xFFB45309), foregroundColor: Colors.white,
+                            backgroundColor: const Color(0xFFEA580C), foregroundColor: Colors.white,
                             shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(12)),
                           ),
                         ),
@@ -512,13 +512,13 @@ class _TimePicker extends StatelessWidget {
       decoration: BoxDecoration(
         color: time != null ? const Color(0xFFE3F2FD) : Colors.grey.shade100,
         borderRadius: BorderRadius.circular(10),
-        border: Border.all(color: time != null ? const Color(0xFFB45309).withAlpha(100) : Colors.grey.shade300),
+        border: Border.all(color: time != null ? const Color(0xFFEA580C).withAlpha(100) : Colors.grey.shade300),
       ),
       child: Column(mainAxisAlignment: MainAxisAlignment.center, children: [
         Text(label, style: const TextStyle(fontSize: 10, color: Colors.grey)),
         Text(
           time != null ? '${time!.hour.toString().padLeft(2,'0')}:${time!.minute.toString().padLeft(2,'0')}' : 'แตะเพื่อเลือก',
-          style: TextStyle(fontSize: 16, fontWeight: FontWeight.bold, color: time != null ? const Color(0xFFB45309) : Colors.grey),
+          style: TextStyle(fontSize: 16, fontWeight: FontWeight.bold, color: time != null ? const Color(0xFFEA580C) : Colors.grey),
         ),
       ]),
     ),

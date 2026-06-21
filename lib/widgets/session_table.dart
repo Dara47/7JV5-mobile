@@ -41,7 +41,7 @@ class SessionTable extends StatelessWidget {
     return Column(children: [
       // Header
       Container(
-        color: const Color(0xFFB45309),
+        color: const Color(0xFFEA580C),
         child: SingleChildScrollView(
           scrollDirection: Axis.horizontal,
           child: Row(children: List.generate(_cols.length, (i) => SizedBox(
@@ -72,7 +72,7 @@ class SessionTable extends StatelessWidget {
                   _cell(_widths[1], Column(mainAxisSize: MainAxisSize.min, children: [
                     Container(
                       padding: const EdgeInsets.symmetric(horizontal: 5, vertical: 1),
-                      decoration: BoxDecoration(color: const Color(0xFFB45309), borderRadius: BorderRadius.circular(4)),
+                      decoration: BoxDecoration(color: const Color(0xFFEA580C), borderRadius: BorderRadius.circular(4)),
                       child: Text(_thaiDay(s.date), style: const TextStyle(fontSize: 11, color: Colors.white, fontWeight: FontWeight.bold)),
                     ),
                     const SizedBox(height: 2),
@@ -89,7 +89,7 @@ class SessionTable extends StatelessWidget {
 
                   _cell(_widths[4], Column(mainAxisSize: MainAxisSize.min, crossAxisAlignment: CrossAxisAlignment.start, children: [
                     if (s.language != null)
-                      Text(s.language!, style: _tdStyle.copyWith(fontSize: 11, fontWeight: FontWeight.w600, color: const Color(0xFFB45309)), overflow: TextOverflow.ellipsis),
+                      Text(s.language!, style: _tdStyle.copyWith(fontSize: 11, fontWeight: FontWeight.w600, color: const Color(0xFFEA580C)), overflow: TextOverflow.ellipsis),
                     if (s.skill != null)
                       Text(s.skill!, style: _tdStyle.copyWith(fontSize: 10, color: Colors.green.shade700), overflow: TextOverflow.ellipsis),
                     if (s.language == null && s.skill == null)
@@ -107,7 +107,7 @@ class SessionTable extends StatelessWidget {
 
                   if (onEdit != null) _cell(_widths[8], IconButton(
                     padding: EdgeInsets.zero,
-                    icon: const Icon(Icons.edit_outlined, size: 18, color: Color(0xFFB45309)),
+                    icon: const Icon(Icons.edit_outlined, size: 18, color: Color(0xFFEA580C)),
                     onPressed: () => onEdit!(s),
                   )) else _cell(_widths[8], const SizedBox()),
                   _cell(_widths[9], IconButton(
