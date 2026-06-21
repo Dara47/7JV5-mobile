@@ -4,7 +4,6 @@ import 'dart:html' as html;
 import 'package:flutter/material.dart';
 import '../models/models.dart';
 import '../services/firestore_service.dart';
-import 'packages_screen.dart';
 import 'leave_request_screen.dart';
 
 class StudentDashboardScreen extends StatefulWidget {

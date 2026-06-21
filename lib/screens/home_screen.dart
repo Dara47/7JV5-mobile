@@ -8,6 +8,7 @@ import 'reports_screen.dart';
 import 'cut_session_screen.dart';
 import 'leave_request_screen.dart';
 import 'settings_screen.dart';
+import 'payroll_screen.dart';
 import 'teacher_dashboard_screen.dart';
 import 'student_dashboard_screen.dart';
 
@@ -33,6 +34,7 @@ class _HomeScreenState extends State<HomeScreen> {
         LeaveRequestScreen(appUser: u),
         const ReportsScreen(),
         const SettingsScreen(),
+        const PayrollScreen(),
       ];
     }
     if (u.isTeacher) {
@@ -60,6 +62,7 @@ class _HomeScreenState extends State<HomeScreen> {
         NavigationDestination(icon: Icon(Icons.event_busy_outlined), selectedIcon: Icon(Icons.event_busy), label: 'ใบลา'),
         NavigationDestination(icon: Icon(Icons.bar_chart_outlined), selectedIcon: Icon(Icons.bar_chart), label: 'รายงาน'),
         NavigationDestination(icon: Icon(Icons.settings_outlined), selectedIcon: Icon(Icons.settings), label: 'ตั้งค่า'),
+        NavigationDestination(icon: Icon(Icons.account_balance_wallet_outlined), selectedIcon: Icon(Icons.account_balance_wallet), label: 'บัญชี'),
       ];
     }
     if (u.isTeacher) {

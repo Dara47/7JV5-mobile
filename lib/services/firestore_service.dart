@@ -346,4 +346,42 @@ class FirestoreService {
       ...data, 'updatedAt': FieldValue.serverTimestamp(),
     }, SetOptions(merge: true));
   }
+
+  // ── Payroll ───────────────────────────────────────────────────────────────
+
+  static Future<List<TeacherPayrollModel>> getTeacherPayrolls() async {
+    final snap = await _db.collection('sevenj_teacher_payroll')
+        .orderBy('createdAt', descending: true).get();
+    return snap.docs.map(TeacherPayrollModel.fromDoc).toList();
+  }
+
+  static Future<void> addTeacherPayroll(Map<String, dynamic> data) async {
+    await _db.collection('sevenj_teacher_payroll').add(data);
+  }
+
+  static Future<void> updateTeacherPayroll(String id, Map<String, dynamic> data) async {
+    await _db.collection('sevenj_teacher_payroll').doc(id).update(data);
+  }
+
+  static Future<void> deleteTeacherPayroll(String id) async {
+    await _db.collection('sevenj_teacher_payroll').doc(id).delete();
+  }
+
+  static Future<List<AdminPayrollModel>> getAdminPayrolls() async {
+    final snap = await _db.collection('sevenj_admin_payroll')
+        .orderBy('createdAt', descending: true).get();
+    return snap.docs.map(AdminPayrollModel.fromDoc).toList();
+  }
+
+  static Future<void> addAdminPayroll(Map<String, dynamic> data) async {
+    await _db.collection('sevenj_admin_payroll').add(data);
+  }
+
+  static Future<void> updateAdminPayroll(String id, Map<String, dynamic> data) async {
+    await _db.collection('sevenj_admin_payroll').doc(id).update(data);
+  }
+
+  static Future<void> deleteAdminPayroll(String id) async {
+    await _db.collection('sevenj_admin_payroll').doc(id).delete();
+  }
 }

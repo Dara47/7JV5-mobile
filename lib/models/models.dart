@@ -367,3 +367,107 @@ class TeacherSlotModel {
     if (notes != null && notes!.isNotEmpty) 'notes': notes,
   };
 }
+
+
+// ── Payroll Models ────────────────────────────────────────────────────────────
+
+class PayrollRole {
+  final String role;
+  final double rate;
+  final double count;
+  PayrollRole({required this.role, required this.rate, required this.count});
+  double get total => rate * count;
+  factory PayrollRole.fromMap(Map<String, dynamic> m) => PayrollRole(
+    role: m['role'] ?? '',
+    rate: (m['rate'] as num?)?.toDouble() ?? 0,
+    count: (m['count'] as num?)?.toDouble() ?? 0,
+  );
+  Map<String, dynamic> toMap() => {'role': role, 'rate': rate, 'count': count};
+}
+
+class PayrollDeduction {
+  final String label;
+  final double amount;
+  PayrollDeduction({required this.label, required this.amount});
+  factory PayrollDeduction.fromMap(Map<String, dynamic> m) => PayrollDeduction(
+    label: m['label'] ?? '',
+    amount: (m['amount'] as num?)?.toDouble() ?? 0,
+  );
+  Map<String, dynamic> toMap() => {'label': label, 'amount': amount};
+}
+
+class TeacherPayrollModel {
+  final String id;
+  final String teacherName;
+  final String? teacherId;
+  final List<PayrollRole> roles;
+  final List<PayrollDeduction> deductions;
+  final double totalSessions;
+  final double totalAmount;
+  final double totalDeductions;
+  final String? dateFrom;
+  final String? dateTo;
+  final String? weekLabel;
+  final String? note;
+  final String status;
+  final String createdAt;
+  TeacherPayrollModel({required this.id, required this.teacherName, this.teacherId,
+    required this.roles, required this.deductions,
+    this.totalSessions = 0, this.totalAmount = 0, this.totalDeductions = 0,
+    this.dateFrom, this.dateTo, this.weekLabel, this.note,
+    required this.status, required this.createdAt});
+  bool get isPaid => status == 'paid';
+  factory TeacherPayrollModel.fromDoc(DocumentSnapshot doc) {
+    final d = doc.data() as Map<String, dynamic>;
+    return TeacherPayrollModel(
+      id: doc.id,
+      teacherName: d['teacherName'] ?? '',
+      teacherId: d['teacherId'],
+      roles: (d['roles'] as List<dynamic>? ?? []).map((r) => PayrollRole.fromMap(r as Map<String, dynamic>)).toList(),
+      deductions: (d['deductions'] as List<dynamic>? ?? []).map((r) => PayrollDeduction.fromMap(r as Map<String, dynamic>)).toList(),
+      totalSessions: (d['totalSessions'] as num?)?.toDouble() ?? 0,
+      totalAmount: (d['totalAmount'] as num?)?.toDouble() ?? 0,
+      totalDeductions: (d['totalDeductions'] as num?)?.toDouble() ?? 0,
+      dateFrom: d['dateFrom'], dateTo: d['dateTo'],
+      weekLabel: d['weekLabel'], note: d['note'],
+      status: d['status'] ?? 'pending',
+      createdAt: d['createdAt'] ?? '',
+    );
+  }
+}
+
+class AdminPayrollModel {
+  final String id;
+  final String adminName;
+  final List<PayrollRole> roles;
+  final List<PayrollDeduction> deductions;
+  final double totalAmount;
+  final double totalDeductions;
+  final String? dateFrom;
+  final String? dateTo;
+  final String? weekLabel;
+  final String? note;
+  final String status;
+  final String createdAt;
+  AdminPayrollModel({required this.id, required this.adminName,
+    required this.roles, required this.deductions,
+    this.totalAmount = 0, this.totalDeductions = 0,
+    this.dateFrom, this.dateTo, this.weekLabel, this.note,
+    required this.status, required this.createdAt});
+  bool get isPaid => status == 'paid';
+  factory AdminPayrollModel.fromDoc(DocumentSnapshot doc) {
+    final d = doc.data() as Map<String, dynamic>;
+    return AdminPayrollModel(
+      id: doc.id,
+      adminName: d['adminName'] ?? '',
+      roles: (d['roles'] as List<dynamic>? ?? []).map((r) => PayrollRole.fromMap(r as Map<String, dynamic>)).toList(),
+      deductions: (d['deductions'] as List<dynamic>? ?? []).map((r) => PayrollDeduction.fromMap(r as Map<String, dynamic>)).toList(),
+      totalAmount: (d['totalAmount'] as num?)?.toDouble() ?? 0,
+      totalDeductions: (d['totalDeductions'] as num?)?.toDouble() ?? 0,
+      dateFrom: d['dateFrom'], dateTo: d['dateTo'],
+      weekLabel: d['weekLabel'], note: d['note'],
+      status: d['status'] ?? 'pending',
+      createdAt: d['createdAt'] ?? '',
+    );
+  }
+}
