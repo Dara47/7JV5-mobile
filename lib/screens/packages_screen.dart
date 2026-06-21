@@ -45,8 +45,7 @@ class _PackagesScreenState extends State<PackagesScreen> {
             ? (widget.filterTeacherName ?? 'ตารางสอน')
             : 'จัดการคาบเรียน';
 
-    // admin only: can add/edit packages
-    final canEdit = !isFiltered;
+    const canEdit = true;
 
     return Scaffold(
       appBar: AppBar(
