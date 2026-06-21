@@ -312,4 +312,19 @@ class FirestoreService {
   static Future<void> deleteTeacherSlot(String teacherId) async {
     await _db.collection('teacherSlots').doc(teacherId).delete();
   }
+
+  // ── App Settings ─────────────────────────────────────────────────────────
+
+  static Stream<Map<String, dynamic>> watchSettings() {
+    return _db.collection('settings').doc('app_settings').snapshots().map((doc) {
+      if (!doc.exists) return <String, dynamic>{};
+      return doc.data() ?? <String, dynamic>{};
+    });
+  }
+
+  static Future<void> saveSettings(Map<String, dynamic> data) async {
+    await _db.collection('settings').doc('app_settings').set({
+      ...data, 'updatedAt': FieldValue.serverTimestamp(),
+    }, SetOptions(merge: true));
+  }
 }

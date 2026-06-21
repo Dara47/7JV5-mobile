@@ -7,6 +7,7 @@ import 'teacher_schedule_screen.dart';
 import 'reports_screen.dart';
 import 'cut_session_screen.dart';
 import 'leave_request_screen.dart';
+import 'settings_screen.dart';
 
 class HomeScreen extends StatefulWidget {
   final AppUser appUser;
@@ -28,6 +29,7 @@ class _HomeScreenState extends State<HomeScreen> {
         const TeacherScheduleScreen(),
         LeaveRequestScreen(appUser: u),
         const ReportsScreen(),
+        const SettingsScreen(),
       ];
     }
     if (u.isTeacher) {
@@ -54,6 +56,7 @@ class _HomeScreenState extends State<HomeScreen> {
         NavigationDestination(icon: Icon(Icons.person_pin_outlined), selectedIcon: Icon(Icons.person_pin), label: 'เวลาครู'),
         NavigationDestination(icon: Icon(Icons.event_busy_outlined), selectedIcon: Icon(Icons.event_busy), label: 'ใบลา'),
         NavigationDestination(icon: Icon(Icons.bar_chart_outlined), selectedIcon: Icon(Icons.bar_chart), label: 'รายงาน'),
+        NavigationDestination(icon: Icon(Icons.settings_outlined), selectedIcon: Icon(Icons.settings), label: 'ตั้งค่า'),
       ];
     }
     if (u.isTeacher) {
