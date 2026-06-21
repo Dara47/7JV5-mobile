@@ -313,6 +313,13 @@ class FirestoreService {
     await _db.collection('teacherSlots').doc(teacherId).delete();
   }
 
+  static Stream<UserModel?> watchUser(String id) {
+    return _db.collection('users').doc(id).snapshots().map((doc) {
+      if (!doc.exists) return null;
+      return UserModel.fromDoc(doc);
+    });
+  }
+
   // ── Code-based login ─────────────────────────────────────────────────────
 
   static Future<AppUser?> getAppUserByCode(String code) async {

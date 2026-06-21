@@ -1,4 +1,6 @@
 ﻿import 'package:flutter/material.dart';
+// ignore: avoid_web_libraries_in_flutter
+import 'dart:html' as html;
 import '../models/models.dart';
 import '../services/firestore_service.dart';
 import 'package_form_dialog.dart';
@@ -118,7 +120,12 @@ class _PackagesScreenState extends State<PackagesScreen> {
                 padding: const EdgeInsets.fromLTRB(12, 8, 12, 80),
                 itemCount: list.length,
                 separatorBuilder: (_, __) => const SizedBox(height: 10),
-                itemBuilder: (_, i) => PackageCard(pkg: list[i], onEdit: () => _openForm(pkg: list[i]), viewerRole: viewerRole),
+                itemBuilder: (_, i) => PackageCard(
+                pkg: list[i],
+                onEdit: () => _openForm(pkg: list[i]),
+                viewerRole: viewerRole,
+                isStudentView: isStudentFilter,
+              ),
               );
             },
           ),
@@ -134,7 +141,8 @@ class PackageCard extends StatelessWidget {
   final PackageModel pkg;
   final VoidCallback onEdit;
   final String viewerRole;
-  const PackageCard({super.key, required this.pkg, required this.onEdit, this.viewerRole = 'admin'});
+  final bool isStudentView;
+  const PackageCard({super.key, required this.pkg, required this.onEdit, this.viewerRole = 'admin', this.isStudentView = false});
 
   String get _statusLabel {
     if (viewerRole == 'teacher') {
@@ -362,6 +370,38 @@ class PackageCard extends StatelessWidget {
                 const SizedBox(width: 6),
                 Expanded(child: Text(pkg.notes!, style: const TextStyle(fontSize: 12, color: Colors.black54))),
               ]),
+            ],
+            // ── Google Meet link (student view only) ─────────────────
+            if (isStudentView) ...[
+              const SizedBox(height: 8),
+              StreamBuilder<UserModel?>(
+                stream: FirestoreService.watchUser(pkg.teacherId),
+                builder: (context, snap) {
+                  final link = snap.data?.googleMeetLink;
+                  if (link == null || link.trim().isEmpty) return const SizedBox.shrink();
+                  return InkWell(
+                    onTap: () => html.window.open(link.trim(), '_blank'),
+                    borderRadius: BorderRadius.circular(10),
+                    child: Container(
+                      padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 10),
+                      decoration: BoxDecoration(
+                        gradient: const LinearGradient(
+                          colors: [Color(0xFF1565C0), Color(0xFF1E88E5)],
+                        ),
+                        borderRadius: BorderRadius.circular(10),
+                        boxShadow: [BoxShadow(color: const Color(0xFF1565C0).withAlpha(60), blurRadius: 6, offset: const Offset(0, 2))],
+                      ),
+                      child: const Row(children: [
+                        Icon(Icons.video_call_rounded, size: 20, color: Colors.white),
+                        SizedBox(width: 8),
+                        Text('เข้าเรียน Google Meet', style: TextStyle(color: Colors.white, fontWeight: FontWeight.w700, fontSize: 13)),
+                        Spacer(),
+                        Icon(Icons.open_in_new, size: 14, color: Colors.white70),
+                      ]),
+                    ),
+                  );
+                },
+              ),
             ],
             const SizedBox(height: 12),
 
