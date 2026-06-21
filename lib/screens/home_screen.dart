@@ -8,6 +8,8 @@ import 'reports_screen.dart';
 import 'cut_session_screen.dart';
 import 'leave_request_screen.dart';
 import 'settings_screen.dart';
+import 'teacher_dashboard_screen.dart';
+import 'student_dashboard_screen.dart';
 
 class HomeScreen extends StatefulWidget {
   final AppUser appUser;
@@ -35,14 +37,14 @@ class _HomeScreenState extends State<HomeScreen> {
     }
     if (u.isTeacher) {
       return [
-        PackagesScreen(filterTeacherId: u.uid, filterTeacherName: u.name),
+        TeacherDashboardScreen(appUser: u),
         TeacherScheduleScreen(filterTeacherId: u.uid),
         LeaveRequestScreen(appUser: u),
       ];
     }
     // student
     return [
-      PackagesScreen(filterStudentId: u.uid, filterStudentName: u.name),
+      StudentDashboardScreen(appUser: u),
       LeaveRequestScreen(appUser: u),
     ];
   }
@@ -62,13 +64,13 @@ class _HomeScreenState extends State<HomeScreen> {
     }
     if (u.isTeacher) {
       return const [
-        NavigationDestination(icon: Icon(Icons.inventory_2_outlined), selectedIcon: Icon(Icons.inventory_2), label: 'คาบเรียน'),
+        NavigationDestination(icon: Icon(Icons.home_outlined), selectedIcon: Icon(Icons.home), label: 'หน้าหลัก'),
         NavigationDestination(icon: Icon(Icons.person_pin_outlined), selectedIcon: Icon(Icons.person_pin), label: 'ตารางสอน'),
         NavigationDestination(icon: Icon(Icons.event_busy_outlined), selectedIcon: Icon(Icons.event_busy), label: 'ใบลา'),
       ];
     }
     return const [
-      NavigationDestination(icon: Icon(Icons.inventory_2_outlined), selectedIcon: Icon(Icons.inventory_2), label: 'คาบเรียน'),
+      NavigationDestination(icon: Icon(Icons.home_outlined), selectedIcon: Icon(Icons.home), label: 'หน้าหลัก'),
       NavigationDestination(icon: Icon(Icons.event_busy_outlined), selectedIcon: Icon(Icons.event_busy), label: 'ใบลา'),
     ];
   }
