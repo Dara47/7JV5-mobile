@@ -218,58 +218,80 @@ class _UserList extends StatelessWidget {
               margin: EdgeInsets.zero,
               shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(12)),
               elevation: 1,
-              child: ListTile(
-                contentPadding: const EdgeInsets.symmetric(horizontal: 12, vertical: 4),
-                leading: CircleAvatar(
-                  backgroundColor: color,
-                  radius: 22,
-                  child: Text(
-                    u.name.isNotEmpty ? u.name[0] : '?',
-                    style: const TextStyle(color: Colors.white, fontWeight: FontWeight.bold, fontSize: 16),
+              child: Column(crossAxisAlignment: CrossAxisAlignment.stretch, children: [
+                ListTile(
+                  contentPadding: const EdgeInsets.symmetric(horizontal: 12, vertical: 4),
+                  leading: CircleAvatar(
+                    backgroundColor: color,
+                    radius: 22,
+                    child: Text(
+                      u.name.isNotEmpty ? u.name[0] : '?',
+                      style: const TextStyle(color: Colors.white, fontWeight: FontWeight.bold, fontSize: 16),
+                    ),
                   ),
-                ),
-                title: Text(u.name, style: const TextStyle(fontWeight: FontWeight.w600)),
-                subtitle: Row(children: [
-                  Text(u.code, style: TextStyle(color: color, fontWeight: FontWeight.w500, fontSize: 13)),
-                  if (u.age != null) ...[
-                    const SizedBox(width: 8),
-                    Text('อายุ ${u.age} ปี', style: const TextStyle(fontSize: 12, color: Colors.grey)),
-                  ],
-                ]),
-                trailing: Row(mainAxisSize: MainAxisSize.min, children: [
-                  role == 'student'
-                    ? _StudentStatusBadge(userId: u.id, isActive: u.isActive)
-                    : Container(
-                        padding: const EdgeInsets.symmetric(horizontal: 7, vertical: 2),
-                        decoration: BoxDecoration(
-                          color: u.isActive ? Colors.green.shade50 : Colors.grey.shade100,
-                          borderRadius: BorderRadius.circular(10),
-                        ),
-                        child: Text(u.isActive ? 'ใช้งาน' : 'หยุด',
-                            style: TextStyle(fontSize: 11, color: u.isActive ? Colors.green.shade700 : Colors.grey)),
-                      ),
-                  PopupMenuButton<String>(
-                    icon: const Icon(Icons.more_vert, size: 20, color: Colors.grey),
-                    onSelected: (v) {
-                      if (v == 'edit') onEdit(user: u);
-                      if (v == 'detail') Navigator.push(context, MaterialPageRoute(
-                          builder: (_) => role == 'student'
-                              ? PackagesScreen(filterStudentId: u.id, filterStudentName: u.name)
-                              : PackagesScreen(filterTeacherId: u.id, filterTeacherName: u.name)));
-                      if (v == 'delete') _confirmDelete(context, u);
-                    },
-                    itemBuilder: (_) => [
-                      const PopupMenuItem(value: 'detail', child: Row(children: [Icon(Icons.visibility_outlined, size: 18), SizedBox(width: 8), Text('ดูรายละเอียด')])),
-                      const PopupMenuItem(value: 'edit', child: Row(children: [Icon(Icons.edit_outlined, size: 18), SizedBox(width: 8), Text('แก้ไข')])),
-                      const PopupMenuItem(value: 'delete', child: Row(children: [Icon(Icons.delete_outline, size: 18, color: Colors.red), SizedBox(width: 8), Text('ลบ', style: TextStyle(color: Colors.red))])),
+                  title: Text(u.name, style: const TextStyle(fontWeight: FontWeight.w600)),
+                  subtitle: Row(children: [
+                    Text(u.code, style: TextStyle(color: color, fontWeight: FontWeight.w500, fontSize: 13)),
+                    if (u.age != null) ...[
+                      const SizedBox(width: 8),
+                      Text('อายุ ${u.age} ปี', style: const TextStyle(fontSize: 12, color: Colors.grey)),
                     ],
+                  ]),
+                  trailing: Row(mainAxisSize: MainAxisSize.min, children: [
+                    role == 'student'
+                      ? _StudentStatusBadge(userId: u.id, isActive: u.isActive)
+                      : Container(
+                          padding: const EdgeInsets.symmetric(horizontal: 7, vertical: 2),
+                          decoration: BoxDecoration(
+                            color: u.isActive ? Colors.green.shade50 : Colors.grey.shade100,
+                            borderRadius: BorderRadius.circular(10),
+                          ),
+                          child: Text(u.isActive ? 'ใช้งาน' : 'หยุด',
+                              style: TextStyle(fontSize: 11, color: u.isActive ? Colors.green.shade700 : Colors.grey)),
+                        ),
+                    PopupMenuButton<String>(
+                      icon: const Icon(Icons.more_vert, size: 20, color: Colors.grey),
+                      onSelected: (v) {
+                        if (v == 'edit') onEdit(user: u);
+                        if (v == 'detail') Navigator.push(context, MaterialPageRoute(
+                            builder: (_) => role == 'student'
+                                ? PackagesScreen(filterStudentId: u.id, filterStudentName: u.name)
+                                : PackagesScreen(filterTeacherId: u.id, filterTeacherName: u.name)));
+                        if (v == 'delete') _confirmDelete(context, u);
+                      },
+                      itemBuilder: (_) => [
+                        const PopupMenuItem(value: 'detail', child: Row(children: [Icon(Icons.visibility_outlined, size: 18), SizedBox(width: 8), Text('ดูรายละเอียด')])),
+                        const PopupMenuItem(value: 'edit', child: Row(children: [Icon(Icons.edit_outlined, size: 18), SizedBox(width: 8), Text('แก้ไข')])),
+                        const PopupMenuItem(value: 'delete', child: Row(children: [Icon(Icons.delete_outline, size: 18, color: Colors.red), SizedBox(width: 8), Text('ลบ', style: TextStyle(color: Colors.red))])),
+                      ],
+                    ),
+                  ]),
+                  onTap: () => Navigator.push(context, MaterialPageRoute(
+                      builder: (_) => role == 'student'
+                          ? PackagesScreen(filterStudentId: u.id, filterStudentName: u.name)
+                          : PackagesScreen(filterTeacherId: u.id, filterTeacherName: u.name))),
+                ),
+                if (role == 'student')
+                  StreamBuilder<List<PackageModel>>(
+                    stream: FirestoreService.watchPackagesForUser(u.id, 'student'),
+                    builder: (ctx, pkgSnap) {
+                      final pkgs = pkgSnap.data ?? [];
+                      if (pkgs.isEmpty) return const SizedBox.shrink();
+                      final total = pkgs.fold(0, (s, p) => s + p.totalSessions);
+                      final parts = pkgs.map((p) => '${p.totalSessions}').join(' + ');
+                      final formula = pkgs.length == 1 ? '$total คาบ' : '$parts = $total คาบ';
+                      return Padding(
+                        padding: const EdgeInsets.fromLTRB(54, 0, 12, 10),
+                        child: Row(children: [
+                          Icon(Icons.book_outlined, size: 13, color: Colors.blue.shade300),
+                          const SizedBox(width: 5),
+                          Text('จำนวนคาบ: ', style: TextStyle(fontSize: 12, color: Colors.grey.shade500)),
+                          Text(formula, style: const TextStyle(fontSize: 12, color: Color(0xFF1565C0), fontWeight: FontWeight.w600)),
+                        ]),
+                      );
+                    },
                   ),
-                ]),
-                onTap: () => Navigator.push(context, MaterialPageRoute(
-                    builder: (_) => role == 'student'
-                        ? PackagesScreen(filterStudentId: u.id, filterStudentName: u.name)
-                        : PackagesScreen(filterTeacherId: u.id, filterTeacherName: u.name))),
-              ),
+              ]),
             );
           },
         );

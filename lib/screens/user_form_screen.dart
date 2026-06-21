@@ -15,6 +15,7 @@ class _UserFormScreenState extends State<UserFormScreen> {
   final _nameCtrl = TextEditingController();
   final _ageCtrl = TextEditingController();
   final _meetCtrl = TextEditingController();
+  final _sessionsCtrl = TextEditingController();
 
   String _role = 'student';
   String _generatedCode = '';
@@ -33,6 +34,7 @@ class _UserFormScreenState extends State<UserFormScreen> {
       _nameCtrl.text = u.name;
       _ageCtrl.text = u.age?.toString() ?? '';
       _meetCtrl.text = u.googleMeetLink ?? '';
+      _sessionsCtrl.text = u.defaultSessions?.toString() ?? '';
     } else {
       _fetchCode('student');
     }
@@ -56,6 +58,8 @@ class _UserFormScreenState extends State<UserFormScreen> {
       if (_ageCtrl.text.isNotEmpty) 'age': int.tryParse(_ageCtrl.text.trim()),
       if (_role == 'teacher' && _meetCtrl.text.isNotEmpty)
         'googleMeetLink': _meetCtrl.text.trim(),
+      if (_role == 'student' && _sessionsCtrl.text.isNotEmpty)
+        'defaultSessions': int.tryParse(_sessionsCtrl.text.trim()),
     };
 
     try {
@@ -75,7 +79,7 @@ class _UserFormScreenState extends State<UserFormScreen> {
 
   @override
   void dispose() {
-    _nameCtrl.dispose(); _ageCtrl.dispose(); _meetCtrl.dispose();
+    _nameCtrl.dispose(); _ageCtrl.dispose(); _meetCtrl.dispose(); _sessionsCtrl.dispose();
     super.dispose();
   }
 
@@ -175,6 +179,25 @@ class _UserFormScreenState extends State<UserFormScreen> {
               return null;
             },
           ),
+
+          // จำนวนคาบ (student only)
+          if (_role == 'student') ...[
+            const SizedBox(height: 16),
+            _label('จำนวนคาบทั้งหมด'),
+            const SizedBox(height: 8),
+            _Field(
+              controller: _sessionsCtrl,
+              hint: 'จำนวนคาบที่จะเรียน',
+              icon: Icons.book_outlined,
+              keyboardType: TextInputType.number,
+              validator: (v) {
+                if (v == null || v.isEmpty) return null;
+                final n = int.tryParse(v);
+                if (n == null || n < 1) return 'กรอกตัวเลข 1 ขึ้นไป';
+                return null;
+              },
+            ),
+          ],
 
           // Google Meet link (teacher only)
           if (_role == 'teacher') ...[

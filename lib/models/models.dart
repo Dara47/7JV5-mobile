@@ -20,9 +20,11 @@ class UserModel {
   final String status;
   final int? age;
   final String? googleMeetLink;
+  final int? defaultSessions;
 
   UserModel({required this.id, required this.code, required this.name,
-      required this.role, required this.status, this.age, this.googleMeetLink});
+      required this.role, required this.status, this.age, this.googleMeetLink,
+      this.defaultSessions});
 
   bool get isStudent => role == 'student';
   bool get isTeacher => role == 'teacher';
@@ -34,6 +36,7 @@ class UserModel {
       id: doc.id, code: d['code'] ?? '', name: d['name'] ?? '',
       role: d['role'] ?? 'student', status: d['status'] ?? 'active',
       age: d['age'], googleMeetLink: d['googleMeetLink'],
+      defaultSessions: d['defaultSessions'],
     );
   }
 }

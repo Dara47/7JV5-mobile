@@ -208,7 +208,13 @@ class _PackageFormSheetState extends State<_PackageFormSheet> {
                         enabled: !_isEdit,
                         color: const Color(0xFF1565C0),
                         onChanged: (u) {
-                          setState(() { _student = u; _takenSlotPackages = []; });
+                          setState(() {
+                            _student = u;
+                            _takenSlotPackages = [];
+                            if (u?.defaultSessions != null && _totalCtrl.text.isEmpty) {
+                              _totalCtrl.text = u!.defaultSessions.toString();
+                            }
+                          });
                           if (u != null && _teacher != null) _loadTakenSlots();
                         },
                       ),
