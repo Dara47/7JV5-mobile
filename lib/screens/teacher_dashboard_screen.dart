@@ -3,21 +3,58 @@ import '../models/models.dart';
 import '../services/firestore_service.dart';
 import 'packages_screen.dart';
 
-class TeacherDashboardScreen extends StatelessWidget {
+class TeacherDashboardScreen extends StatefulWidget {
   final AppUser appUser;
   const TeacherDashboardScreen({super.key, required this.appUser});
+
+  @override
+  State<TeacherDashboardScreen> createState() => _TeacherDashboardScreenState();
+}
+
+class _TeacherDashboardScreenState extends State<TeacherDashboardScreen> {
+  bool _isEn = false;
+
+  String t(String th, String en) => _isEn ? en : th;
 
   @override
   Widget build(BuildContext context) {
     return Scaffold(
       backgroundColor: const Color(0xFFF5F5F4),
       appBar: AppBar(
-        title: Text(appUser.name),
+        title: Text(widget.appUser.name),
         backgroundColor: const Color(0xFFF97316),
         foregroundColor: Colors.white,
+        actions: [
+          Padding(
+            padding: const EdgeInsets.only(right: 8),
+            child: GestureDetector(
+              onTap: () => setState(() => _isEn = !_isEn),
+              child: AnimatedContainer(
+                duration: const Duration(milliseconds: 200),
+                padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 5),
+                decoration: BoxDecoration(
+                  color: Colors.white.withOpacity(_isEn ? 0.30 : 0.15),
+                  borderRadius: BorderRadius.circular(20),
+                  border: Border.all(color: Colors.white.withOpacity(0.50)),
+                ),
+                child: Row(mainAxisSize: MainAxisSize.min, children: [
+                  Text('TH', style: TextStyle(
+                      fontSize: 12, fontWeight: FontWeight.bold,
+                      color: _isEn ? Colors.white54 : Colors.white)),
+                  const SizedBox(width: 4),
+                  const Text('|', style: TextStyle(fontSize: 12, color: Colors.white38)),
+                  const SizedBox(width: 4),
+                  Text('EN', style: TextStyle(
+                      fontSize: 12, fontWeight: FontWeight.bold,
+                      color: _isEn ? Colors.white : Colors.white54)),
+                ]),
+              ),
+            ),
+          ),
+        ],
       ),
       body: StreamBuilder<List<PackageModel>>(
-        stream: FirestoreService.watchPackagesForUser(appUser.uid, 'teacher'),
+        stream: FirestoreService.watchPackagesForUser(widget.appUser.uid, 'teacher'),
         builder: (context, snap) {
           if (snap.connectionState == ConnectionState.waiting) {
             return const Center(child: CircularProgressIndicator());
@@ -31,12 +68,12 @@ class TeacherDashboardScreen extends StatelessWidget {
             padding: const EdgeInsets.fromLTRB(14, 14, 14, 24),
             children: [
 
-              // ── Teacher summary card ────────────────────────────
               _TeacherSummaryCard(
-                appUser: appUser,
+                appUser: widget.appUser,
                 totalStudents: totalStudents,
                 totalTaught: totalTaught,
                 totalRemaining: totalRemaining,
+                isEn: _isEn,
               ),
               const SizedBox(height: 18),
 
@@ -46,22 +83,22 @@ class TeacherDashboardScreen extends StatelessWidget {
                   child: Column(mainAxisSize: MainAxisSize.min, children: [
                     Icon(Icons.group_outlined, size: 64, color: Colors.grey.shade300),
                     const SizedBox(height: 12),
-                    const Text('ยังไม่มีนักเรียนในความดูแล',
-                        style: TextStyle(color: Colors.grey, fontSize: 15)),
+                    Text(t('ยังไม่มีนักเรียนในความดูแล', 'No students yet'),
+                        style: const TextStyle(color: Colors.grey, fontSize: 15)),
                   ]),
                 ))
               else ...[
                 Row(children: [
                   const Icon(Icons.groups_2_outlined, size: 18, color: Colors.black54),
                   const SizedBox(width: 6),
-                  Text('นักเรียนในความดูแล (${packages.length} คาบ)',
+                  Text('${t('นักเรียนในความดูแล', 'Students under care')} (${packages.length})',
                       style: const TextStyle(fontWeight: FontWeight.bold,
                           fontSize: 14, color: Colors.black87)),
                 ]),
                 const SizedBox(height: 10),
                 ...packages.map((pkg) => Padding(
                   padding: const EdgeInsets.only(bottom: 10),
-                  child: _TeacherStudentCard(pkg: pkg, teacher: appUser),
+                  child: _TeacherStudentCard(pkg: pkg, teacher: widget.appUser, isEn: _isEn),
                 )),
               ],
             ],
@@ -79,11 +116,15 @@ class _TeacherSummaryCard extends StatelessWidget {
   final int totalStudents;
   final int totalTaught;
   final int totalRemaining;
+  final bool isEn;
 
   const _TeacherSummaryCard({
     required this.appUser, required this.totalStudents,
     required this.totalTaught, required this.totalRemaining,
+    required this.isEn,
   });
+
+  String t(String th, String en) => isEn ? en : th;
 
   @override
   Widget build(BuildContext context) => Container(
@@ -118,11 +159,11 @@ class _TeacherSummaryCard extends StatelessWidget {
       ]),
       const SizedBox(height: 16),
       Row(children: [
-        _SummaryChip(label: 'นักเรียน',    value: '$totalStudents',  icon: Icons.people_outline),
+        _SummaryChip(label: t('นักเรียน', 'Students'),   value: '$totalStudents',  icon: Icons.people_outline),
         const SizedBox(width: 8),
-        _SummaryChip(label: 'สอนแล้วรวม', value: '$totalTaught',    icon: Icons.check_circle_outline),
+        _SummaryChip(label: t('สอนแล้วรวม', 'Taught'),  value: '$totalTaught',    icon: Icons.check_circle_outline),
         const SizedBox(width: 8),
-        _SummaryChip(label: 'เหลือรวม',   value: '$totalRemaining', icon: Icons.hourglass_bottom_outlined),
+        _SummaryChip(label: t('เหลือรวม', 'Remaining'), value: '$totalRemaining', icon: Icons.hourglass_bottom_outlined),
       ]),
     ]),
   );
@@ -159,13 +200,16 @@ class _SummaryChip extends StatelessWidget {
 class _TeacherStudentCard extends StatelessWidget {
   final PackageModel pkg;
   final AppUser teacher;
-  const _TeacherStudentCard({required this.pkg, required this.teacher});
+  final bool isEn;
+  const _TeacherStudentCard({required this.pkg, required this.teacher, required this.isEn});
+
+  String t(String th, String en) => isEn ? en : th;
 
   String get _statusLabel {
-    if (pkg.isCurrentlyInSession) return 'กำลังสอน';
-    if (pkg.isExpired) return 'สอนเสร็จแล้ว';
-    if (pkg.isLowBalance) return 'ใกล้เสร็จ';
-    return 'รอสอน';
+    if (pkg.isCurrentlyInSession) return t('กำลังสอน', 'Teaching');
+    if (pkg.isExpired)            return t('สอนเสร็จแล้ว', 'Completed');
+    if (pkg.isLowBalance)         return t('ใกล้เสร็จ', 'Almost done');
+    return t('รอสอน', 'Waiting');
   }
 
   @override
@@ -201,7 +245,7 @@ class _TeacherStudentCard extends StatelessWidget {
                 builder: (_) => PackageReportScreen(pkg: pkg),
               )),
               icon: const Icon(Icons.bar_chart, size: 16),
-              label: const Text('รายงาน', style: TextStyle(fontSize: 12)),
+              label: Text(t('รายงาน', 'Report'), style: const TextStyle(fontSize: 12)),
               style: TextButton.styleFrom(
                 foregroundColor: Colors.blueGrey,
                 padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 2),
@@ -228,7 +272,7 @@ class _TeacherStudentCard extends StatelessWidget {
             Row(children: [
               const Icon(Icons.school_outlined, size: 15, color: Color(0xFF2E7D32)),
               const SizedBox(width: 6),
-              Expanded(child: Text('ครู: ${teacher.name}',
+              Expanded(child: Text('${t('ครู', 'Teacher')}: ${teacher.name}',
                   style: const TextStyle(fontSize: 13, color: Colors.black54))),
               Text(teacher.code,
                   style: const TextStyle(color: Color(0xFF2E7D32), fontSize: 12)),
@@ -255,11 +299,11 @@ class _TeacherStudentCard extends StatelessWidget {
 
             // ── Stats ─────────────────────────────────────────
             Row(children: [
-              _MiniStat(label: 'รวมคาบ',   value: '${pkg.totalSessions}',    color: Colors.blueGrey),
+              _MiniStat(label: t('รวมคาบ', 'Total'),    value: '${pkg.totalSessions}',    color: Colors.blueGrey),
               const SizedBox(width: 6),
-              _MiniStat(label: 'สอนแล้ว',  value: '${pkg.usedSessions}',     color: Colors.green),
+              _MiniStat(label: t('สอนแล้ว', 'Taught'),  value: '${pkg.usedSessions}',     color: Colors.green),
               const SizedBox(width: 6),
-              _MiniStat(label: 'คงเหลือ',  value: '${pkg.remainingSessions}', color: pkg.statusColor, bold: true),
+              _MiniStat(label: t('คงเหลือ', 'Left'),    value: '${pkg.remainingSessions}', color: pkg.statusColor, bold: true),
             ]),
             const SizedBox(height: 8),
 
@@ -274,7 +318,9 @@ class _TeacherStudentCard extends StatelessWidget {
             ),
             const SizedBox(height: 4),
             Text(
-              'เหลือ = รวม − สอนแล้ว  (${pkg.totalSessions} − ${pkg.usedSessions} = ${pkg.remainingSessions})',
+              isEn
+                  ? 'Left = Total − Taught  (${pkg.totalSessions} − ${pkg.usedSessions} = ${pkg.remainingSessions})'
+                  : 'เหลือ = รวม − สอนแล้ว  (${pkg.totalSessions} − ${pkg.usedSessions} = ${pkg.remainingSessions})',
               style: const TextStyle(fontSize: 10, color: Colors.grey),
             ),
           ]),
