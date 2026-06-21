@@ -2,6 +2,7 @@ import 'package:flutter/material.dart';
 import '../models/models.dart';
 import '../services/firestore_service.dart';
 import 'package_form_dialog.dart';
+import 'teacher_schedule_screen.dart';
 
 class PackagesScreen extends StatefulWidget {
   final String? filterStudentId;
@@ -48,14 +49,25 @@ class _PackagesScreenState extends State<PackagesScreen> {
         backgroundColor: const Color(0xFF1565C0),
         foregroundColor: Colors.white,
       ),
-      floatingActionButton: FloatingActionButton.extended(
-        heroTag: 'add_pkg',
-        onPressed: () => _openForm(),
-        backgroundColor: const Color(0xFF1565C0),
-        foregroundColor: Colors.white,
-        icon: const Icon(Icons.add),
-        label: const Text('เพิ่มคาบ'),
-      ),
+      floatingActionButton: isTeacherFilter
+          ? FloatingActionButton.extended(
+              heroTag: 'add_slot',
+              onPressed: () => Navigator.push(context, MaterialPageRoute(
+                builder: (_) => TeacherScheduleScreen(filterTeacherId: widget.filterTeacherId),
+              )),
+              backgroundColor: const Color(0xFF2E7D32),
+              foregroundColor: Colors.white,
+              icon: const Icon(Icons.schedule),
+              label: const Text('เพิ่มเวลาว่าง'),
+            )
+          : FloatingActionButton.extended(
+              heroTag: 'add_pkg',
+              onPressed: () => _openForm(),
+              backgroundColor: const Color(0xFF1565C0),
+              foregroundColor: Colors.white,
+              icon: const Icon(Icons.add),
+              label: const Text('เพิ่มคาบ'),
+            ),
       body: Column(children: [
         if (!isFiltered) Padding(
           padding: const EdgeInsets.fromLTRB(12, 12, 12, 4),
