@@ -34,6 +34,7 @@ class _PackageFormSheetState extends State<_PackageFormSheet> {
   TimeOfDay? _startTime;
   TimeOfDay? _endTime;
   TeacherSlotModel? _teacherSlot;
+  List<PackageModel> _takenSlotPackages = [];
   bool _loadingUsers = true;
   bool _loadingSlot = false;
   bool _saving = false;
@@ -63,6 +64,23 @@ class _PackageFormSheetState extends State<_PackageFormSheet> {
       _teacherSlot = doc.exists ? TeacherSlotModel.fromDoc(doc) : null;
       _loadingSlot = false;
     });
+    await _loadTakenSlots();
+  }
+
+  Future<void> _loadTakenSlots() async {
+    if (_student == null || _teacher == null) return;
+    final pkgs = await FirestoreService.getPackagesForUser(_student!.id, 'student');
+    if (!mounted) return;
+    setState(() {
+      _takenSlotPackages = pkgs.where((p) => p.teacherId == _teacher!.id).toList();
+    });
+  }
+
+  bool _isSlotTaken(SlotItem s) {
+    return _takenSlotPackages.any((p) =>
+        p.scheduledDay == s.day &&
+        p.scheduledTime == s.startTime &&
+        p.scheduledEndTime == s.endTime);
   }
 
   Future<void> _loadUsers() async {
@@ -189,7 +207,10 @@ class _PackageFormSheetState extends State<_PackageFormSheet> {
                         hint: 'เลือกนักเรียน...',
                         enabled: !_isEdit,
                         color: const Color(0xFF1565C0),
-                        onChanged: (u) => setState(() => _student = u),
+                        onChanged: (u) {
+                          setState(() { _student = u; _takenSlotPackages = []; });
+                          if (u != null && _teacher != null) _loadTakenSlots();
+                        },
                       ),
                       const SizedBox(height: 14),
 
@@ -230,22 +251,36 @@ class _PackageFormSheetState extends State<_PackageFormSheet> {
                               const SizedBox(height: 8),
                               Wrap(
                                 spacing: 6, runSpacing: 6,
-                                children: _teacherSlot!.slots.map((s) => GestureDetector(
-                                  onTap: () => setState(() {
-                                    _scheduledDay = s.day;
-                                    _startTime = _parseTime(s.startTime);
-                                    _endTime = _parseTime(s.endTime);
-                                  }),
-                                  child: Container(
-                                    padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 6),
-                                    decoration: BoxDecoration(
-                                      color: const Color(0xFF2E7D32),
-                                      borderRadius: BorderRadius.circular(8),
+                                children: _teacherSlot!.slots.map((s) {
+                                  final taken = _isSlotTaken(s);
+                                  return GestureDetector(
+                                    onTap: taken ? null : () => setState(() {
+                                      _scheduledDay = s.day;
+                                      _startTime = _parseTime(s.startTime);
+                                      _endTime = _parseTime(s.endTime);
+                                    }),
+                                    child: Container(
+                                      padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 6),
+                                      decoration: BoxDecoration(
+                                        color: taken ? Colors.grey.shade300 : const Color(0xFF2E7D32),
+                                        borderRadius: BorderRadius.circular(8),
+                                      ),
+                                      child: Row(mainAxisSize: MainAxisSize.min, children: [
+                                        if (taken) const Padding(
+                                          padding: EdgeInsets.only(right: 4),
+                                          child: Icon(Icons.block, size: 12, color: Colors.grey),
+                                        ),
+                                        Text('${s.day}  ${s.startTime}–${s.endTime}',
+                                            style: TextStyle(
+                                              fontSize: 12,
+                                              color: taken ? Colors.grey.shade600 : Colors.white,
+                                              fontWeight: FontWeight.w600,
+                                              decoration: taken ? TextDecoration.lineThrough : null,
+                                            )),
+                                      ]),
                                     ),
-                                    child: Text('${s.day}  ${s.startTime}–${s.endTime}',
-                                        style: const TextStyle(fontSize: 12, color: Colors.white, fontWeight: FontWeight.w600)),
-                                  ),
-                                )).toList(),
+                                  );
+                                }).toList(),
                               ),
                             ]),
                           )
