@@ -1,4 +1,4 @@
-import 'package:flutter/material.dart';
+﻿import 'package:flutter/material.dart';
 import '../models/models.dart';
 
 class SummaryFooter extends StatelessWidget {
@@ -34,7 +34,7 @@ class SummaryFooter extends StatelessWidget {
         Padding(
           padding: const EdgeInsets.fromLTRB(8, 10, 8, 6),
           child: Row(children: [
-            _Stat(icon: Icons.event_note, label: 'ทั้งหมด', value: '$total คาบ', color: const Color(0xFF1565C0)),
+            _Stat(icon: Icons.event_note, label: 'ทั้งหมด', value: '$total คาบ', color: const Color(0xFFB45309)),
             _divider(),
             _Stat(icon: Icons.check_circle_outline, label: 'เรียนแล้ว', value: '$completed คาบ', color: Colors.green),
             _divider(),

@@ -1,4 +1,4 @@
-import 'package:flutter/material.dart';
+﻿import 'package:flutter/material.dart';
 import '../models/models.dart';
 import '../services/firestore_service.dart';
 import 'user_form_screen.dart';
@@ -85,7 +85,7 @@ class _UsersListScreenState extends State<UsersListScreen> with SingleTickerProv
     return Scaffold(
       appBar: AppBar(
         title: const Text('จัดการผู้ใช้'),
-        backgroundColor: const Color(0xFF1565C0),
+        backgroundColor: const Color(0xFFB45309),
         foregroundColor: Colors.white,
         bottom: TabBar(
           controller: _tabs,
@@ -98,7 +98,7 @@ class _UsersListScreenState extends State<UsersListScreen> with SingleTickerProv
       floatingActionButton: FloatingActionButton.extended(
         heroTag: 'add_user',
         onPressed: () => _openForm(),
-        backgroundColor: const Color(0xFF1565C0),
+        backgroundColor: const Color(0xFFB45309),
         foregroundColor: Colors.white,
         icon: const Icon(Icons.person_add_outlined),
         label: const Text('เพิ่มผู้ใช้'),
@@ -213,7 +213,7 @@ class _UserList extends StatelessWidget {
           separatorBuilder: (_, __) => const SizedBox(height: 6),
           itemBuilder: (context, i) {
             final u = filtered[i];
-            final color = role == 'student' ? const Color(0xFF1565C0) : const Color(0xFF2E7D32);
+            final color = role == 'student' ? const Color(0xFFB45309) : const Color(0xFF2E7D32);
             return Card(
               margin: EdgeInsets.zero,
               shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(12)),
@@ -336,7 +336,7 @@ class _UserList extends StatelessWidget {
                           Wrap(spacing: 6, crossAxisAlignment: WrapCrossAlignment.center, children: [
                             Icon(Icons.book_outlined, size: 13, color: Colors.blue.shade300),
                             Text('จำนวนคาบ:', style: TextStyle(fontSize: 12, color: Colors.grey.shade500)),
-                            Text('$total คาบ', style: const TextStyle(fontSize: 12, color: Color(0xFF1565C0), fontWeight: FontWeight.w600)),
+                            Text('$total คาบ', style: const TextStyle(fontSize: 12, color: Color(0xFFB45309), fontWeight: FontWeight.w600)),
                             if (hasAdj) ...[
                               if (u.totalAdded > 0)
                                 Container(

@@ -1,4 +1,4 @@
-import 'package:flutter/material.dart';
+﻿import 'package:flutter/material.dart';
 import 'package:firebase_auth/firebase_auth.dart';
 import '../services/firestore_service.dart';
 
@@ -83,7 +83,7 @@ class _SettingsScreenState extends State<SettingsScreen> {
               const SizedBox(height: 24),
 
               // ── QR ธนาคาร ───────────────────────────────────────────
-              _SectionHeader(icon: Icons.qr_code_2, label: 'ภาพ QR ธนาคาร (URL)', color: const Color(0xFF1565C0)),
+              _SectionHeader(icon: Icons.qr_code_2, label: 'ภาพ QR ธนาคาร (URL)', color: const Color(0xFFB45309)),
               const SizedBox(height: 8),
               _Field(
                 controller: _qrCtrl,

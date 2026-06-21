@@ -1,4 +1,4 @@
-import 'package:flutter/material.dart';
+﻿import 'package:flutter/material.dart';
 import '../models/models.dart';
 import '../services/firestore_service.dart';
 
@@ -131,7 +131,7 @@ class CutSessionScreen extends StatelessWidget {
                               Expanded(
                                 child: Column(crossAxisAlignment: CrossAxisAlignment.start, children: [
                                   Row(children: [
-                                    const Icon(Icons.school_outlined, size: 14, color: Color(0xFF1565C0)),
+                                    const Icon(Icons.school_outlined, size: 14, color: Color(0xFFB45309)),
                                     const SizedBox(width: 4),
                                     Expanded(
                                       child: Text(pkg.studentName,

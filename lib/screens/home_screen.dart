@@ -1,4 +1,4 @@
-import 'package:flutter/material.dart';
+﻿import 'package:flutter/material.dart';
 import 'package:firebase_auth/firebase_auth.dart';
 import '../models/models.dart';
 import 'users_list_screen.dart';
@@ -159,7 +159,7 @@ class _SingleTabBar extends StatelessWidget {
       child: Row(mainAxisAlignment: MainAxisAlignment.spaceBetween, children: [
         Padding(
           padding: const EdgeInsets.only(left: 16),
-          child: Text(label, style: const TextStyle(fontWeight: FontWeight.w600, color: Color(0xFF1565C0))),
+          child: Text(label, style: const TextStyle(fontWeight: FontWeight.w600, color: Color(0xFFB45309))),
         ),
         IconButton(icon: const Icon(Icons.logout, color: Colors.grey), onPressed: onLogout),
       ]),

@@ -1,4 +1,4 @@
-import 'package:flutter/material.dart';
+﻿import 'package:flutter/material.dart';
 import '../models/models.dart';
 import '../services/firestore_service.dart';
 
@@ -64,7 +64,7 @@ class ReportsScreen extends StatelessWidget {
     return Scaffold(
       appBar: AppBar(
         title: const Text('รายงาน'),
-        backgroundColor: const Color(0xFF1565C0),
+        backgroundColor: const Color(0xFFB45309),
         foregroundColor: Colors.white,
       ),
       body: StreamBuilder<List<SessionModel>>(
@@ -132,7 +132,7 @@ class ReportsScreen extends StatelessWidget {
                         // Info
                         Expanded(child: Column(crossAxisAlignment: CrossAxisAlignment.start, children: [
                           Row(children: [
-                            const Icon(Icons.school_outlined, size: 14, color: Color(0xFF1565C0)),
+                            const Icon(Icons.school_outlined, size: 14, color: Color(0xFFB45309)),
                             const SizedBox(width: 4),
                             Text(s.studentName, style: const TextStyle(fontWeight: FontWeight.w600, fontSize: 14)),
                           ]),
@@ -146,7 +146,7 @@ class ReportsScreen extends StatelessWidget {
                           Row(children: [
                             Container(
                               padding: const EdgeInsets.symmetric(horizontal: 6, vertical: 1),
-                              decoration: BoxDecoration(color: const Color(0xFF1565C0), borderRadius: BorderRadius.circular(4)),
+                              decoration: BoxDecoration(color: const Color(0xFFB45309), borderRadius: BorderRadius.circular(4)),
                               child: Text(_thaiDay(s.date), style: const TextStyle(fontSize: 10, color: Colors.white, fontWeight: FontWeight.bold)),
                             ),
                             const SizedBox(width: 6),
@@ -157,7 +157,7 @@ class ReportsScreen extends StatelessWidget {
                             Text(s.timeRange, style: const TextStyle(fontSize: 12, color: Colors.grey)),
                             if (s.language != null) ...[
                               const SizedBox(width: 8),
-                              Text(s.language!, style: const TextStyle(fontSize: 11, color: Color(0xFF1565C0))),
+                              Text(s.language!, style: const TextStyle(fontSize: 11, color: Color(0xFFB45309))),
                             ],
                           ]),
                         ])),

@@ -111,7 +111,7 @@ class _HeroPanel extends StatelessWidget {
         gradient: LinearGradient(
           begin: Alignment.topLeft,
           end: Alignment.bottomRight,
-          colors: [Color(0xFF0A2472), Color(0xFF1565C0), Color(0xFF1E88E5)],
+          colors: [Color(0xFF0F2A4A), Color(0xFF1E3A5F), Color(0xFF2A5298)],
         ),
       ),
       child: Stack(children: [
@@ -233,7 +233,7 @@ class _FormContent extends StatelessWidget {
             children: [
               const Text('ยินดีต้อนรับ',
                   style: TextStyle(fontSize: 26, fontWeight: FontWeight.w800,
-                      color: Color(0xFF0A2472))),
+                      color: Color(0xFF0F2A4A))),
               const SizedBox(height: 4),
               Text('กรุณาเข้าสู่ระบบเพื่อดำเนินการต่อ',
                   style: TextStyle(fontSize: 13, color: Colors.grey.shade600)),
@@ -279,22 +279,22 @@ class _FormContent extends StatelessWidget {
               const SizedBox(height: 24),
 
               // ── Admin ─────────────────────────────────────────────────
-              _SectionBadge(label: 'ผู้ดูแลระบบ', color: const Color(0xFF1565C0)),
+              _SectionBadge(label: 'ผู้ดูแลระบบ', color: const Color(0xFF1E3A5F)),
               const SizedBox(height: 14),
               _Field(ctrl: state._emailCtrl, label: 'อีเมล',
                   icon: Icons.email_outlined, type: TextInputType.emailAddress,
-                  accent: const Color(0xFF1565C0)),
+                  accent: const Color(0xFF1E3A5F)),
               const SizedBox(height: 12),
               _Field(ctrl: state._passCtrl, label: 'รหัสผ่าน',
                   icon: Icons.lock_outline, obscure: true,
-                  accent: const Color(0xFF1565C0), onSubmit: state._login),
+                  accent: const Color(0xFF1E3A5F), onSubmit: state._login),
               if (state._error != null) ...[
                 const SizedBox(height: 8), _ErrorRow(state._error!),
               ],
               const SizedBox(height: 16),
               _ActionButton(
                 label: 'เข้าสู่ระบบ (Admin)', loading: state._loading,
-                color: const Color(0xFF1565C0), icon: Icons.login_rounded,
+                color: const Color(0xFF1E3A5F), icon: Icons.login_rounded,
                 onPressed: state._login,
               ),
               const SizedBox(height: 24),

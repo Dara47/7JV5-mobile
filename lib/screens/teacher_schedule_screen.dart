@@ -1,4 +1,4 @@
-import 'package:flutter/material.dart';
+﻿import 'package:flutter/material.dart';
 import '../models/models.dart';
 import '../services/firestore_service.dart';
 import 'teacher_slot_form_dialog.dart';
@@ -268,7 +268,7 @@ class _TeacherCard extends StatelessWidget {
                         Container(
                           padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 3),
                           decoration: BoxDecoration(color: const Color(0xFFE3F2FD), borderRadius: BorderRadius.circular(12)),
-                          child: Text(name, style: const TextStyle(fontSize: 11, color: Color(0xFF1565C0))),
+                          child: Text(name, style: const TextStyle(fontSize: 11, color: Color(0xFFB45309))),
                         )).toList()),
                       const SizedBox(height: 10),
                     ] else ...[
@@ -443,7 +443,7 @@ class _TeacherReportScreen extends StatelessWidget {
           shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(10)),
           child: Padding(padding: const EdgeInsets.all(12), child: Column(crossAxisAlignment: CrossAxisAlignment.start, children: [
             Row(children: [
-              const Icon(Icons.school_outlined, size: 16, color: Color(0xFF1565C0)),
+              const Icon(Icons.school_outlined, size: 16, color: Color(0xFFB45309)),
               const SizedBox(width: 6),
               Expanded(child: Text('${pkg.studentName} (${pkg.studentCode})', style: const TextStyle(fontWeight: FontWeight.w600))),
               Container(

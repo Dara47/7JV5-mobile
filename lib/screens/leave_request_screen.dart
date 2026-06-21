@@ -1,4 +1,4 @@
-import 'package:flutter/material.dart';
+﻿import 'package:flutter/material.dart';
 import '../models/models.dart';
 import '../services/firestore_service.dart';
 
@@ -202,7 +202,7 @@ class _AdminLeaveCard extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
-    final roleColor = leave.userRole == 'teacher' ? const Color(0xFF2E7D32) : const Color(0xFF1565C0);
+    final roleColor = leave.userRole == 'teacher' ? const Color(0xFF2E7D32) : const Color(0xFFB45309);
     return Card(
       margin: EdgeInsets.zero,
       shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(12)),

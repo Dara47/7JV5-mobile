@@ -1,4 +1,4 @@
-import 'package:flutter/material.dart';
+﻿import 'package:flutter/material.dart';
 import '../models/models.dart';
 import '../services/firestore_service.dart';
 
@@ -222,10 +222,10 @@ class _TeacherSlotSheetState extends State<_TeacherSlotSheet> {
                 ),
                 child: Column(crossAxisAlignment: CrossAxisAlignment.start, children: [
                   const Row(children: [
-                    Icon(Icons.add_circle_outline, size: 16, color: Color(0xFF1565C0)),
+                    Icon(Icons.add_circle_outline, size: 16, color: Color(0xFFB45309)),
                     SizedBox(width: 6),
                     Text('เพิ่มช่วงเวลาใหม่',
-                        style: TextStyle(fontSize: 13, fontWeight: FontWeight.w600, color: Color(0xFF1565C0))),
+                        style: TextStyle(fontSize: 13, fontWeight: FontWeight.w600, color: Color(0xFFB45309))),
                   ]),
                   const SizedBox(height: 12),
 
@@ -240,10 +240,10 @@ class _TeacherSlotSheetState extends State<_TeacherSlotSheet> {
                         duration: const Duration(milliseconds: 150),
                         width: 40, height: 40,
                         decoration: BoxDecoration(
-                          color: _newDay == d ? const Color(0xFF1565C0) : Colors.white,
+                          color: _newDay == d ? const Color(0xFFB45309) : Colors.white,
                           shape: BoxShape.circle,
                           border: Border.all(
-                              color: _newDay == d ? const Color(0xFF1565C0) : Colors.grey.shade300),
+                              color: _newDay == d ? const Color(0xFFB45309) : Colors.grey.shade300),
                         ),
                         child: Center(child: Text(d,
                             style: TextStyle(
@@ -294,7 +294,7 @@ class _TeacherSlotSheetState extends State<_TeacherSlotSheet> {
                       icon: const Icon(Icons.add, size: 18),
                       label: const Text('เพิ่มช่วงเวลานี้'),
                       style: ElevatedButton.styleFrom(
-                        backgroundColor: const Color(0xFF1565C0),
+                        backgroundColor: const Color(0xFFB45309),
                         foregroundColor: Colors.white,
                         padding: const EdgeInsets.symmetric(vertical: 10),
                         shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(10)),
@@ -367,7 +367,7 @@ class _TimeTile extends StatelessWidget {
         color: time != null ? const Color(0xFFE3F2FD) : Colors.grey.shade100,
         borderRadius: BorderRadius.circular(10),
         border: Border.all(
-            color: time != null ? const Color(0xFF1565C0).withAlpha(100) : Colors.grey.shade300),
+            color: time != null ? const Color(0xFFB45309).withAlpha(100) : Colors.grey.shade300),
       ),
       child: Column(mainAxisAlignment: MainAxisAlignment.center, children: [
         Text(label, style: const TextStyle(fontSize: 11, color: Colors.grey)),
@@ -379,7 +379,7 @@ class _TimeTile extends StatelessWidget {
           style: TextStyle(
             fontSize: 17,
             fontWeight: FontWeight.bold,
-            color: time != null ? const Color(0xFF1565C0) : Colors.grey,
+            color: time != null ? const Color(0xFFB45309) : Colors.grey,
           ),
         ),
       ]),

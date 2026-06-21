@@ -1,4 +1,4 @@
-import 'package:flutter/material.dart';
+﻿import 'package:flutter/material.dart';
 import '../models/models.dart';
 import '../services/firestore_service.dart';
 import '../widgets/session_table.dart';
@@ -25,7 +25,7 @@ class UserDetailScreen extends StatelessWidget {
             Text(userName, style: const TextStyle(fontSize: 16, fontWeight: FontWeight.bold)),
             Text('รหัส $userCode', style: const TextStyle(fontSize: 12, fontWeight: FontWeight.normal)),
           ]),
-          backgroundColor: const Color(0xFF1565C0),
+          backgroundColor: const Color(0xFFB45309),
           foregroundColor: Colors.white,
           bottom: const TabBar(
             labelColor: Colors.white,
@@ -138,7 +138,7 @@ class _PackageCard extends StatelessWidget {
   @override
   Widget build(BuildContext context) {
     final pct = pkg.totalSessions > 0 ? pkg.remainingSessions / pkg.totalSessions : 0.0;
-    final barColor = pkg.isLowBalance ? Colors.orange : const Color(0xFF1565C0);
+    final barColor = pkg.isLowBalance ? Colors.orange : const Color(0xFFB45309);
 
     return Card(
       shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(12)),

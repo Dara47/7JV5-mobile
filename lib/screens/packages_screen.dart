@@ -1,4 +1,4 @@
-import 'package:flutter/material.dart';
+﻿import 'package:flutter/material.dart';
 import '../models/models.dart';
 import '../services/firestore_service.dart';
 import 'package_form_dialog.dart';
@@ -47,7 +47,7 @@ class _PackagesScreenState extends State<PackagesScreen> {
     return Scaffold(
       appBar: AppBar(
         title: Text(filterTitle),
-        backgroundColor: const Color(0xFF1565C0),
+        backgroundColor: const Color(0xFFB45309),
         foregroundColor: Colors.white,
       ),
       floatingActionButton: isTeacherFilter
@@ -64,7 +64,7 @@ class _PackagesScreenState extends State<PackagesScreen> {
           : FloatingActionButton.extended(
               heroTag: 'add_pkg',
               onPressed: () => _openForm(),
-              backgroundColor: const Color(0xFF1565C0),
+              backgroundColor: const Color(0xFFB45309),
               foregroundColor: Colors.white,
               icon: const Icon(Icons.add),
               label: const Text('เพิ่มคาบ'),
@@ -220,7 +220,7 @@ class PackageCard extends StatelessWidget {
           label: Text(d),
           selected: day == d,
           onSelected: (_) => setS(() => day = d),
-          selectedColor: const Color(0xFF1565C0),
+          selectedColor: const Color(0xFFB45309),
           labelStyle: TextStyle(color: day == d ? Colors.white : Colors.black87, fontWeight: FontWeight.bold),
         )).toList()),
         const SizedBox(height: 12),
@@ -258,7 +258,7 @@ class PackageCard extends StatelessWidget {
             };
             if (data.isNotEmpty) await FirestoreService.updatePackageFields(pkg.id, data);
           },
-          style: ElevatedButton.styleFrom(backgroundColor: const Color(0xFF1565C0), foregroundColor: Colors.white),
+          style: ElevatedButton.styleFrom(backgroundColor: const Color(0xFFB45309), foregroundColor: Colors.white),
           child: const Text('บันทึก'),
         ),
       ],
@@ -318,14 +318,14 @@ class PackageCard extends StatelessWidget {
             // Primary person (student when teacher views, teacher when student/admin views)
             Row(children: [
               Icon(viewerRole == 'teacher' ? Icons.school_outlined : Icons.school_outlined,
-                  size: 16, color: const Color(0xFF1565C0)),
+                  size: 16, color: const Color(0xFFB45309)),
               const SizedBox(width: 6),
               Expanded(child: Text(
                 viewerRole == 'teacher' ? pkg.studentName : pkg.studentName,
                 style: const TextStyle(fontWeight: FontWeight.bold, fontSize: 15))),
               Text(
                 viewerRole == 'teacher' ? pkg.studentCode : pkg.studentCode,
-                style: const TextStyle(color: Color(0xFF1565C0), fontWeight: FontWeight.w600, fontSize: 13)),
+                style: const TextStyle(color: Color(0xFFB45309), fontWeight: FontWeight.w600, fontSize: 13)),
             ]),
             const SizedBox(height: 4),
             Row(children: [
@@ -345,13 +345,13 @@ class PackageCard extends StatelessWidget {
                 padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 6),
                 decoration: BoxDecoration(color: const Color(0xFFE3F2FD), borderRadius: BorderRadius.circular(8)),
                 child: Row(children: [
-                  const Icon(Icons.calendar_today, size: 14, color: Color(0xFF1565C0)),
+                  const Icon(Icons.calendar_today, size: 14, color: Color(0xFFB45309)),
                   const SizedBox(width: 6),
-                  Text(pkg.scheduleLabel, style: const TextStyle(fontSize: 13, color: Color(0xFF1565C0), fontWeight: FontWeight.w600)),
+                  Text(pkg.scheduleLabel, style: const TextStyle(fontSize: 13, color: Color(0xFFB45309), fontWeight: FontWeight.w600)),
                   const Spacer(),
-                  const Icon(Icons.edit_calendar, size: 14, color: Color(0xFF1565C0)),
+                  const Icon(Icons.edit_calendar, size: 14, color: Color(0xFFB45309)),
                   const SizedBox(width: 4),
-                  const Text('ย้าย', style: TextStyle(fontSize: 11, color: Color(0xFF1565C0))),
+                  const Text('ย้าย', style: TextStyle(fontSize: 11, color: Color(0xFFB45309))),
                 ]),
               ),
             ),
@@ -408,7 +408,7 @@ class PackageCard extends StatelessWidget {
             _vDivider(),
             _ActionBtn(icon: Icons.add_circle_outline, label: 'เพิ่มคาบ', color: Colors.green, onTap: () => _showAdjustDialog(context, isAdd: true)),
             _vDivider(),
-            _ActionBtn(icon: Icons.edit_outlined, label: 'Edit', color: const Color(0xFF1565C0), onTap: onEdit),
+            _ActionBtn(icon: Icons.edit_outlined, label: 'Edit', color: const Color(0xFFB45309), onTap: onEdit),
             _vDivider(),
             _ActionBtn(icon: Icons.delete_outline, label: 'ลบ', color: Colors.red, onTap: () => _confirmDelete(context)),
           ]),
@@ -476,7 +476,7 @@ class _TimeTile extends StatelessWidget {
         Text(label, style: const TextStyle(fontSize: 11, color: Colors.grey)),
         Text(
           time != null ? '${time!.hour.toString().padLeft(2,'0')}:${time!.minute.toString().padLeft(2,'0')}' : '--:--',
-          style: const TextStyle(fontSize: 18, fontWeight: FontWeight.bold, color: Color(0xFF1565C0)),
+          style: const TextStyle(fontSize: 18, fontWeight: FontWeight.bold, color: Color(0xFFB45309)),
         ),
       ]),
     ),
@@ -494,7 +494,7 @@ class _PackageReportScreen extends StatelessWidget {
     return Scaffold(
       appBar: AppBar(
         title: Text('รายงาน: ${pkg.studentName}'),
-        backgroundColor: const Color(0xFF1565C0),
+        backgroundColor: const Color(0xFFB45309),
         foregroundColor: Colors.white,
       ),
       body: StreamBuilder<List<SessionModel>>(
@@ -533,8 +533,8 @@ class _PackageReportScreen extends StatelessWidget {
                   child: ListTile(
                     leading: CircleAvatar(
                       radius: 18,
-                      backgroundColor: const Color(0xFF1565C0).withAlpha(20),
-                      child: Text('${i + 1}', style: const TextStyle(fontSize: 12, color: Color(0xFF1565C0), fontWeight: FontWeight.bold)),
+                      backgroundColor: const Color(0xFFB45309).withAlpha(20),
+                      child: Text('${i + 1}', style: const TextStyle(fontSize: 12, color: Color(0xFFB45309), fontWeight: FontWeight.bold)),
                     ),
                     title: Text('${s.date}  ${s.startTime}–${s.endTime}'),
                     subtitle: Text([
