@@ -189,10 +189,10 @@ class PackageCard extends StatelessWidget {
             Navigator.pop(dialogCtx);
             try {
               if (isAdd) {
-                await FirestoreService.adjustSessions(pkg.id, totalDelta: n, remainingDelta: n);
+                await FirestoreService.adjustSessions(pkg.id, totalDelta: n, remainingDelta: n, studentId: pkg.studentId);
               } else {
                 final deduct = n.clamp(1, pkg.remainingSessions > 0 ? pkg.remainingSessions : n);
-                await FirestoreService.adjustSessions(pkg.id, totalDelta: -deduct, remainingDelta: -deduct);
+                await FirestoreService.adjustSessions(pkg.id, totalDelta: -deduct, remainingDelta: -deduct, studentId: pkg.studentId);
               }
             } catch (e) {
               if (context.mounted) {

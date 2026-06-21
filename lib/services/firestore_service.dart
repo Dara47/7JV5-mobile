@@ -165,12 +165,18 @@ class FirestoreService {
     await _db.collection('packages').doc(id).update({...data, 'updatedAt': FieldValue.serverTimestamp()});
   }
 
-  static Future<void> adjustSessions(String id, {int totalDelta = 0, int remainingDelta = 0}) async {
+  static Future<void> adjustSessions(String id, {int totalDelta = 0, int remainingDelta = 0, String? studentId}) async {
     await _db.collection('packages').doc(id).update({
       if (totalDelta != 0) 'totalSessions': FieldValue.increment(totalDelta),
       if (remainingDelta != 0) 'remainingSessions': FieldValue.increment(remainingDelta),
       'updatedAt': FieldValue.serverTimestamp(),
     });
+    if (studentId != null && totalDelta != 0) {
+      await _db.collection('users').doc(studentId).update({
+        if (totalDelta > 0) 'totalAdded': FieldValue.increment(totalDelta),
+        if (totalDelta < 0) 'totalRemoved': FieldValue.increment(-totalDelta),
+      });
+    }
   }
 
   // ── User management ──────────────────────────────────────────────────────

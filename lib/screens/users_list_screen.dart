@@ -276,17 +276,29 @@ class _UserList extends StatelessWidget {
                     stream: FirestoreService.watchPackagesForUser(u.id, 'student'),
                     builder: (ctx, pkgSnap) {
                       final pkgs = pkgSnap.data ?? [];
-                      if (pkgs.isEmpty) return const SizedBox.shrink();
+                      if (pkgs.isEmpty && u.totalAdded == 0 && u.totalRemoved == 0) return const SizedBox.shrink();
                       final total = pkgs.fold(0, (s, p) => s + p.totalSessions);
-                      final parts = pkgs.map((p) => '${p.totalSessions}').join(' + ');
-                      final formula = pkgs.length == 1 ? '$total คาบ' : '$parts = $total คาบ';
+                      final hasAdj = u.totalAdded > 0 || u.totalRemoved > 0;
                       return Padding(
                         padding: const EdgeInsets.fromLTRB(54, 0, 12, 10),
-                        child: Row(children: [
+                        child: Wrap(spacing: 6, crossAxisAlignment: WrapCrossAlignment.center, children: [
                           Icon(Icons.book_outlined, size: 13, color: Colors.blue.shade300),
-                          const SizedBox(width: 5),
-                          Text('จำนวนคาบ: ', style: TextStyle(fontSize: 12, color: Colors.grey.shade500)),
-                          Text(formula, style: const TextStyle(fontSize: 12, color: Color(0xFF1565C0), fontWeight: FontWeight.w600)),
+                          Text('จำนวนคาบ:', style: TextStyle(fontSize: 12, color: Colors.grey.shade500)),
+                          Text('$total คาบ', style: const TextStyle(fontSize: 12, color: Color(0xFF1565C0), fontWeight: FontWeight.w600)),
+                          if (hasAdj) ...[
+                            if (u.totalAdded > 0)
+                              Container(
+                                padding: const EdgeInsets.symmetric(horizontal: 6, vertical: 1),
+                                decoration: BoxDecoration(color: Colors.green.shade50, borderRadius: BorderRadius.circular(6)),
+                                child: Text('+${u.totalAdded}', style: TextStyle(fontSize: 11, color: Colors.green.shade700, fontWeight: FontWeight.bold)),
+                              ),
+                            if (u.totalRemoved > 0)
+                              Container(
+                                padding: const EdgeInsets.symmetric(horizontal: 6, vertical: 1),
+                                decoration: BoxDecoration(color: Colors.red.shade50, borderRadius: BorderRadius.circular(6)),
+                                child: Text('-${u.totalRemoved}', style: TextStyle(fontSize: 11, color: Colors.red.shade600, fontWeight: FontWeight.bold)),
+                              ),
+                          ],
                         ]),
                       );
                     },
