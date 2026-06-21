@@ -28,7 +28,8 @@ class _PackagesScreenState extends State<PackagesScreen> {
   void dispose() { _searchCtrl.dispose(); super.dispose(); }
 
   void _openForm({PackageModel? pkg}) {
-    showPackageForm(context, existing: pkg);
+    showPackageForm(context, existing: pkg,
+        preselectedStudentId: pkg == null ? widget.filterStudentId : null);
   }
 
   @override

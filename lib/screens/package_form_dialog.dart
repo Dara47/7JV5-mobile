@@ -3,18 +3,19 @@ import 'package:cloud_firestore/cloud_firestore.dart';
 import '../models/models.dart';
 import '../services/firestore_service.dart';
 
-Future<void> showPackageForm(BuildContext context, {PackageModel? existing}) {
+Future<void> showPackageForm(BuildContext context, {PackageModel? existing, String? preselectedStudentId}) {
   return showModalBottomSheet(
     context: context,
     isScrollControlled: true,
     backgroundColor: Colors.transparent,
-    builder: (_) => _PackageFormSheet(existing: existing),
+    builder: (_) => _PackageFormSheet(existing: existing, preselectedStudentId: preselectedStudentId),
   );
 }
 
 class _PackageFormSheet extends StatefulWidget {
   final PackageModel? existing;
-  const _PackageFormSheet({this.existing});
+  final String? preselectedStudentId;
+  const _PackageFormSheet({this.existing, this.preselectedStudentId});
   @override
   State<_PackageFormSheet> createState() => _PackageFormSheetState();
 }
@@ -96,6 +97,12 @@ class _PackageFormSheetState extends State<_PackageFormSheet> {
       if (_isEdit) {
         try { _student = students.firstWhere((u) => u.id == widget.existing!.studentId); } catch (_) {}
         try { _teacher = teachers.firstWhere((u) => u.id == widget.existing!.teacherId); } catch (_) {}
+      } else if (widget.preselectedStudentId != null) {
+        try {
+          final s = students.firstWhere((u) => u.id == widget.preselectedStudentId);
+          _student = s;
+          if (s.defaultSessions != null) _totalCtrl.text = s.defaultSessions.toString();
+        } catch (_) {}
       }
       _loadingUsers = false;
     });
@@ -199,13 +206,13 @@ class _PackageFormSheetState extends State<_PackageFormSheet> {
                     child: Column(crossAxisAlignment: CrossAxisAlignment.start, children: [
 
                       // ── นักเรียน ──
-                      _label('👤 นักเรียน', required: !_isEdit),
+                      _label('👤 นักเรียน', required: !_isEdit && widget.preselectedStudentId == null),
                       const SizedBox(height: 6),
                       _UserDropdown(
                         users: _students,
                         selected: _student,
                         hint: 'เลือกนักเรียน...',
-                        enabled: !_isEdit,
+                        enabled: !_isEdit && widget.preselectedStudentId == null,
                         color: const Color(0xFF1565C0),
                         onChanged: (u) {
                           setState(() {
