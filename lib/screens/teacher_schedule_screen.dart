@@ -268,7 +268,7 @@ class _TeacherCard extends StatelessWidget {
                         Container(
                           padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 3),
                           decoration: BoxDecoration(color: const Color(0xFFE3F2FD), borderRadius: BorderRadius.circular(12)),
-                          child: Text(name, style: const TextStyle(fontSize: 11, color: Color(0xFFEA580C))),
+                          child: Text(name, style: const TextStyle(fontSize: 11, color: Color(0xFFF97316))),
                         )).toList()),
                       const SizedBox(height: 10),
                     ] else ...[
@@ -443,7 +443,7 @@ class _TeacherReportScreen extends StatelessWidget {
           shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(10)),
           child: Padding(padding: const EdgeInsets.all(12), child: Column(crossAxisAlignment: CrossAxisAlignment.start, children: [
             Row(children: [
-              const Icon(Icons.school_outlined, size: 16, color: Color(0xFFEA580C)),
+              const Icon(Icons.school_outlined, size: 16, color: Color(0xFFF97316)),
               const SizedBox(width: 6),
               Expanded(child: Text('${pkg.studentName} (${pkg.studentCode})', style: const TextStyle(fontWeight: FontWeight.w600))),
               Container(

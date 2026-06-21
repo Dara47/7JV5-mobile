@@ -111,7 +111,7 @@ class _HeroPanel extends StatelessWidget {
         gradient: LinearGradient(
           begin: Alignment.topLeft,
           end: Alignment.bottomRight,
-          colors: [Color(0xFF0C0A09), Color(0xFF1C1917), Color(0xFF44403C)],
+          colors: [Color(0xFF0D47A1), Color(0xFF1565C0), Color(0xFF1E88E5)],
         ),
       ),
       child: Stack(children: [
@@ -233,21 +233,21 @@ class _FormContent extends StatelessWidget {
             children: [
               const Text('ยินดีต้อนรับ',
                   style: TextStyle(fontSize: 26, fontWeight: FontWeight.w800,
-                      color: Color(0xFF1C1917))),
+                      color: Color(0xFF1565C0))),
               const SizedBox(height: 4),
               Text('กรุณาเข้าสู่ระบบเพื่อดำเนินการต่อ',
                   style: TextStyle(fontSize: 13, color: Colors.grey.shade600)),
               const SizedBox(height: 30),
 
               // ── Teacher / Student ─────────────────────────────────────
-              _SectionBadge(label: 'ครู / นักเรียน', color: const Color(0xFFEA580C)),
+              _SectionBadge(label: 'ครู / นักเรียน', color: const Color(0xFFF97316)),
               const SizedBox(height: 14),
               StatefulBuilder(builder: (_, setInner) => _Field(
                 ctrl: state._codeCtrl,
                 label: 'รหัสผู้ใช้',
                 hint: 'เช่น T270001 หรือ S270001',
                 icon: Icons.badge_outlined,
-                accent: const Color(0xFFEA580C),
+                accent: const Color(0xFFF97316),
                 textCaps: TextCapitalization.characters,
                 onSubmit: state._loginWithCode,
                 onChanged: () => setInner(() {}),
@@ -261,7 +261,7 @@ class _FormContent extends StatelessWidget {
               const SizedBox(height: 16),
               _ActionButton(
                 label: 'เข้าสู่ระบบด้วยรหัส', loading: state._codeLoading,
-                color: const Color(0xFFEA580C), icon: Icons.person_pin_rounded,
+                color: const Color(0xFFF97316), icon: Icons.person_pin_rounded,
                 onPressed: state._loginWithCode,
               ),
 
@@ -279,22 +279,22 @@ class _FormContent extends StatelessWidget {
               const SizedBox(height: 24),
 
               // ── Admin ─────────────────────────────────────────────────
-              _SectionBadge(label: 'ผู้ดูแลระบบ', color: const Color(0xFF1C1917)),
+              _SectionBadge(label: 'ผู้ดูแลระบบ', color: const Color(0xFF1565C0)),
               const SizedBox(height: 14),
               _Field(ctrl: state._emailCtrl, label: 'อีเมล',
                   icon: Icons.email_outlined, type: TextInputType.emailAddress,
-                  accent: const Color(0xFF1C1917)),
+                  accent: const Color(0xFF1565C0)),
               const SizedBox(height: 12),
               _Field(ctrl: state._passCtrl, label: 'รหัสผ่าน',
                   icon: Icons.lock_outline, obscure: true,
-                  accent: const Color(0xFF1C1917), onSubmit: state._login),
+                  accent: const Color(0xFF1565C0), onSubmit: state._login),
               if (state._error != null) ...[
                 const SizedBox(height: 8), _ErrorRow(state._error!),
               ],
               const SizedBox(height: 16),
               _ActionButton(
                 label: 'เข้าสู่ระบบ (Admin)', loading: state._loading,
-                color: const Color(0xFF1C1917), icon: Icons.login_rounded,
+                color: const Color(0xFF1565C0), icon: Icons.login_rounded,
                 onPressed: state._login,
               ),
               const SizedBox(height: 24),

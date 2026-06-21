@@ -131,7 +131,7 @@ class CutSessionScreen extends StatelessWidget {
                               Expanded(
                                 child: Column(crossAxisAlignment: CrossAxisAlignment.start, children: [
                                   Row(children: [
-                                    const Icon(Icons.school_outlined, size: 14, color: Color(0xFFEA580C)),
+                                    const Icon(Icons.school_outlined, size: 14, color: Color(0xFFF97316)),
                                     const SizedBox(width: 4),
                                     Expanded(
                                       child: Text(pkg.studentName,

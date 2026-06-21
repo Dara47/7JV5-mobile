@@ -22,7 +22,7 @@ class JV5App extends StatelessWidget {
       title: '7J English',
       debugShowCheckedModeBanner: false,
       theme: ThemeData(
-        colorScheme: ColorScheme.fromSeed(seedColor: const Color(0xFFEA580C)),
+        colorScheme: ColorScheme.fromSeed(seedColor: const Color(0xFFF97316)),
         useMaterial3: true,
         fontFamily: 'Roboto',
       ),

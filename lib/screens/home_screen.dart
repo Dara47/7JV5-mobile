@@ -159,7 +159,7 @@ class _SingleTabBar extends StatelessWidget {
       child: Row(mainAxisAlignment: MainAxisAlignment.spaceBetween, children: [
         Padding(
           padding: const EdgeInsets.only(left: 16),
-          child: Text(label, style: const TextStyle(fontWeight: FontWeight.w600, color: Color(0xFFEA580C))),
+          child: Text(label, style: const TextStyle(fontWeight: FontWeight.w600, color: Color(0xFFF97316))),
         ),
         IconButton(icon: const Icon(Icons.logout, color: Colors.grey), onPressed: onLogout),
       ]),

@@ -83,7 +83,7 @@ class _SettingsScreenState extends State<SettingsScreen> {
               const SizedBox(height: 24),
 
               // ── QR ธนาคาร ───────────────────────────────────────────
-              _SectionHeader(icon: Icons.qr_code_2, label: 'ภาพ QR ธนาคาร (URL)', color: const Color(0xFFEA580C)),
+              _SectionHeader(icon: Icons.qr_code_2, label: 'ภาพ QR ธนาคาร (URL)', color: const Color(0xFFF97316)),
               const SizedBox(height: 8),
               _Field(
                 controller: _qrCtrl,
