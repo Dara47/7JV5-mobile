@@ -61,132 +61,159 @@ class _LoginScreenState extends State<LoginScreen> {
   @override
   Widget build(BuildContext context) {
     return Scaffold(
-      body: LayoutBuilder(builder: (context, constraints) {
-        final isWide = constraints.maxWidth >= 740;
-        if (isWide) {
-          final heroW = constraints.maxWidth * 0.50 + 40;
-          return Stack(
-            fit: StackFit.expand,
-            children: [
-              const ColoredBox(color: Color(0xFFF5F5F4)),
-              Positioned(
-                left: 0, top: 0, bottom: 0,
-                width: heroW,
-                child: ClipPath(
-                  clipper: _WaveClipper(),
-                  child: const _HeroPanel(),
-                ),
+      body: Stack(
+        fit: StackFit.expand,
+        children: [
+          // ── Amber gradient background ─────────────────────────────
+          Container(
+            decoration: const BoxDecoration(
+              gradient: LinearGradient(
+                begin: Alignment.topCenter,
+                end: Alignment.bottomCenter,
+                colors: [Color(0xFFFFF8DC), Color(0xFFFFE082), Color(0xFFFFB300)],
               ),
-              Positioned(
-                left: constraints.maxWidth * 0.48,
-                top: 0, bottom: 0, right: 0,
-                child: _FormContent(state: this),
-              ),
-            ],
-          );
-        }
-        return ColoredBox(
-          color: const Color(0xFFF5F5F4),
-          child: SingleChildScrollView(
-            child: Column(children: [
-              const SizedBox(height: 220, child: _HeroPanel(showFeatures: false)),
-              _FormContent(state: this, narrowMode: true),
-            ]),
-          ),
-        );
-      }),
-    );
-  }
-}
-
-// ── Hero panel ────────────────────────────────────────────────────────────────
-
-class _HeroPanel extends StatelessWidget {
-  final bool showFeatures;
-  const _HeroPanel({super.key, this.showFeatures = true});
-
-  @override
-  Widget build(BuildContext context) {
-    return Container(
-      decoration: const BoxDecoration(
-        gradient: LinearGradient(
-          begin: Alignment.topCenter,
-          end: Alignment.bottomCenter,
-          colors: [Color(0xFFFFF8DC), Color(0xFFFFE082), Color(0xFFFFB300)],
-        ),
-      ),
-      child: Stack(children: [
-        // ── Dot grids ─────────────────────────────────────────
-        const Positioned(top: 18,  left: 36,  child: _DotGrid(4, 4)),
-        if (showFeatures)
-          const Positioned(bottom: 210, right: 14, child: _DotGrid(3, 5)),
-
-        // ── Background circles ────────────────────────────────
-        Positioned(top: -55, right: -30, child: _Bubble(220, 0.13)),
-        Positioned(top: 70,  left:  8,   child: _Bubble(65,  0.10)),
-        if (showFeatures) ...[
-          Positioned(bottom: 140, left: -65, child: _OutlineCircle(185)),
-          Positioned(top: 195,   right:  2,  child: _Bubble(42,  0.08)),
-        ],
-
-        // ── Floating word chips ───────────────────────────────
-        const Positioned(top: 22,  left: 14, child: _WordChip('Aa')),
-        if (showFeatures) ...[
-          Positioned(top: 138, right: 22,   child: _ChatDotBubble()),
-          const Positioned(top: 268, left: 22,  child: _WordChip('Hello')),
-          const Positioned(top: 358, right: 28, child: _WordChip('Hi!')),
-          const Positioned(bottom: 218, left: 14,  child: _WordChip('Learn')),
-          const Positioned(bottom: 192, right: 14, child: _WordChip('English')),
-        ],
-
-        // ── Small geometric accents ───────────────────────────
-        if (showFeatures) ...[
-          Positioned(top: 192, right: 78,  child: _Diamond()),
-          Positioned(bottom: 288, left: 88, child: _Diamond()),
-          Positioned(top: 438, right: 58,
-              child: _Bubble(10, 0.35)),
-          Positioned(top: 308, left: 104,
-              child: _Bubble(8, 0.40)),
-        ],
-
-        // ── Center logo + title ───────────────────────────────
-        SafeArea(
-          child: Center(
-            child: Padding(
-              padding: const EdgeInsets.fromLTRB(36, 24, 36, 24),
-              child: Column(mainAxisSize: MainAxisSize.min, children: [
-                Image.asset(
-                  'assets/images/logo.png',
-                  width: 130,
-                  height: 130,
-                  errorBuilder: (_, __, ___) => Container(
-                    width: 96, height: 96,
-                    decoration: BoxDecoration(
-                      shape: BoxShape.circle,
-                      color: Colors.white.withOpacity(0.18),
-                      border: Border.all(color: Colors.white.withOpacity(0.35), width: 2),
-                    ),
-                    child: const Icon(Icons.school_rounded, size: 52, color: Colors.white),
-                  ),
-                ),
-                const SizedBox(height: 12),
-                const Text('7J English',
-                    style: TextStyle(fontSize: 34, fontWeight: FontWeight.w800,
-                        color: Color(0xFF1A237E), letterSpacing: 0.5)),
-                const SizedBox(height: 6),
-                const Text('ระบบจัดการโรงเรียน',
-                    style: TextStyle(fontSize: 15,
-                        color: Color(0xFF3949AB), letterSpacing: 0.3)),
-              ]),
             ),
           ),
-        ),
-      ]),
+
+          // ── Background decorations ────────────────────────────────
+          Positioned(top: -50, right: -30, child: _Bubble(200, 0.13)),
+          Positioned(bottom: 60, left: -50, child: _OutlineCircle(180)),
+          Positioned(top: 60, left: 8,     child: _Bubble(55, 0.10)),
+          const Positioned(top: 18,  left: 38, child: _DotGrid(4, 4)),
+          const Positioned(bottom: 40, right: 16, child: _DotGrid(3, 4)),
+          const Positioned(top: 22,   left: 14, child: _WordChip('Aa')),
+          const Positioned(top: 90,   right: 18, child: _WordChip('Hello')),
+          Positioned(bottom: 100, left: 14,   child: const _WordChip('Learn')),
+          Positioned(bottom: 76, right: 14,   child: const _WordChip('English')),
+          Positioned(top: 170,  right: 20,    child: const _ChatDotBubble()),
+          Positioned(top: 192,  right: 74,    child: const _Diamond()),
+          Positioned(bottom: 200, left: 80,   child: const _Diamond()),
+
+          // ── Centered login card ───────────────────────────────────
+          SafeArea(
+            child: Center(
+              child: SingleChildScrollView(
+                padding: const EdgeInsets.symmetric(horizontal: 20, vertical: 20),
+                child: ConstrainedBox(
+                  constraints: const BoxConstraints(maxWidth: 420),
+                  child: Card(
+                    elevation: 10,
+                    shadowColor: Colors.amber.withOpacity(0.35),
+                    shape: RoundedRectangleBorder(
+                        borderRadius: BorderRadius.circular(24)),
+                    child: Padding(
+                      padding: const EdgeInsets.fromLTRB(28, 28, 28, 24),
+                      child: Column(
+                        mainAxisSize: MainAxisSize.min,
+                        children: [
+
+                          // ── Logo ──────────────────────────────────
+                          Image.asset(
+                            'assets/images/logo.png',
+                            width: 110, height: 110,
+                            errorBuilder: (_, __, ___) => const Icon(
+                                Icons.school_rounded,
+                                size: 80, color: Color(0xFFF97316)),
+                          ),
+                          const SizedBox(height: 8),
+                          const Text('7J English Center',
+                              style: TextStyle(fontSize: 20,
+                                  fontWeight: FontWeight.w800,
+                                  color: Color(0xFF1A237E))),
+                          const SizedBox(height: 4),
+                          const Text('ระบบจัดการโรงเรียน',
+                              style: TextStyle(fontSize: 13, color: Colors.grey)),
+                          const SizedBox(height: 24),
+
+                          // ── ครู / นักเรียน ────────────────────────
+                          const _SectionBadge(
+                              label: 'ครู / นักเรียน',
+                              color: Color(0xFFF97316)),
+                          const SizedBox(height: 12),
+                          StatefulBuilder(builder: (_, setInner) => _Field(
+                            ctrl: _codeCtrl,
+                            label: 'รหัสผู้ใช้',
+                            hint: 'เช่น T270001 หรือ S270001',
+                            icon: Icons.badge_outlined,
+                            accent: const Color(0xFFF97316),
+                            textCaps: TextCapitalization.characters,
+                            onSubmit: _loginWithCode,
+                            onChanged: () => setInner(() {}),
+                            clearBtn: _codeCtrl.text.isNotEmpty
+                                ? () { _codeCtrl.clear(); setInner(() {}); }
+                                : null,
+                          )),
+                          if (_codeError != null) ...[
+                            const SizedBox(height: 8),
+                            _ErrorRow(_codeError!),
+                          ],
+                          const SizedBox(height: 14),
+                          _ActionButton(
+                            label: 'เข้าสู่ระบบด้วยรหัส',
+                            loading: _codeLoading,
+                            color: const Color(0xFFF97316),
+                            icon: Icons.person_pin_rounded,
+                            onPressed: _loginWithCode,
+                          ),
+
+                          // ── Divider ───────────────────────────────
+                          const SizedBox(height: 20),
+                          Row(children: [
+                            Expanded(child: Divider(color: Colors.grey.shade300)),
+                            Padding(
+                              padding: const EdgeInsets.symmetric(horizontal: 12),
+                              child: Text('หรือ',
+                                  style: TextStyle(
+                                      fontSize: 12, color: Colors.grey.shade500)),
+                            ),
+                            Expanded(child: Divider(color: Colors.grey.shade300)),
+                          ]),
+                          const SizedBox(height: 20),
+
+                          // ── Admin ─────────────────────────────────
+                          const _SectionBadge(
+                              label: 'ผู้ดูแลระบบ',
+                              color: Color(0xFF1565C0)),
+                          const SizedBox(height: 12),
+                          _Field(
+                              ctrl: _emailCtrl, label: 'อีเมล',
+                              icon: Icons.email_outlined,
+                              type: TextInputType.emailAddress,
+                              accent: const Color(0xFF1565C0)),
+                          const SizedBox(height: 10),
+                          _Field(
+                              ctrl: _passCtrl, label: 'รหัสผ่าน',
+                              icon: Icons.lock_outline, obscure: true,
+                              accent: const Color(0xFF1565C0),
+                              onSubmit: _login),
+                          if (_error != null) ...[
+                            const SizedBox(height: 8),
+                            _ErrorRow(_error!),
+                          ],
+                          const SizedBox(height: 14),
+                          _ActionButton(
+                            label: 'เข้าสู่ระบบ (Admin)',
+                            loading: _loading,
+                            color: const Color(0xFF1565C0),
+                            icon: Icons.login_rounded,
+                            onPressed: _login,
+                          ),
+                          const SizedBox(height: 4),
+                        ],
+                      ),
+                    ),
+                  ),
+                ),
+              ),
+            ),
+          ),
+        ],
+      ),
     );
   }
 }
 
-// ── Hero decorative widgets ───────────────────────────────────────────────────
+// ── Decorative background widgets ─────────────────────────────────────────────
 
 class _Bubble extends StatelessWidget {
   final double size;
@@ -209,7 +236,7 @@ class _OutlineCircle extends StatelessWidget {
     width: size, height: size,
     decoration: BoxDecoration(
       shape: BoxShape.circle,
-      border: Border.all(color: Colors.white.withOpacity(0.14), width: 2),
+      border: Border.all(color: Colors.white.withOpacity(0.20), width: 2),
     ),
   );
 }
@@ -231,7 +258,7 @@ class _DotGrid extends StatelessWidget {
             width: 5, height: 5,
             decoration: BoxDecoration(
               shape: BoxShape.circle,
-              color: const Color(0xFFE65100).withOpacity(0.18),
+              color: const Color(0xFFE65100).withOpacity(0.22),
             ),
           ),
         )),
@@ -253,7 +280,7 @@ class _WordChip extends StatelessWidget {
     ),
     child: Text(text,
         style: const TextStyle(color: Color(0xFF7B3500),
-            fontWeight: FontWeight.bold, fontSize: 14)),
+            fontWeight: FontWeight.bold, fontSize: 13)),
   );
 }
 
@@ -261,20 +288,18 @@ class _ChatDotBubble extends StatelessWidget {
   const _ChatDotBubble();
   @override
   Widget build(BuildContext context) => Container(
-    padding: const EdgeInsets.symmetric(horizontal: 14, vertical: 10),
+    padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 8),
     decoration: BoxDecoration(
       color: const Color(0xFFFF8F00).withOpacity(0.22),
-      borderRadius: BorderRadius.circular(20),
+      borderRadius: BorderRadius.circular(18),
       border: Border.all(color: const Color(0xFFE65100).withOpacity(0.35)),
     ),
     child: Row(mainAxisSize: MainAxisSize.min, children: [
-      _dot(), const SizedBox(width: 4),
-      _dot(), const SizedBox(width: 4),
-      _dot(),
+      _dot(), const SizedBox(width: 4), _dot(), const SizedBox(width: 4), _dot(),
     ]),
   );
   Widget _dot() => Container(
-    width: 6, height: 6,
+    width: 5, height: 5,
     decoration: const BoxDecoration(
         shape: BoxShape.circle, color: Color(0xFF7B3500)),
   );
@@ -286,141 +311,34 @@ class _Diamond extends StatelessWidget {
   Widget build(BuildContext context) => Transform.rotate(
     angle: math.pi / 4,
     child: Container(
-      width: 12, height: 12,
+      width: 10, height: 10,
       decoration: BoxDecoration(
-        color: Colors.white.withOpacity(0.30),
+        color: const Color(0xFFFF8F00).withOpacity(0.30),
         borderRadius: BorderRadius.circular(2),
       ),
     ),
   );
 }
 
-// ── Wave clipper ──────────────────────────────────────────────────────────────
-
-class _WaveClipper extends CustomClipper<Path> {
-  @override
-  Path getClip(Size size) {
-    final w = size.width;
-    final h = size.height;
-    return Path()
-      ..moveTo(0, 0)
-      ..lineTo(w - 50, 0)
-      ..cubicTo(w + 15, h * 0.12, w - 55, h * 0.38, w - 20, h * 0.50)
-      ..cubicTo(w + 35, h * 0.62, w - 45, h * 0.88, w - 50, h)
-      ..lineTo(0, h)
-      ..close();
-  }
-  @override
-  bool shouldReclip(_) => false;
-}
-
-// ── Form content ──────────────────────────────────────────────────────────────
-
-class _FormContent extends StatelessWidget {
-  final _LoginScreenState state;
-  final bool narrowMode;
-  const _FormContent({required this.state, this.narrowMode = false});
-
-  @override
-  Widget build(BuildContext context) {
-    return Center(
-      child: SingleChildScrollView(
-        padding: EdgeInsets.fromLTRB(narrowMode ? 28 : 48, 36, 28, 32),
-        child: ConstrainedBox(
-          constraints: const BoxConstraints(maxWidth: 360),
-          child: Column(crossAxisAlignment: CrossAxisAlignment.start, mainAxisSize: MainAxisSize.min,
-            children: [
-              const Text('ยินดีต้อนรับ',
-                  style: TextStyle(fontSize: 26, fontWeight: FontWeight.w800,
-                      color: Color(0xFF1565C0))),
-              const SizedBox(height: 4),
-              Text('กรุณาเข้าสู่ระบบเพื่อดำเนินการต่อ',
-                  style: TextStyle(fontSize: 13, color: Colors.grey.shade600)),
-              const SizedBox(height: 30),
-
-              // ── Teacher / Student ─────────────────────────────────────
-              _SectionBadge(label: 'ครู / นักเรียน', color: const Color(0xFFF97316)),
-              const SizedBox(height: 14),
-              StatefulBuilder(builder: (_, setInner) => _Field(
-                ctrl: state._codeCtrl,
-                label: 'รหัสผู้ใช้',
-                hint: 'เช่น T270001 หรือ S270001',
-                icon: Icons.badge_outlined,
-                accent: const Color(0xFFF97316),
-                textCaps: TextCapitalization.characters,
-                onSubmit: state._loginWithCode,
-                onChanged: () => setInner(() {}),
-                clearBtn: state._codeCtrl.text.isNotEmpty
-                    ? () { state._codeCtrl.clear(); setInner(() {}); }
-                    : null,
-              )),
-              if (state._codeError != null) ...[
-                const SizedBox(height: 8), _ErrorRow(state._codeError!),
-              ],
-              const SizedBox(height: 16),
-              _ActionButton(
-                label: 'เข้าสู่ระบบด้วยรหัส', loading: state._codeLoading,
-                color: const Color(0xFFF97316), icon: Icons.person_pin_rounded,
-                onPressed: state._loginWithCode,
-              ),
-
-              // ── Divider ───────────────────────────────────────────────
-              const SizedBox(height: 28),
-              Row(children: [
-                Expanded(child: Divider(color: Colors.grey.shade300)),
-                Padding(
-                  padding: const EdgeInsets.symmetric(horizontal: 14),
-                  child: Text('หรือ',
-                      style: TextStyle(fontSize: 12, color: Colors.grey.shade500)),
-                ),
-                Expanded(child: Divider(color: Colors.grey.shade300)),
-              ]),
-              const SizedBox(height: 24),
-
-              // ── Admin ─────────────────────────────────────────────────
-              _SectionBadge(label: 'ผู้ดูแลระบบ', color: const Color(0xFF1565C0)),
-              const SizedBox(height: 14),
-              _Field(ctrl: state._emailCtrl, label: 'อีเมล',
-                  icon: Icons.email_outlined, type: TextInputType.emailAddress,
-                  accent: const Color(0xFF1565C0)),
-              const SizedBox(height: 12),
-              _Field(ctrl: state._passCtrl, label: 'รหัสผ่าน',
-                  icon: Icons.lock_outline, obscure: true,
-                  accent: const Color(0xFF1565C0), onSubmit: state._login),
-              if (state._error != null) ...[
-                const SizedBox(height: 8), _ErrorRow(state._error!),
-              ],
-              const SizedBox(height: 16),
-              _ActionButton(
-                label: 'เข้าสู่ระบบ (Admin)', loading: state._loading,
-                color: const Color(0xFF1565C0), icon: Icons.login_rounded,
-                onPressed: state._login,
-              ),
-              const SizedBox(height: 24),
-            ],
-          ),
-        ),
-      ),
-    );
-  }
-}
-
-// ── Sub-widgets ───────────────────────────────────────────────────────────────
+// ── Form widgets ──────────────────────────────────────────────────────────────
 
 class _SectionBadge extends StatelessWidget {
   final String label;
   final Color color;
   const _SectionBadge({required this.label, required this.color});
   @override
-  Widget build(BuildContext context) => Container(
-    padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 5),
-    decoration: BoxDecoration(
-      color: color.withOpacity(0.10),
-      borderRadius: BorderRadius.circular(20),
-      border: Border.all(color: color.withOpacity(0.30)),
+  Widget build(BuildContext context) => Align(
+    alignment: Alignment.centerLeft,
+    child: Container(
+      padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 5),
+      decoration: BoxDecoration(
+        color: color.withOpacity(0.10),
+        borderRadius: BorderRadius.circular(20),
+        border: Border.all(color: color.withOpacity(0.30)),
+      ),
+      child: Text(label,
+          style: TextStyle(fontSize: 12, fontWeight: FontWeight.w700, color: color)),
     ),
-    child: Text(label,
-        style: TextStyle(fontSize: 12, fontWeight: FontWeight.w700, color: color)),
   );
 }
 
@@ -457,10 +375,11 @@ class _Field extends StatelessWidget {
       hintText: hint,
       prefixIcon: Icon(icon, size: 20, color: Colors.grey.shade500),
       suffixIcon: clearBtn != null
-          ? IconButton(icon: Icon(Icons.clear, size: 18, color: Colors.grey.shade400),
+          ? IconButton(
+              icon: Icon(Icons.clear, size: 18, color: Colors.grey.shade400),
               onPressed: clearBtn)
           : null,
-      filled: true, fillColor: Colors.white,
+      filled: true, fillColor: Colors.grey.shade50,
       border: OutlineInputBorder(
           borderRadius: BorderRadius.circular(12),
           borderSide: BorderSide(color: Colors.grey.shade200)),
@@ -481,8 +400,8 @@ class _ActionButton extends StatelessWidget {
   final Color color;
   final IconData icon;
   final VoidCallback onPressed;
-  const _ActionButton({required this.label, required this.loading, required this.color,
-      required this.icon, required this.onPressed});
+  const _ActionButton({required this.label, required this.loading,
+      required this.color, required this.icon, required this.onPressed});
   @override
   Widget build(BuildContext context) => SizedBox(
     width: double.infinity, height: 50,
@@ -510,11 +429,13 @@ class _ErrorRow extends StatelessWidget {
   final String message;
   const _ErrorRow(this.message);
   @override
-  Widget build(BuildContext context) => Row(crossAxisAlignment: CrossAxisAlignment.start,
+  Widget build(BuildContext context) => Row(
+    crossAxisAlignment: CrossAxisAlignment.start,
     children: [
       const Icon(Icons.error_outline, size: 14, color: Colors.red),
       const SizedBox(width: 5),
       Expanded(child: Text(message,
           style: const TextStyle(color: Colors.red, fontSize: 12))),
-    ]);
+    ],
+  );
 }
