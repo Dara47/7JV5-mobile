@@ -313,6 +313,18 @@ class FirestoreService {
     await _db.collection('teacherSlots').doc(teacherId).delete();
   }
 
+  // ── Code-based login ─────────────────────────────────────────────────────
+
+  static Future<AppUser?> getAppUserByCode(String code) async {
+    final snap = await _db.collection('users').where('code', isEqualTo: code.trim()).limit(1).get();
+    if (snap.docs.isEmpty) return null;
+    final doc = snap.docs.first;
+    final d = doc.data();
+    final role = d['role'] as String? ?? '';
+    if (role != 'teacher' && role != 'student') return null;
+    return AppUser(uid: doc.id, role: role, name: d['name'] ?? '', code: d['code'] ?? '');
+  }
+
   // ── App Settings ─────────────────────────────────────────────────────────
 
   static Stream<Map<String, dynamic>> watchSettings() {

@@ -11,7 +11,8 @@ import 'settings_screen.dart';
 
 class HomeScreen extends StatefulWidget {
   final AppUser appUser;
-  const HomeScreen({super.key, required this.appUser});
+  final bool isCodeLogin;
+  const HomeScreen({super.key, required this.appUser, this.isCodeLogin = false});
   @override
   State<HomeScreen> createState() => _HomeScreenState();
 }
@@ -105,6 +106,29 @@ class _HomeScreenState extends State<HomeScreen> {
                 ));
                 if (ok == true) FirebaseAuth.instance.signOut();
               },
+            ),
+          if (widget.isCodeLogin)
+            Container(
+              color: Colors.white,
+              padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 4),
+              child: Row(
+                mainAxisAlignment: MainAxisAlignment.spaceBetween,
+                children: [
+                  Text(
+                    '${widget.appUser.name}  (${widget.appUser.code})',
+                    style: TextStyle(fontSize: 12, color: Colors.grey.shade600),
+                  ),
+                  TextButton.icon(
+                    onPressed: () => Navigator.of(context).pop(),
+                    icon: const Icon(Icons.logout, size: 14, color: Colors.grey),
+                    label: const Text('ออกจากระบบ', style: TextStyle(fontSize: 12, color: Colors.grey)),
+                    style: TextButton.styleFrom(
+                      padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 2),
+                      tapTargetSize: MaterialTapTargetSize.shrinkWrap,
+                    ),
+                  ),
+                ],
+              ),
             ),
           Container(
             color: Colors.white,
