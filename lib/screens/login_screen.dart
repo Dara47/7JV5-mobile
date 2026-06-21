@@ -239,39 +239,6 @@ class _FormContent extends StatelessWidget {
                   style: TextStyle(fontSize: 13, color: Colors.grey.shade600)),
               const SizedBox(height: 30),
 
-              // ── Admin ─────────────────────────────────────────────────
-              _SectionBadge(label: 'ผู้ดูแลระบบ', color: const Color(0xFF1565C0)),
-              const SizedBox(height: 14),
-              _Field(ctrl: state._emailCtrl, label: 'อีเมล',
-                  icon: Icons.email_outlined, type: TextInputType.emailAddress,
-                  accent: const Color(0xFF1565C0)),
-              const SizedBox(height: 12),
-              _Field(ctrl: state._passCtrl, label: 'รหัสผ่าน',
-                  icon: Icons.lock_outline, obscure: true,
-                  accent: const Color(0xFF1565C0), onSubmit: state._login),
-              if (state._error != null) ...[
-                const SizedBox(height: 8), _ErrorRow(state._error!),
-              ],
-              const SizedBox(height: 16),
-              _ActionButton(
-                label: 'เข้าสู่ระบบ (Admin)', loading: state._loading,
-                color: const Color(0xFF1565C0), icon: Icons.login_rounded,
-                onPressed: state._login,
-              ),
-
-              // ── Divider ───────────────────────────────────────────────
-              const SizedBox(height: 28),
-              Row(children: [
-                Expanded(child: Divider(color: Colors.grey.shade300)),
-                Padding(
-                  padding: const EdgeInsets.symmetric(horizontal: 14),
-                  child: Text('หรือ',
-                      style: TextStyle(fontSize: 12, color: Colors.grey.shade500)),
-                ),
-                Expanded(child: Divider(color: Colors.grey.shade300)),
-              ]),
-              const SizedBox(height: 24),
-
               // ── Teacher / Student ─────────────────────────────────────
               _SectionBadge(label: 'ครู / นักเรียน', color: const Color(0xFF2E7D32)),
               const SizedBox(height: 14),
@@ -296,6 +263,39 @@ class _FormContent extends StatelessWidget {
                 label: 'เข้าสู่ระบบด้วยรหัส', loading: state._codeLoading,
                 color: const Color(0xFF2E7D32), icon: Icons.person_pin_rounded,
                 onPressed: state._loginWithCode,
+              ),
+
+              // ── Divider ───────────────────────────────────────────────
+              const SizedBox(height: 28),
+              Row(children: [
+                Expanded(child: Divider(color: Colors.grey.shade300)),
+                Padding(
+                  padding: const EdgeInsets.symmetric(horizontal: 14),
+                  child: Text('หรือ',
+                      style: TextStyle(fontSize: 12, color: Colors.grey.shade500)),
+                ),
+                Expanded(child: Divider(color: Colors.grey.shade300)),
+              ]),
+              const SizedBox(height: 24),
+
+              // ── Admin ─────────────────────────────────────────────────
+              _SectionBadge(label: 'ผู้ดูแลระบบ', color: const Color(0xFF1565C0)),
+              const SizedBox(height: 14),
+              _Field(ctrl: state._emailCtrl, label: 'อีเมล',
+                  icon: Icons.email_outlined, type: TextInputType.emailAddress,
+                  accent: const Color(0xFF1565C0)),
+              const SizedBox(height: 12),
+              _Field(ctrl: state._passCtrl, label: 'รหัสผ่าน',
+                  icon: Icons.lock_outline, obscure: true,
+                  accent: const Color(0xFF1565C0), onSubmit: state._login),
+              if (state._error != null) ...[
+                const SizedBox(height: 8), _ErrorRow(state._error!),
+              ],
+              const SizedBox(height: 16),
+              _ActionButton(
+                label: 'เข้าสู่ระบบ (Admin)', loading: state._loading,
+                color: const Color(0xFF1565C0), icon: Icons.login_rounded,
+                onPressed: state._login,
               ),
               const SizedBox(height: 24),
             ],
