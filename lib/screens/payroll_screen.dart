@@ -1,6 +1,7 @@
 import 'package:flutter/material.dart';
 import '../models/models.dart';
 import '../services/firestore_service.dart';
+import '../utils/date_format.dart';
 
 const _kPass = 'ATAL190314';
 
@@ -77,7 +78,7 @@ class _PayrollScreenState extends State<PayrollScreen>
   Future<void> _toggleStatus(String id, String current, String type) async {
     final next = current == 'paid' ? 'pending' : 'paid';
     final data = <String, dynamic>{'status': next};
-    if (next == 'paid') data['paidAt'] = DateTime.now().toIso8601String();
+    if (next == 'paid') data['paidAt'] = nowThaiIso();
     if (type == 'teacher') {
       await FirestoreService.updateTeacherPayroll(id, data);
     } else {
@@ -618,7 +619,7 @@ class _PayrollFormSheetState extends State<_PayrollFormSheet> {
     final totalDeductsAmt = validDeducts.fold(0.0, (s, d) => s + d.amount);
     final totalAmount = gross - totalDeductsAmt;
     final totalSessions = validRoles.fold(0.0, (s, r) => s + r.count);
-    final now = DateTime.now().toIso8601String();
+    final now = nowThaiIso();
 
     setState(() => _saving = true);
     try {

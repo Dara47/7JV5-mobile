@@ -1,6 +1,7 @@
 ﻿import 'package:flutter/material.dart';
 import '../models/models.dart';
 import '../services/firestore_service.dart';
+import '../utils/date_format.dart';
 import 'user_form_screen.dart';
 import 'packages_screen.dart';
 
@@ -282,7 +283,7 @@ class _UserList extends StatelessWidget {
                       final hasAdj = u.totalAdded > 0 || u.totalRemoved > 0;
 
                       // ── คำนวณสถานะการเรียน ──
-                      final now = DateTime.now();
+                      final now = nowThai();
                       const dayMap = {'อา': 7, 'จ': 1, 'อ': 2, 'พ': 3, 'พฤ': 4, 'ศ': 5, 'ส': 6};
                       final todayStr = '${now.year}-${now.month.toString().padLeft(2,'0')}-${now.day.toString().padLeft(2,'0')}';
                       final hasSchedule = pkgs.any((p) => p.scheduledDay != null && p.scheduledTime != null);

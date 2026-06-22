@@ -89,7 +89,7 @@ class _PackageFormSheetState extends State<_PackageFormSheet> {
   }
 
   bool _isSlotPast(SlotItem s) {
-    final now = DateTime.now();
+    final now = nowThai();
     // slot ที่ระบุวันที่เจาะจง
     if (s.date != null && s.date!.isNotEmpty) {
       final d = parseDateStr(s.date!);
@@ -149,7 +149,7 @@ class _PackageFormSheetState extends State<_PackageFormSheet> {
   Future<void> _pickScheduledDate() async {
     final d = await showDatePicker(
       context: context,
-      initialDate: _scheduledDate ?? DateTime.now(),
+      initialDate: _scheduledDate ?? nowThai(),
       firstDate: DateTime(2020),
       lastDate: DateTime(2030),
     );

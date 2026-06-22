@@ -1,5 +1,6 @@
 import 'package:cloud_firestore/cloud_firestore.dart';
 import '../models/models.dart';
+import '../utils/date_format.dart';
 
 class FirestoreService {
   static final _db = FirebaseFirestore.instance;
@@ -50,10 +51,10 @@ class FirestoreService {
   }
 
   static Stream<List<PackageModel>> watchPendingCutPackages() {
-    final now = DateTime.now();
+    final now = nowThai();
     const thaiDays = {1: 'จ', 2: 'อ', 3: 'พ', 4: 'พฤ', 5: 'ศ', 6: 'ส', 7: 'อา'};
     final todayDay = thaiDays[now.weekday]!;
-    final todayStr = now.toIso8601String().substring(0, 10);
+    final todayStr = todayThaiStr();
     final nowMinutes = now.hour * 60 + now.minute;
 
     return _db.collection('packages')
@@ -79,7 +80,7 @@ class FirestoreService {
   }
 
   static Future<void> cutPackageSession(PackageModel pkg) async {
-    final today = DateTime.now().toIso8601String().substring(0, 10);
+    final today = todayThaiStr();
     await _db.collection('sessions').add({
       'packageId': pkg.id,
       'studentId': pkg.studentId,

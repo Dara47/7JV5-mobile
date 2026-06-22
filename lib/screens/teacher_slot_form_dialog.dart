@@ -61,7 +61,7 @@ class _TeacherSlotSheetState extends State<_TeacherSlotSheet> {
     if (p.length != 2) return false;
     final start = DateTime(d.year, d.month, d.day,
         int.tryParse(p[0]) ?? 0, int.tryParse(p[1]) ?? 0);
-    return DateTime.now().isAfter(start);
+    return nowThai().isAfter(start);
   }
 
   void _addSlot() {
@@ -74,7 +74,7 @@ class _TeacherSlotSheetState extends State<_TeacherSlotSheet> {
     if (_newDate != null) {
       final start = DateTime(_newDate!.year, _newDate!.month, _newDate!.day,
           _newStart!.hour, _newStart!.minute);
-      if (DateTime.now().isAfter(start)) {
+      if (nowThai().isAfter(start)) {
         ScaffoldMessenger.of(context).showSnackBar(const SnackBar(
           content: Text('ตั้งเวลาว่างที่ผ่านไปแล้วไม่ได้ — เลือกวัน/เวลาในอนาคต'),
           backgroundColor: Colors.redAccent,
@@ -97,7 +97,7 @@ class _TeacherSlotSheetState extends State<_TeacherSlotSheet> {
   }
 
   Future<void> _pickNewDate() async {
-    final now = DateTime.now();
+    final now = nowThai();
     final d = await showDatePicker(
       context: context,
       initialDate: _newDate ?? now,

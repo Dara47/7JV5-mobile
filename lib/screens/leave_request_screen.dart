@@ -1,6 +1,7 @@
 ﻿import 'package:flutter/material.dart';
 import '../models/models.dart';
 import '../services/firestore_service.dart';
+import '../utils/date_format.dart';
 
 const _kColor = Color(0xFFE65100);
 
@@ -336,12 +337,12 @@ class _UserLeaveViewState extends State<_UserLeaveView> {
                   onTap: () async {
                     final picked = await showDatePicker(
                       context: ctx,
-                      initialDate: DateTime.now(),
-                      firstDate: DateTime.now().subtract(const Duration(days: 30)),
-                      lastDate: DateTime.now().add(const Duration(days: 90)),
+                      initialDate: nowThai(),
+                      firstDate: nowThai().subtract(const Duration(days: 30)),
+                      lastDate: nowThai().add(const Duration(days: 90)),
                     );
                     if (picked != null) {
-                      setSheet(() => selectedDate = picked.toIso8601String().substring(0, 10));
+                      setSheet(() => selectedDate = toStorageDateStr(picked));
                     }
                   },
                   child: Container(

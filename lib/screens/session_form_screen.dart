@@ -22,7 +22,7 @@ class _SessionFormScreenState extends State<SessionFormScreen> {
   PackageModel? _selectedPkg;
   bool _loadingPkgs = true;
 
-  DateTime _date = DateTime.now();
+  DateTime _date = nowThai();
   TimeOfDay _startTime = const TimeOfDay(hour: 9, minute: 0);
   TimeOfDay _endTime = const TimeOfDay(hour: 10, minute: 0);
 

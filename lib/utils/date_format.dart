@@ -77,3 +77,17 @@ DateTime? parseDateStr(String s) {
 /// แปลง DateTime เป็น "YYYY-MM-DD" สำหรับบันทึก Firestore
 String toStorageDateStr(DateTime d) =>
     '${d.year}-${_pad(d.month)}-${_pad(d.day)}';
+
+/// เวลาปัจจุบันของประเทศไทย (UTC+7) คืนเป็น DateTime แบบ local-kind ที่ถือค่าเวลาไทย
+/// ใช้แทน DateTime.now() ทุกที่ที่ต้องอ้างอิง "เวลาปัจจุบันไทย" เพื่อไม่ให้เพี้ยนตาม timezone ของเครื่อง/เบราว์เซอร์
+/// (สร้างใหม่ด้วย DateTime(...) เพื่อให้ isBefore/isAfter เทียบกับ DateTime(...) อื่นได้ถูกต้อง)
+DateTime nowThai() {
+  final t = DateTime.now().toUtc().add(const Duration(hours: 7));
+  return DateTime(t.year, t.month, t.day, t.hour, t.minute, t.second);
+}
+
+/// วันที่ปัจจุบันของไทยเป็น "YYYY-MM-DD"
+String todayThaiStr() => toStorageDateStr(nowThai());
+
+/// เวลาปัจจุบันไทยเป็น ISO string (สำหรับ timestamp ที่แสดงผลในบริบทไทย)
+String nowThaiIso() => nowThai().toIso8601String();

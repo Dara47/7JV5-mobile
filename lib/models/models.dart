@@ -101,7 +101,7 @@ class PackageModel {
 
   bool get isCurrentlyInSession {
     if (scheduledDay == null || scheduledTime == null) return false;
-    final now = DateTime.now();
+    final now = nowThai();
     // ถ้ามีวันที่เจาะจง ต้องตรงวันนั้นเป๊ะ
     if (scheduledDate != null && scheduledDate!.isNotEmpty) {
       final today = '${now.year}-${now.month.toString().padLeft(2, '0')}-${now.day.toString().padLeft(2, '0')}';
@@ -308,7 +308,7 @@ class SlotItem {
   const SlotItem({required this.day, required this.startTime, required this.endTime, this.date});
 
   bool get isCurrentlyActive {
-    final now = DateTime.now();
+    final now = nowThai();
     // ถ้ามีวันที่เจาะจง ต้องตรงวันนั้นเป๊ะ
     if (date != null && date!.isNotEmpty) {
       final today = '${now.year}-${now.month.toString().padLeft(2, '0')}-${now.day.toString().padLeft(2, '0')}';

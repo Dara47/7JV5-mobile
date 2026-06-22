@@ -254,7 +254,7 @@ class PackageCard extends StatelessWidget {
           onTap: () async {
             final d = await showDatePicker(
               context: ctx,
-              initialDate: date ?? DateTime.now(),
+              initialDate: date ?? nowThai(),
               firstDate: DateTime(2020), lastDate: DateTime(2030),
             );
             if (d != null) setS(() { date = d; day = thaiDayAbbr(d); });
@@ -357,7 +357,7 @@ class PackageCard extends StatelessWidget {
   /// คาบนี้ถึง/เลยเวลาเริ่มเรียนแล้วหรือยัง — ใช้ห้ามย้ายคาบหลังถึงเวลาเรียน
   bool get _scheduleStarted {
     if (pkg.scheduledTime == null) return false;
-    final now = DateTime.now();
+    final now = nowThai();
     final sp = pkg.scheduledTime!.split(':');
     if (sp.length != 2) return false;
     final startMin = (int.tryParse(sp[0]) ?? 0) * 60 + (int.tryParse(sp[1]) ?? 0);
@@ -630,7 +630,7 @@ class _TeacherGroupView extends StatelessWidget {
 
   DateTime _nextDate(String day) {
     final target = _dayWeekday[day]!;
-    final now = DateTime.now();
+    final now = nowThai();
     var diff = target - now.weekday;
     if (diff < 0) diff += 7;
     return now.add(Duration(days: diff));

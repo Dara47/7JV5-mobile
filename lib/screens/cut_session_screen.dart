@@ -6,11 +6,10 @@ import '../utils/date_format.dart';
 class CutSessionScreen extends StatelessWidget {
   const CutSessionScreen({super.key});
 
-  String _todayLabel() => thaiDateFull(DateTime.now());
+  String _todayLabel() => thaiDateFull(nowThai());
 
   void _confirmCut(BuildContext context, PackageModel pkg) {
-    final now = DateTime.now();
-    final dateStr = thaiDateFull(now);
+    final now = nowThai();
     showDialog(
       context: context,
       builder: (_) => AlertDialog(
@@ -51,7 +50,7 @@ class CutSessionScreen extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
-    final todayStr = DateTime.now().toIso8601String().substring(0, 10);
+    final todayStr = todayThaiStr();
 
     return Scaffold(
       appBar: AppBar(

@@ -44,7 +44,7 @@ class _ScheduleCalendarScreenState extends State<ScheduleCalendarScreen> {
   @override
   void initState() {
     super.initState();
-    final now = DateTime.now();
+    final now = nowThai();
     _visibleMonth = DateTime(now.year, now.month, 1);
     _selectedDay = DateTime(now.year, now.month, now.day);
   }
@@ -66,7 +66,7 @@ class _ScheduleCalendarScreenState extends State<ScheduleCalendarScreen> {
   }
 
   void _goToday() {
-    final now = DateTime.now();
+    final now = nowThai();
     setState(() {
       _visibleMonth = DateTime(now.year, now.month, 1);
       _selectedDay = DateTime(now.year, now.month, now.day);
@@ -202,7 +202,7 @@ class _ScheduleCalendarScreenState extends State<ScheduleCalendarScreen> {
     for (int i = 0; i < leadingBlanks; i++) {
       cells.add(const SizedBox());
     }
-    final now = DateTime.now();
+    final now = nowThai();
     for (int day = 1; day <= daysInMonth; day++) {
       final date = DateTime(year, month, day);
       final isToday = date.year == now.year && date.month == now.month && date.day == now.day;
