@@ -38,6 +38,7 @@ class _PackageFormSheetState extends State<_PackageFormSheet> {
   TimeOfDay? _endTime;
   TeacherSlotModel? _teacherSlot;
   List<PackageModel> _takenSlotPackages = [];
+  PackageModel? _existingPkg; // แพ็กเกจเดิมของนักเรียน+ครูคู่นี้ (โควตาร่วม)
   bool _loadingUsers = true;
   bool _loadingSlot = false;
   bool _saving = false;
@@ -76,10 +77,23 @@ class _PackageFormSheetState extends State<_PackageFormSheet> {
     // โหลด "ทุกแพ็กเกจของครูคนนี้" (ทุกนักเรียน) เพื่อกันจองเวลาชนกัน
     final pkgs = await FirestoreService.getPackagesForUser(_teacher!.id, 'teacher');
     if (!mounted) return;
+    // หาแพ็กเกจเดิมของนักเรียน+ครูคู่นี้ (เพื่อเพิ่ม slot ใช้โควตาร่วม)
+    PackageModel? existing;
+    if (!_isEdit && _student != null) {
+      for (final p in pkgs) {
+        if (p.studentId == _student!.id) { existing = p; break; }
+      }
+    }
     setState(() {
       _takenSlotPackages = pkgs
           .where((p) => !_isEdit || p.id != widget.existing!.id) // ไม่นับตัวเองตอนแก้ไข
           .toList();
+      _existingPkg = existing;
+      // ถ้ามีแพ็กเกจเดิม → ใช้โควตาเดิม (read-only)
+      if (existing != null) {
+        _totalCtrl.text = existing.totalSessions.toString();
+        _usedCtrl.text = existing.usedSessions.toString();
+      }
     });
   }
 
@@ -100,15 +114,18 @@ class _PackageFormSheetState extends State<_PackageFormSheet> {
     return a1 < b2 && a2 < b1;
   }
 
-  /// แพ็กเกจ p ชนกับช่วง (day, date, start–end) ไหม
+  /// แพ็กเกจ p (ทุก slot) ชนกับช่วง (day, date, start–end) ไหม
   /// - ต้องวันเดียวกัน + เวลาทับซ้อน
   /// - วันที่: ถ้าทั้งคู่ระบุวันที่เจาะจง ต้องตรงกันถึงชน / ถ้าฝ่ายใดเป็น recurring ถือว่าคลุมทุกสัปดาห์ = ชน
   bool _conflicts(PackageModel p, String day, String? dateStr, String start, String end) {
-    if (p.scheduledDay != day) return false;
-    final pDate = p.scheduledDate ?? '';
     final nDate = dateStr ?? '';
-    if (pDate.isNotEmpty && nDate.isNotEmpty && pDate != nDate) return false;
-    return _timeOverlap(p.scheduledTime ?? '', p.scheduledEndTime ?? '', start, end);
+    for (final sl in p.effectiveSlots) {
+      if (sl.day != day) continue;
+      final pDate = sl.date ?? '';
+      if (pDate.isNotEmpty && nDate.isNotEmpty && pDate != nDate) continue;
+      if (_timeOverlap(sl.startTime, sl.endTime, start, end)) return true;
+    }
+    return false;
   }
 
   bool _isSlotPast(SlotItem s) {
@@ -220,7 +237,45 @@ class _PackageFormSheetState extends State<_PackageFormSheet> {
       } catch (_) {/* ถ้าเช็คไม่ได้ ปล่อยให้บันทึกต่อ */}
     }
 
+    // slot ใหม่จากที่เลือก
+    final hasSlot = _scheduledDay != null && _startTime != null;
+    final newSlot = hasSlot
+        ? SlotItem(
+            day: _scheduledDay!,
+            startTime: _fmtTime(_startTime!),
+            endTime: _endTime != null ? _fmtTime(_endTime!) : _fmtTime(_startTime!),
+            date: _scheduledDate != null ? toStorageDateStr(_scheduledDate!) : null,
+          )
+        : null;
+
+    // ── โหมดเพิ่มช่วงเวลาในแพ็กเกจเดิม (ใช้โควตาคาบร่วมกัน ไม่สร้างโควตาใหม่) ──
+    if (_existingPkg != null) {
+      if (newSlot == null) {
+        setState(() => _saving = false);
+        _snack('กรุณาเลือกวันและเวลาที่จะเพิ่ม');
+        return;
+      }
+      final merged = [..._existingPkg!.effectiveSlots, newSlot];
+      try {
+        await FirestoreService.updatePackageFields(_existingPkg!.id, {
+          'slots': merged.map((s) => s.toMap()).toList(),
+          if (_notesCtrl.text.isNotEmpty) 'notes': _notesCtrl.text.trim(),
+        });
+        if (mounted) Navigator.pop(context);
+      } catch (e) {
+        if (mounted) { _snack('เกิดข้อผิดพลาด: $e'); setState(() => _saving = false); }
+      }
+      return;
+    }
+
     final total = int.tryParse(_totalCtrl.text) ?? 0;
+    // slots สำหรับสร้างใหม่/แก้ไข (slot แรก + slot เดิมที่เกินมา)
+    List<Map<String, dynamic>>? slotsData;
+    if (newSlot != null) {
+      final extra = (_isEdit && widget.existing!.slots.length > 1)
+          ? widget.existing!.slots.sublist(1) : <SlotItem>[];
+      slotsData = [newSlot, ...extra].map((s) => s.toMap()).toList();
+    }
 
     final data = {
       'studentId': _student!.id, 'teacherId': _teacher!.id,
@@ -236,6 +291,7 @@ class _PackageFormSheetState extends State<_PackageFormSheet> {
         'scheduledDate': FieldValue.delete(), // แก้ไขแล้วล้างวันที่ → ลบค่าเดิม
       if (_startTime != null) 'scheduledTime': _fmtTime(_startTime!),
       if (_endTime != null) 'scheduledEndTime': _fmtTime(_endTime!),
+      if (slotsData != null) 'slots': slotsData,
       if (_notesCtrl.text.isNotEmpty) 'notes': _notesCtrl.text.trim(),
     };
 
@@ -538,30 +594,52 @@ class _PackageFormSheetState extends State<_PackageFormSheet> {
                       // ── จำนวนคาบ ──
                       _label('📊 จำนวนคาบ'),
                       const SizedBox(height: 8),
-                      Row(crossAxisAlignment: CrossAxisAlignment.start, children: [
-                        Expanded(child: _numField(_totalCtrl, 'รวมทั้งหมด', onChanged: (_) => setState(() {}))),
-                        const SizedBox(width: 10),
-                        Expanded(child: _numField(_usedCtrl, 'เรียนแล้ว', onChanged: (_) => setState(() {}))),
-                        const SizedBox(width: 10),
-                        // เหลือ = auto
-                        Expanded(child: Container(
-                          height: 56,
+                      if (_existingPkg != null) ...[
+                        // โหมดเพิ่ม slot — ใช้โควตาเดิม (read-only)
+                        Container(
+                          padding: const EdgeInsets.all(12),
                           decoration: BoxDecoration(
-                            color: const Color(0xFFF1F8E9),
+                            color: const Color(0xFFFFF3E0),
                             borderRadius: BorderRadius.circular(10),
-                            border: Border.all(color: Colors.green.shade300),
+                            border: Border.all(color: Colors.orange.shade300),
                           ),
-                          child: Column(mainAxisAlignment: MainAxisAlignment.center, children: [
-                            Text('$_calcRemaining', style: const TextStyle(fontSize: 20, fontWeight: FontWeight.bold, color: Color(0xFF2E7D32))),
-                            const Text('เหลือ (auto)', style: TextStyle(fontSize: 9, color: Colors.grey)),
+                          child: Row(children: [
+                            const Icon(Icons.link, size: 18, color: Color(0xFFF97316)),
+                            const SizedBox(width: 8),
+                            Expanded(child: Column(crossAxisAlignment: CrossAxisAlignment.start, children: [
+                              const Text('นักเรียนคนนี้มีแพ็กเกจอยู่แล้ว — เพิ่มเป็นช่วงเวลาใหม่ ใช้โควตาคาบร่วมกัน',
+                                  style: TextStyle(fontSize: 12, fontWeight: FontWeight.w600, color: Color(0xFFE65100))),
+                              const SizedBox(height: 4),
+                              Text('โควตารวม ${_existingPkg!.totalSessions} • เรียนแล้ว ${_existingPkg!.usedSessions} • เหลือ ${_existingPkg!.remainingSessions} คาบ',
+                                  style: TextStyle(fontSize: 12, color: Colors.orange.shade800)),
+                            ])),
                           ]),
-                        )),
-                      ]),
-                      const SizedBox(height: 6),
-                      Text(
-                        'สูตร: เหลือ = รวม − เรียนแล้ว  (${_totalCtrl.text.isEmpty ? 0 : _totalCtrl.text} − ${_usedCtrl.text.isEmpty ? 0 : _usedCtrl.text} = $_calcRemaining)',
-                        style: const TextStyle(fontSize: 11, color: Colors.grey),
-                      ),
+                        ),
+                      ] else ...[
+                        Row(crossAxisAlignment: CrossAxisAlignment.start, children: [
+                          Expanded(child: _numField(_totalCtrl, 'รวมทั้งหมด', onChanged: (_) => setState(() {}))),
+                          const SizedBox(width: 10),
+                          Expanded(child: _numField(_usedCtrl, 'เรียนแล้ว', onChanged: (_) => setState(() {}))),
+                          const SizedBox(width: 10),
+                          Expanded(child: Container(
+                            height: 56,
+                            decoration: BoxDecoration(
+                              color: const Color(0xFFF1F8E9),
+                              borderRadius: BorderRadius.circular(10),
+                              border: Border.all(color: Colors.green.shade300),
+                            ),
+                            child: Column(mainAxisAlignment: MainAxisAlignment.center, children: [
+                              Text('$_calcRemaining', style: const TextStyle(fontSize: 20, fontWeight: FontWeight.bold, color: Color(0xFF2E7D32))),
+                              const Text('เหลือ (auto)', style: TextStyle(fontSize: 9, color: Colors.grey)),
+                            ]),
+                          )),
+                        ]),
+                        const SizedBox(height: 6),
+                        Text(
+                          'สูตร: เหลือ = รวม − เรียนแล้ว  (${_totalCtrl.text.isEmpty ? 0 : _totalCtrl.text} − ${_usedCtrl.text.isEmpty ? 0 : _usedCtrl.text} = $_calcRemaining)',
+                          style: const TextStyle(fontSize: 11, color: Colors.grey),
+                        ),
+                      ],
                       const SizedBox(height: 14),
 
                       // ── หมายเหตุ ──

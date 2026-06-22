@@ -17,9 +17,10 @@ const _dayAbbrWeekday = {'อา': 7, 'จ': 1, 'อ': 2, 'พ': 3, 'พฤ': 4,
 /// occurrence ของคาบเรียนในวันหนึ่ง (ฉายจากแพ็กเกจ + overlay สถานะ session จริง)
 class _Occurrence {
   final PackageModel pkg;
+  final SlotItem slot;
   final bool isSpecificDate; // true = วันที่เจาะจง, false = ตารางประจำสัปดาห์
   final String status; // 'planned'(ยังไม่ generate) | 'scheduled' | 'completed' | 'cancelled'
-  _Occurrence(this.pkg, this.isSpecificDate, this.status);
+  _Occurrence(this.pkg, this.slot, this.isSpecificDate, this.status);
 }
 
 String _statusLabel(String s) {
@@ -113,30 +114,28 @@ class _ScheduleCalendarScreenState extends State<ScheduleCalendarScreen> {
 
     void add(int day, _Occurrence occ) => map.putIfAbsent(day, () => []).add(occ);
 
-    String statusFor(String pkgId, int year, int month, int day) {
+    String statusFor(String pkgId, int year, int month, int day, String start) {
       final ds = toStorageDateStr(DateTime(year, month, day));
-      return statusMap['${pkgId}_$ds'] ?? 'planned';
+      return statusMap['${pkgId}_${ds}_$start'] ?? 'planned';
     }
 
     for (final p in packages) {
       if (p.status != 'active') continue;
-      if (p.scheduledTime == null) continue;
-
-      // วันที่เจาะจง
-      if (p.scheduledDate != null && p.scheduledDate!.isNotEmpty) {
-        final d = parseDateStr(p.scheduledDate!);
-        if (d != null && d.year == year && d.month == month) {
-          add(d.day, _Occurrence(p, true, statusFor(p.id, year, month, d.day)));
+      for (final slot in p.effectiveSlots) {
+        // วันที่เจาะจง
+        if (slot.date != null && slot.date!.isNotEmpty) {
+          final d = parseDateStr(slot.date!);
+          if (d != null && d.year == year && d.month == month) {
+            add(d.day, _Occurrence(p, slot, true, statusFor(p.id, year, month, d.day, slot.startTime)));
+          }
+          continue;
         }
-        continue;
-      }
-      // ตารางประจำสัปดาห์
-      if (p.scheduledDay != null) {
-        final wd = _dayAbbrWeekday[p.scheduledDay];
+        // ตารางประจำสัปดาห์
+        final wd = _dayAbbrWeekday[slot.day];
         if (wd == null) continue;
         for (int day = 1; day <= daysInMonth; day++) {
           if (DateTime(year, month, day).weekday == wd) {
-            add(day, _Occurrence(p, false, statusFor(p.id, year, month, day)));
+            add(day, _Occurrence(p, slot, false, statusFor(p.id, year, month, day, slot.startTime)));
           }
         }
       }
@@ -144,7 +143,7 @@ class _ScheduleCalendarScreenState extends State<ScheduleCalendarScreen> {
 
     // เรียงแต่ละวันตามเวลาเริ่ม
     for (final list in map.values) {
-      list.sort((a, b) => (a.pkg.scheduledTime ?? '').compareTo(b.pkg.scheduledTime ?? ''));
+      list.sort((a, b) => a.slot.startTime.compareTo(b.slot.startTime));
     }
     return map;
   }
@@ -179,7 +178,7 @@ class _ScheduleCalendarScreenState extends State<ScheduleCalendarScreen> {
               // (packageId_date) → status ของ session จริง
               final statusMap = <String, String>{};
               for (final s in sessions) {
-                statusMap['${s.packageId}_${s.date}'] = s.status;
+                statusMap['${s.packageId}_${s.date}_${s.startTime}'] = s.status;
               }
               final occ = _buildOccurrences(packages, statusMap);
 
@@ -380,7 +379,7 @@ class _ScheduleCalendarScreenState extends State<ScheduleCalendarScreen> {
 
   Widget _occTile(_Occurrence o) {
     final p = o.pkg;
-    final time = '${p.scheduledTime ?? ''}${p.scheduledEndTime != null ? '–${p.scheduledEndTime}' : ''}';
+    final time = '${o.slot.startTime}${o.slot.endTime.isNotEmpty ? '–${o.slot.endTime}' : ''}';
     return Container(
       padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 8),
       decoration: BoxDecoration(

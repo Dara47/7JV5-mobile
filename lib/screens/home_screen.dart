@@ -4,7 +4,6 @@ import 'package:flutter/material.dart';
 import 'package:firebase_auth/firebase_auth.dart';
 import '../models/models.dart';
 import '../services/firestore_service.dart';
-import '../utils/date_format.dart';
 import 'users_list_screen.dart';
 import 'packages_screen.dart';
 import 'teacher_schedule_screen.dart';
@@ -47,10 +46,8 @@ class _HomeScreenState extends State<HomeScreen> {
   void initState() {
     super.initState();
     if (widget.appUser.isAdmin) {
-      _cutSub = FirestoreService.watchPendingCutPackages().listen((list) {
-        final today = todayThaiStr();
-        final count = list.where((p) => p.lastCutDate != today).length;
-        if (mounted) setState(() => _pendingCuts = count);
+      _cutSub = FirestoreService.watchPendingCuts().listen((list) {
+        if (mounted) setState(() => _pendingCuts = list.length);
       });
       _leaveSub = FirestoreService.watchLeaveRequests().listen((list) {
         final count = list.where((r) => r.isPending).length;

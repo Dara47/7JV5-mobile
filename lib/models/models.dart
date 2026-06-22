@@ -57,10 +57,13 @@ class PackageModel {
   final int totalSessions;
   final int remainingSessions;
   final String status;
+  // ── ตารางเรียน — slot แรก (mirror ของ slots[0]) เก็บไว้เพื่อ backward-compat ──
   final String? scheduledDay;      // 'อา','จ','อ','พ','พฤ','ศ','ส'
   final String? scheduledDate;     // 'YYYY-MM-DD' (วันที่เจาะจง — optional)
   final String? scheduledTime;     // '16:00'
   final String? scheduledEndTime;  // '17:00'
+  /// ช่วงเวลาเรียนทั้งหมด (หลาย slot ใช้โควตาคาบร่วมกัน) — ว่าง = ใช้ scheduled* ด้านบน
+  final List<SlotItem> slots;
   final String? notes;
   final String? lastCutDate;       // 'YYYY-MM-DD' of last cut
 
@@ -69,9 +72,24 @@ class PackageModel {
     required this.studentName, required this.teacherName, required this.studentCode,
     required this.teacherCode, required this.totalSessions,
     required this.remainingSessions, required this.status,
-    this.scheduledDay, this.scheduledDate, this.scheduledTime, this.scheduledEndTime, this.notes,
+    this.scheduledDay, this.scheduledDate, this.scheduledTime, this.scheduledEndTime,
+    this.slots = const [], this.notes,
     this.lastCutDate,
   });
+
+  /// ช่วงเวลาที่ใช้จริง — ถ้ามี slots ใช้ slots, ไม่งั้น fallback เป็น slot เดี่ยวจาก scheduled*
+  List<SlotItem> get effectiveSlots {
+    if (slots.isNotEmpty) return slots;
+    if (scheduledDay != null && scheduledTime != null) {
+      return [SlotItem(
+        day: scheduledDay!,
+        startTime: scheduledTime!,
+        endTime: scheduledEndTime ?? scheduledTime!,
+        date: scheduledDate,
+      )];
+    }
+    return const [];
+  }
 
   int get usedSessions => totalSessions - remainingSessions;
   bool get isExpired => remainingSessions <= 0;
@@ -91,37 +109,17 @@ class PackageModel {
   }
 
   String get scheduleLabel {
-    if (scheduledDay == null && scheduledDate == null) return '-';
-    final datePart = (scheduledDate != null && scheduledDate!.isNotEmpty)
-        ? '${thaiShortDateFromStr(scheduledDate!)} ' : '';
-    final t = scheduledTime ?? '';
-    final e = scheduledEndTime != null ? '–$scheduledEndTime' : '';
-    return '$datePart${scheduledDay ?? ''}  $t$e'.trim();
+    final list = effectiveSlots;
+    if (list.isEmpty) return '-';
+    return list.map((sl) {
+      final datePart = (sl.date != null && sl.date!.isNotEmpty)
+          ? '${thaiShortDateFromStr(sl.date!)} ' : '';
+      final e = sl.endTime.isNotEmpty ? '–${sl.endTime}' : '';
+      return '$datePart${sl.day}  ${sl.startTime}$e';
+    }).join('   •   ');
   }
 
-  bool get isCurrentlyInSession {
-    if (scheduledDay == null || scheduledTime == null) return false;
-    final now = nowThai();
-    // ถ้ามีวันที่เจาะจง ต้องตรงวันนั้นเป๊ะ
-    if (scheduledDate != null && scheduledDate!.isNotEmpty) {
-      final today = '${now.year}-${now.month.toString().padLeft(2, '0')}-${now.day.toString().padLeft(2, '0')}';
-      if (scheduledDate != today) return false;
-    } else {
-      const dayMap = {'อา': 7, 'จ': 1, 'อ': 2, 'พ': 3, 'พฤ': 4, 'ศ': 5, 'ส': 6};
-      if (dayMap[scheduledDay] != now.weekday) return false;
-    }
-    try {
-      final sp = scheduledTime!.split(':');
-      final startM = int.parse(sp[0]) * 60 + int.parse(sp[1]);
-      final nowM = now.hour * 60 + now.minute;
-      int endM = startM + 60;
-      if (scheduledEndTime != null) {
-        final ep = scheduledEndTime!.split(':');
-        endM = int.parse(ep[0]) * 60 + int.parse(ep[1]);
-      }
-      return nowM >= startM && nowM < endM;
-    } catch (_) { return false; }
-  }
+  bool get isCurrentlyInSession => effectiveSlots.any((s) => s.isCurrentlyActive);
 
   static const days = ['อา', 'จ', 'อ', 'พ', 'พฤ', 'ศ', 'ส'];
 
@@ -135,7 +133,11 @@ class PackageModel {
       status: d['status'] ?? 'active',
       scheduledDay: d['scheduledDay'], scheduledDate: d['scheduledDate'],
       scheduledTime: d['scheduledTime'],
-      scheduledEndTime: d['scheduledEndTime'], notes: d['notes'],
+      scheduledEndTime: d['scheduledEndTime'],
+      slots: (d['slots'] as List?)
+          ?.map((m) => SlotItem.fromMap(m as Map<String, dynamic>))
+          .toList() ?? const [],
+      notes: d['notes'],
       lastCutDate: d['lastCutDate'],
     );
   }
@@ -150,8 +152,16 @@ class PackageModel {
     if (scheduledDate != null) 'scheduledDate': scheduledDate,
     if (scheduledTime != null) 'scheduledTime': scheduledTime,
     if (scheduledEndTime != null) 'scheduledEndTime': scheduledEndTime,
+    if (slots.isNotEmpty) 'slots': slots.map((s) => s.toMap()).toList(),
     if (notes != null && notes!.isNotEmpty) 'notes': notes,
   };
+}
+
+/// คาบที่รอตัดวันนี้ (1 รายการ = 1 ช่วงเวลาของแพ็กเกจ) — รองรับหลาย slot/วัน
+class PendingCut {
+  final PackageModel pkg;
+  final SlotItem slot;
+  PendingCut(this.pkg, this.slot);
 }
 
 class SessionModel {

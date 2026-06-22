@@ -1,15 +1,18 @@
-﻿import 'package:flutter/material.dart';
+import 'package:flutter/material.dart';
 import '../models/models.dart';
 import '../services/firestore_service.dart';
 import '../utils/date_format.dart';
+
+const _kPurple = Color(0xFF6A1B9A);
 
 class CutSessionScreen extends StatelessWidget {
   const CutSessionScreen({super.key});
 
   String _todayLabel() => thaiDateFull(nowThai());
 
-  void _confirmCut(BuildContext context, PackageModel pkg) {
+  void _confirmCut(BuildContext context, PendingCut item) {
     final now = nowThai();
+    final pkg = item.pkg;
     showDialog(
       context: context,
       builder: (_) => AlertDialog(
@@ -17,30 +20,25 @@ class CutSessionScreen extends StatelessWidget {
         content: Column(mainAxisSize: MainAxisSize.min, crossAxisAlignment: CrossAxisAlignment.start, children: [
           Text('นักเรียน: ${pkg.studentName}'),
           Text('ครู: ${pkg.teacherName}'),
-          Text(thaiDateTimeFull(now, startTime: pkg.scheduledTime, endTime: pkg.scheduledEndTime)),
+          Text(thaiDateTimeFull(now, startTime: item.slot.startTime, endTime: item.slot.endTime)),
           const SizedBox(height: 8),
-          const Text('ยืนยันตัดคาบ? ระบบจะ:\n• บันทึกผลการเรียน\n• หักคาบที่เหลือ 1 คาบ',
-              style: TextStyle(fontSize: 13, color: Colors.grey)),
+          Text('คงเหลือก่อนตัด ${pkg.remainingSessions} คาบ → จะเหลือ ${pkg.remainingSessions - 1} คาบ',
+              style: const TextStyle(fontSize: 13, color: Colors.grey)),
         ]),
         actions: [
           TextButton(onPressed: () => Navigator.pop(context), child: const Text('ยกเลิก')),
           ElevatedButton(
             onPressed: () async {
               Navigator.pop(context);
-              await FirestoreService.cutPackageSession(pkg);
+              await FirestoreService.cutSlot(pkg, item.slot);
               if (context.mounted) {
-                ScaffoldMessenger.of(context).showSnackBar(
-                  SnackBar(
-                    content: Text('ตัดคาบ ${pkg.studentName} เรียบร้อย'),
-                    backgroundColor: Colors.green,
-                  ),
-                );
+                ScaffoldMessenger.of(context).showSnackBar(SnackBar(
+                  content: Text('ตัดคาบ ${pkg.studentName} เรียบร้อย'),
+                  backgroundColor: Colors.green,
+                ));
               }
             },
-            style: ElevatedButton.styleFrom(
-              backgroundColor: const Color(0xFF6A1B9A),
-              foregroundColor: Colors.white,
-            ),
+            style: ElevatedButton.styleFrom(backgroundColor: _kPurple, foregroundColor: Colors.white),
             child: const Text('ยืนยันตัดคาบ'),
           ),
         ],
@@ -48,18 +46,16 @@ class CutSessionScreen extends StatelessWidget {
     );
   }
 
-  void _confirmCutAll(BuildContext context, List<PackageModel> packages) {
-    final today = todayThaiStr();
-    final pending = packages.where((p) => p.lastCutDate != today && p.remainingSessions > 0).toList();
-    if (pending.isEmpty) return;
+  void _confirmCutAll(BuildContext context, List<PendingCut> items) {
+    if (items.isEmpty) return;
     showDialog(
       context: context,
       builder: (_) => AlertDialog(
         title: const Text('ตัดคาบทั้งหมด'),
         content: Column(mainAxisSize: MainAxisSize.min, crossAxisAlignment: CrossAxisAlignment.start, children: [
-          Text('ยืนยันตัดคาบทั้งหมด ${pending.length} คาบ ในคลิกเดียว?'),
+          Text('ยืนยันตัดคาบทั้งหมด ${items.length} คาบ ในคลิกเดียว?'),
           const SizedBox(height: 8),
-          const Text('ระบบจะ:\n• บันทึกผลการเรียนทุกคาบ\n• หักคาบที่เหลือคาบละ 1',
+          const Text('ระบบจะ:\n• บันทึกผลการเรียนทุกคาบ\n• หักโควตาคาบที่เหลือคาบละ 1',
               style: TextStyle(fontSize: 13, color: Colors.grey)),
         ]),
         actions: [
@@ -67,7 +63,7 @@ class CutSessionScreen extends StatelessWidget {
           ElevatedButton(
             onPressed: () async {
               Navigator.pop(context);
-              final n = await FirestoreService.cutAllPending(pending);
+              final n = await FirestoreService.cutAllSlots(items);
               if (context.mounted) {
                 ScaffoldMessenger.of(context).showSnackBar(SnackBar(
                   content: Text('ตัดคาบทั้งหมด $n คาบเรียบร้อย'),
@@ -75,7 +71,7 @@ class CutSessionScreen extends StatelessWidget {
                 ));
               }
             },
-            style: ElevatedButton.styleFrom(backgroundColor: const Color(0xFF6A1B9A), foregroundColor: Colors.white),
+            style: ElevatedButton.styleFrom(backgroundColor: _kPurple, foregroundColor: Colors.white),
             child: const Text('ยืนยันตัดทั้งหมด'),
           ),
         ],
@@ -85,23 +81,20 @@ class CutSessionScreen extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
-    final todayStr = todayThaiStr();
-
     return Scaffold(
       appBar: AppBar(
         title: const Text('ตัดคาบเรียน'),
-        backgroundColor: const Color(0xFF6A1B9A),
+        backgroundColor: _kPurple,
         foregroundColor: Colors.white,
       ),
-      body: StreamBuilder<List<PackageModel>>(
-        stream: FirestoreService.watchPendingCutPackages(),
+      body: StreamBuilder<List<PendingCut>>(
+        stream: FirestoreService.watchPendingCuts(),
         builder: (context, snap) {
           if (snap.connectionState == ConnectionState.waiting) {
             return const Center(child: CircularProgressIndicator());
           }
-          final packages = snap.data ?? [];
-          // นับเฉพาะที่ยังไม่ตัดวันนี้ (งานค้างจริง)
-          final pendingCount = packages.where((p) => p.lastCutDate != todayStr).length;
+          final items = snap.data ?? [];
+          final pendingCount = items.length;
 
           return Column(children: [
             // Header bar
@@ -149,12 +142,12 @@ class CutSessionScreen extends StatelessWidget {
                 child: SizedBox(
                   width: double.infinity,
                   child: ElevatedButton.icon(
-                    onPressed: () => _confirmCutAll(context, packages),
+                    onPressed: () => _confirmCutAll(context, items),
                     icon: const Icon(Icons.done_all, size: 18),
                     label: Text('ตัดคาบทั้งหมด ($pendingCount คาบ)',
                         style: const TextStyle(fontWeight: FontWeight.bold)),
                     style: ElevatedButton.styleFrom(
-                      backgroundColor: const Color(0xFF6A1B9A),
+                      backgroundColor: _kPurple,
                       foregroundColor: Colors.white,
                       padding: const EdgeInsets.symmetric(vertical: 12),
                       shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(10)),
@@ -165,7 +158,7 @@ class CutSessionScreen extends StatelessWidget {
 
             // List
             Expanded(
-              child: packages.isEmpty
+              child: items.isEmpty
                   ? Center(
                       child: Column(mainAxisSize: MainAxisSize.min, children: [
                         Icon(Icons.content_cut, size: 56, color: Colors.grey.shade300),
@@ -181,10 +174,12 @@ class CutSessionScreen extends StatelessWidget {
                     )
                   : ListView.separated(
                       padding: const EdgeInsets.fromLTRB(12, 8, 12, 24),
-                      itemCount: packages.length,
+                      itemCount: items.length,
                       separatorBuilder: (_, __) => const SizedBox(height: 6),
                       itemBuilder: (_, i) {
-                        final pkg = packages[i];
+                        final item = items[i];
+                        final pkg = item.pkg;
+                        final slot = item.slot;
                         return Card(
                           margin: EdgeInsets.zero,
                           shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(12)),
@@ -192,7 +187,6 @@ class CutSessionScreen extends StatelessWidget {
                           child: Padding(
                             padding: const EdgeInsets.symmetric(horizontal: 14, vertical: 10),
                             child: Row(children: [
-                              // Number
                               Container(
                                 width: 28, height: 28,
                                 decoration: BoxDecoration(color: Colors.purple.shade50, shape: BoxShape.circle),
@@ -202,49 +196,32 @@ class CutSessionScreen extends StatelessWidget {
                                 ),
                               ),
                               const SizedBox(width: 10),
-
-                              // Info
                               Expanded(
                                 child: Column(crossAxisAlignment: CrossAxisAlignment.start, children: [
                                   Row(children: [
                                     const Icon(Icons.school_outlined, size: 14, color: Color(0xFFF97316)),
                                     const SizedBox(width: 4),
-                                    Expanded(
-                                      child: Text(pkg.studentName,
-                                          style: const TextStyle(fontWeight: FontWeight.w600, fontSize: 14)),
-                                    ),
-                                    Container(
-                                      padding: const EdgeInsets.symmetric(horizontal: 7, vertical: 2),
-                                      decoration: BoxDecoration(
-                                        color: Colors.green.shade50,
-                                        borderRadius: BorderRadius.circular(8),
-                                      ),
-                                      child: Text('เรียนแล้ว',
-                                          style: TextStyle(fontSize: 11, color: Colors.green.shade700, fontWeight: FontWeight.w600)),
-                                    ),
+                                    Expanded(child: Text(pkg.studentName,
+                                        style: const TextStyle(fontWeight: FontWeight.w600, fontSize: 14))),
                                   ]),
                                   const SizedBox(height: 2),
                                   Row(children: [
                                     const Icon(Icons.person_outlined, size: 14, color: Color(0xFF2E7D32)),
                                     const SizedBox(width: 4),
-                                    Text(pkg.teacherName,
-                                        style: const TextStyle(fontSize: 12, color: Colors.black87)),
+                                    Text(pkg.teacherName, style: const TextStyle(fontSize: 12, color: Colors.black87)),
                                   ]),
                                   const SizedBox(height: 4),
                                   Row(children: [
                                     Container(
                                       padding: const EdgeInsets.symmetric(horizontal: 6, vertical: 1),
-                                      decoration: BoxDecoration(
-                                        color: const Color(0xFF6A1B9A),
-                                        borderRadius: BorderRadius.circular(4),
-                                      ),
-                                      child: Text(pkg.scheduledDay ?? '',
+                                      decoration: BoxDecoration(color: _kPurple, borderRadius: BorderRadius.circular(4)),
+                                      child: Text(slot.day,
                                           style: const TextStyle(fontSize: 10, color: Colors.white, fontWeight: FontWeight.bold)),
                                     ),
                                     const SizedBox(width: 6),
                                     const Icon(Icons.access_time, size: 12, color: Colors.grey),
                                     const SizedBox(width: 2),
-                                    Text('${pkg.scheduledTime ?? ''}–${pkg.scheduledEndTime ?? ''}',
+                                    Text('${slot.startTime}–${slot.endTime}',
                                         style: const TextStyle(fontSize: 12, color: Colors.grey)),
                                     const SizedBox(width: 8),
                                     Container(
@@ -259,33 +236,17 @@ class CutSessionScreen extends StatelessWidget {
                                   ]),
                                 ]),
                               ),
-
-                              // Cut button or done badge
                               const SizedBox(width: 8),
-                              pkg.lastCutDate == todayStr
-                                  ? Container(
-                                      padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 8),
-                                      decoration: BoxDecoration(
-                                        color: Colors.green.shade50,
-                                        borderRadius: BorderRadius.circular(8),
-                                        border: Border.all(color: Colors.green.shade300),
-                                      ),
-                                      child: Text('✓ ตัดคาบแล้ว',
-                                          style: TextStyle(fontSize: 12, color: Colors.green.shade700, fontWeight: FontWeight.w600)),
-                                    )
-                                  : InkWell(
-                                      onTap: () => _confirmCut(context, pkg),
-                                      borderRadius: BorderRadius.circular(8),
-                                      child: Container(
-                                        padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 8),
-                                        decoration: BoxDecoration(
-                                          color: const Color(0xFF6A1B9A),
-                                          borderRadius: BorderRadius.circular(8),
-                                        ),
-                                        child: const Text('✂ ตัดคาบ',
-                                            style: TextStyle(fontSize: 12, color: Colors.white, fontWeight: FontWeight.w600)),
-                                      ),
-                                    ),
+                              InkWell(
+                                onTap: () => _confirmCut(context, item),
+                                borderRadius: BorderRadius.circular(8),
+                                child: Container(
+                                  padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 8),
+                                  decoration: BoxDecoration(color: _kPurple, borderRadius: BorderRadius.circular(8)),
+                                  child: const Text('✂ ตัดคาบ',
+                                      style: TextStyle(fontSize: 12, color: Colors.white, fontWeight: FontWeight.w600)),
+                                ),
+                              ),
                             ]),
                           ),
                         );

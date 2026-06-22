@@ -1,3 +1,4 @@
+import 'dart:async';
 import 'package:cloud_firestore/cloud_firestore.dart';
 import '../models/models.dart';
 import '../utils/date_format.dart';
@@ -50,62 +51,89 @@ class FirestoreService {
     });
   }
 
-  static Stream<List<PackageModel>> watchPendingCutPackages() {
-    final now = nowThai();
-    const thaiDays = {1: 'จ', 2: 'อ', 3: 'พ', 4: 'พฤ', 5: 'ศ', 6: 'ส', 7: 'อา'};
-    final todayDay = thaiDays[now.weekday]!;
-    final todayStr = todayThaiStr();
-    final nowMinutes = now.hour * 60 + now.minute;
-
-    return _db.collection('packages')
-        .where('scheduledDay', isEqualTo: todayDay)
-        .snapshots()
-        .map((s) {
-      return s.docs.map(PackageModel.fromDoc).where((pkg) {
-        if (pkg.scheduledEndTime == null) return false;
-        // ถ้าตั้งวันที่เจาะจงไว้ ให้ตัดเฉพาะวันนั้นเท่านั้น (ไม่ใช่ทุก weekday ที่ตรง)
-        if (pkg.scheduledDate != null && pkg.scheduledDate!.isNotEmpty &&
-            pkg.scheduledDate != todayStr) return false;
-        // show if already cut today OR still has sessions to cut
-        final cutToday = pkg.lastCutDate == todayStr;
-        if (!cutToday && pkg.remainingSessions <= 0) return false;
-        try {
-          final ep = pkg.scheduledEndTime!.split(':');
-          final endM = int.parse(ep[0]) * 60 + int.parse(ep[1]);
-          return nowMinutes >= endM;
-        } catch (_) { return false; }
-      }).toList()
-        ..sort((a, b) => (a.scheduledTime ?? '').compareTo(b.scheduledTime ?? ''));
-    });
+  /// session ของวันนี้ (ทุกสถานะ) — ใช้เช็คว่า slot ไหนตัดไปแล้ว
+  static Stream<List<SessionModel>> watchTodaySessions() {
+    return _db.collection('sessions').where('date', isEqualTo: todayThaiStr())
+        .snapshots().map((s) => s.docs.map(SessionModel.fromDoc).toList());
   }
 
-  static Future<void> cutPackageSession(PackageModel pkg) async {
+  /// คำนวณคาบที่รอตัดวันนี้ (รองรับหลาย slot/วัน) จาก packages + session ของวันนี้
+  static List<PendingCut> computePendingCuts(
+      List<PackageModel> packages, List<SessionModel> todaySessions) {
+    final now = nowThai();
+    final todayStr = todayThaiStr();
+    final nowMinutes = now.hour * 60 + now.minute;
+    const thaiDays = {1: 'จ', 2: 'อ', 3: 'พ', 4: 'พฤ', 5: 'ศ', 6: 'ส', 7: 'อา'};
+    final todayDay = thaiDays[now.weekday]!;
+    // slot ที่ "ตัดแล้ว" วันนี้ = มี session completed ที่ packageId+startTime ตรงกัน
+    final completed = <String>{};
+    for (final s in todaySessions) {
+      if (s.status == 'completed') completed.add('${s.packageId}_${s.startTime}');
+    }
+
+    final result = <PendingCut>[];
+    for (final pkg in packages) {
+      if (pkg.status != 'active') continue;
+      if (pkg.remainingSessions <= 0) continue;
+      for (final slot in pkg.effectiveSlots) {
+        // ต้องเป็นช่วงของวันนี้
+        if (slot.date != null && slot.date!.isNotEmpty) {
+          if (slot.date != todayStr) continue;
+        } else if (slot.day != todayDay) {
+          continue;
+        }
+        // เลยเวลาสิ้นสุดแล้ว
+        try {
+          final ref = slot.endTime.isNotEmpty ? slot.endTime : slot.startTime;
+          final ep = ref.split(':');
+          final endM = int.parse(ep[0]) * 60 + int.parse(ep[1]);
+          if (nowMinutes < endM) continue;
+        } catch (_) { continue; }
+        // ยังไม่ตัด slot นี้วันนี้
+        if (completed.contains('${pkg.id}_${slot.startTime}')) continue;
+        result.add(PendingCut(pkg, slot));
+      }
+    }
+    result.sort((a, b) => a.slot.startTime.compareTo(b.slot.startTime));
+    return result;
+  }
+
+  /// stream คาบรอตัดวันนี้ (รวม packages + session ของวันนี้)
+  static Stream<List<PendingCut>> watchPendingCuts() {
+    final controller = StreamController<List<PendingCut>>();
+    List<PackageModel>? pkgs;
+    List<SessionModel>? sess;
+    void emit() {
+      if (pkgs != null && sess != null) controller.add(computePendingCuts(pkgs!, sess!));
+    }
+    final s1 = watchAllPackages().listen((p) { pkgs = p; emit(); });
+    final s2 = watchTodaySessions().listen((s) { sess = s; emit(); });
+    controller.onCancel = () { s1.cancel(); s2.cancel(); };
+    return controller.stream;
+  }
+
+  /// ตัดคาบ 1 ช่วงเวลา (slot) ของแพ็กเกจ — หักโควตาคาบร่วม 1 คาบ
+  /// reuse session ที่มีอยู่ของวันนี้+เวลาเดียวกัน (เช่นที่ generate ไว้) ไม่สร้างซ้ำ
+  static Future<void> cutSlot(PackageModel pkg, SlotItem slot) async {
     final today = todayThaiStr();
-    // ถ้ามี session ของวันนี้อยู่แล้ว (เช่นที่ generate ตารางล่วงหน้าไว้) → อัปเดตเป็น completed
     final existing = await _db.collection('sessions')
         .where('packageId', isEqualTo: pkg.id)
         .where('date', isEqualTo: today)
+        .where('startTime', isEqualTo: slot.startTime)
         .limit(1).get();
     if (existing.docs.isNotEmpty) {
+      if ((existing.docs.first.data()['status'] as String?) == 'completed') return; // ตัดไปแล้ว
       await existing.docs.first.reference.update({
-        'status': 'completed',
-        'startTime': pkg.scheduledTime ?? '',
-        'endTime': pkg.scheduledEndTime ?? '',
+        'status': 'completed', 'endTime': slot.endTime,
         'updatedAt': FieldValue.serverTimestamp(),
       });
     } else {
       await _db.collection('sessions').add({
         'packageId': pkg.id,
-        'studentId': pkg.studentId,
-        'teacherId': pkg.teacherId,
-        'studentName': pkg.studentName,
-        'teacherName': pkg.teacherName,
-        'date': today,
-        'startTime': pkg.scheduledTime ?? '',
-        'endTime': pkg.scheduledEndTime ?? '',
-        'status': 'completed',
-        'isLate': false,
-        'isAbsent': false,
+        'studentId': pkg.studentId, 'teacherId': pkg.teacherId,
+        'studentName': pkg.studentName, 'teacherName': pkg.teacherName,
+        'date': today, 'startTime': slot.startTime, 'endTime': slot.endTime,
+        'status': 'completed', 'isLate': false, 'isAbsent': false,
         'createdAt': FieldValue.serverTimestamp(),
       });
     }
@@ -116,53 +144,46 @@ class FirestoreService {
     });
   }
 
-  /// ตัดคาบทั้งหมดที่ยังไม่ตัดวันนี้ในคลิกเดียว (batch) — คืนจำนวนที่ตัดสำเร็จ
-  static Future<int> cutAllPending(List<PackageModel> packages) async {
+  /// ตัดคาบหลาย slot ในคลิกเดียว (batch) — คืนจำนวนที่ตัดสำเร็จ
+  static Future<int> cutAllSlots(List<PendingCut> items) async {
     final today = todayThaiStr();
-    // โหลด session ของวันนี้ทั้งหมด เพื่อ reuse คาบที่ generate ตารางไว้ (กันซ้ำ)
     final todaySnap = await _db.collection('sessions').where('date', isEqualTo: today).get();
-    final byPkg = <String, DocumentReference>{};
+    // map packageId+startTime → ref (reuse session ที่ generate ไว้)
+    final byKey = <String, DocumentReference>{};
     for (final d in todaySnap.docs) {
-      final pid = d.data()['packageId'] as String?;
-      if (pid != null && !byPkg.containsKey(pid)) byPkg[pid] = d.reference;
+      final m = d.data();
+      final k = '${m['packageId']}_${m['startTime']}';
+      byKey.putIfAbsent(k, () => d.reference);
     }
     final batch = _db.batch();
+    final dec = <String, int>{}; // packageId → จำนวนคาบที่หัก
     int count = 0;
-    for (final pkg in packages) {
-      if (pkg.lastCutDate == today) continue;   // ตัดไปแล้ววันนี้
-      if (pkg.remainingSessions <= 0) continue;  // ไม่มีคาบเหลือ
-      final existingRef = byPkg[pkg.id];
-      if (existingRef != null) {
-        batch.update(existingRef, {
-          'status': 'completed',
-          'startTime': pkg.scheduledTime ?? '',
-          'endTime': pkg.scheduledEndTime ?? '',
-          'updatedAt': FieldValue.serverTimestamp(),
-        });
+    for (final it in items) {
+      final key = '${it.pkg.id}_${it.slot.startTime}';
+      final ref = byKey[key];
+      if (ref != null) {
+        batch.update(ref, {'status': 'completed', 'endTime': it.slot.endTime, 'updatedAt': FieldValue.serverTimestamp()});
       } else {
-        final sessionRef = _db.collection('sessions').doc();
-        batch.set(sessionRef, {
-          'packageId': pkg.id,
-          'studentId': pkg.studentId,
-          'teacherId': pkg.teacherId,
-          'studentName': pkg.studentName,
-          'teacherName': pkg.teacherName,
-          'date': today,
-          'startTime': pkg.scheduledTime ?? '',
-          'endTime': pkg.scheduledEndTime ?? '',
-          'status': 'completed',
-          'isLate': false,
-          'isAbsent': false,
+        final sref = _db.collection('sessions').doc();
+        batch.set(sref, {
+          'packageId': it.pkg.id,
+          'studentId': it.pkg.studentId, 'teacherId': it.pkg.teacherId,
+          'studentName': it.pkg.studentName, 'teacherName': it.pkg.teacherName,
+          'date': today, 'startTime': it.slot.startTime, 'endTime': it.slot.endTime,
+          'status': 'completed', 'isLate': false, 'isAbsent': false,
           'createdAt': FieldValue.serverTimestamp(),
         });
       }
-      batch.update(_db.collection('packages').doc(pkg.id), {
-        'remainingSessions': FieldValue.increment(-1),
+      dec[it.pkg.id] = (dec[it.pkg.id] ?? 0) + 1;
+      count++;
+    }
+    dec.forEach((pid, n) {
+      batch.update(_db.collection('packages').doc(pid), {
+        'remainingSessions': FieldValue.increment(-n),
         'lastCutDate': today,
         'updatedAt': FieldValue.serverTimestamp(),
       });
-      count++;
-    }
+    });
     if (count > 0) await batch.commit();
     return count;
   }
@@ -191,7 +212,8 @@ class FirestoreService {
       final m = d.data();
       final pid = m['packageId'] as String? ?? '';
       final dt = m['date'] as String? ?? '';
-      existingKeys.add('${pid}_$dt');
+      final st = m['startTime'] as String? ?? '';
+      existingKeys.add('${pid}_${dt}_$st'); // กันซ้ำราย slot (packageId+date+เวลาเริ่ม)
       if ((m['status'] as String?) == 'scheduled') {
         scheduledCount[pid] = (scheduledCount[pid] ?? 0) + 1;
       }
@@ -203,32 +225,36 @@ class FirestoreService {
     int created = 0;
 
     for (final p in packages) {
-      if (p.scheduledTime == null) continue;
-      if (p.scheduledDay == null && p.scheduledDate == null) continue;
       int allowed = p.remainingSessions - (scheduledCount[p.id] ?? 0);
       if (allowed <= 0) continue;
 
-      // วันที่ที่จะเกิดคาบในช่วง
-      final dates = <DateTime>[];
-      if (p.scheduledDate != null && p.scheduledDate!.isNotEmpty) {
-        final d = parseDateStr(p.scheduledDate!);
-        if (d != null) {
-          final dd = DateTime(d.year, d.month, d.day);
-          if (!dd.isBefore(today) && !dd.isAfter(endDate)) dates.add(dd);
-        }
-      } else {
-        final wd = dayMap[p.scheduledDay];
-        if (wd != null) {
-          for (var dt = today; !dt.isAfter(endDate); dt = dt.add(const Duration(days: 1))) {
-            if (dt.weekday == wd) dates.add(dt);
+      // รวม (วันที่, slot) ที่จะเกิดในช่วง — จากทุก slot ของแพ็กเกจ
+      final occ = <({DateTime date, SlotItem slot})>[];
+      for (final slot in p.effectiveSlots) {
+        if (slot.date != null && slot.date!.isNotEmpty) {
+          final d = parseDateStr(slot.date!);
+          if (d != null) {
+            final dd = DateTime(d.year, d.month, d.day);
+            if (!dd.isBefore(today) && !dd.isAfter(endDate)) occ.add((date: dd, slot: slot));
+          }
+        } else {
+          final wd = dayMap[slot.day];
+          if (wd != null) {
+            for (var dt = today; !dt.isAfter(endDate); dt = dt.add(const Duration(days: 1))) {
+              if (dt.weekday == wd) occ.add((date: dt, slot: slot));
+            }
           }
         }
       }
+      occ.sort((a, b) {
+        final c = a.date.compareTo(b.date);
+        return c != 0 ? c : a.slot.startTime.compareTo(b.slot.startTime);
+      });
 
-      for (final dt in dates) {
+      for (final o in occ) {
         if (allowed <= 0) break;
-        final ds = toStorageDateStr(dt);
-        final key = '${p.id}_$ds';
+        final ds = toStorageDateStr(o.date);
+        final key = '${p.id}_${ds}_${o.slot.startTime}';
         if (existingKeys.contains(key)) continue;
         final ref = _db.collection('sessions').doc();
         batch.set(ref, {
@@ -236,8 +262,8 @@ class FirestoreService {
           'studentId': p.studentId, 'teacherId': p.teacherId,
           'studentName': p.studentName, 'teacherName': p.teacherName,
           'date': ds,
-          'startTime': p.scheduledTime ?? '',
-          'endTime': p.scheduledEndTime ?? '',
+          'startTime': o.slot.startTime,
+          'endTime': o.slot.endTime,
           'status': 'scheduled',
           'isLate': false, 'isAbsent': false,
           'generated': true,
