@@ -471,6 +471,7 @@ class FirestoreService {
     for (final doc in snap.docs) {
       final code = (doc.data()['code'] ?? '') as String;
       if (code.startsWith(prefix)) {
+        // รองรับรหัสหลายยุค (S26xxxx / S27xxxx) — ตัด prefix แล้ว parse ตัวเลข
         final num = int.tryParse(code.substring(1));
         if (num != null && num > max) max = num;
       }
@@ -478,8 +479,66 @@ class FirestoreService {
     return '$prefix${max + 1}';
   }
 
+  /// รหัสนี้ถูกใช้แล้วหรือยัง (กันซ้ำตอนสร้าง/โอนย้ายข้อมูล) — ข้ามเอกสารของตัวเองได้
+  static Future<bool> isCodeTaken(String code, {String? excludeId}) async {
+    final snap = await _db.collection('users')
+        .where('code', isEqualTo: code.trim()).get();
+    return snap.docs.any((d) => d.id != excludeId);
+  }
+
   static Future<void> addUser(Map<String, dynamic> data) async {
     await _db.collection('users').add({...data, 'createdAt': FieldValue.serverTimestamp()});
+  }
+
+  /// รหัสผู้ใช้ทั้งหมดในระบบ (uppercase) — ใช้กันซ้ำตอน bulk import
+  static Future<Set<String>> allUserCodes() async {
+    final snap = await _db.collection('users').get();
+    return snap.docs
+        .map((d) => ((d.data()['code'] ?? '') as String).trim().toUpperCase())
+        .where((c) => c.isNotEmpty)
+        .toSet();
+  }
+
+  /// เพิ่มผู้ใช้หลายคนพร้อมกัน (batch) — สำหรับโอนย้ายข้อมูลจาก V4.1.2
+  static Future<void> bulkAddUsers(List<Map<String, dynamic>> users) async {
+    var batch = _db.batch();
+    int ops = 0;
+    for (final u in users) {
+      final ref = _db.collection('users').doc();
+      batch.set(ref, {...u, 'createdAt': FieldValue.serverTimestamp()});
+      ops++;
+      if (ops >= 400) { await batch.commit(); batch = _db.batch(); ops = 0; }
+    }
+    if (ops > 0) await batch.commit();
+  }
+
+  /// ดัชนี user ตามรหัส (uppercase) → {id, name, role} — ใช้ resolve รหัสตอน import ความสัมพันธ์
+  static Future<Map<String, ({String id, String name, String role})>> userIndexByCode() async {
+    final snap = await _db.collection('users').get();
+    final map = <String, ({String id, String name, String role})>{};
+    for (final d in snap.docs) {
+      final code = ((d.data()['code'] ?? '') as String).trim().toUpperCase();
+      if (code.isEmpty) continue;
+      map[code] = (
+        id: d.id,
+        name: (d.data()['name'] ?? '') as String,
+        role: (d.data()['role'] ?? '') as String,
+      );
+    }
+    return map;
+  }
+
+  /// เพิ่มแพ็กเกจ (ความสัมพันธ์ครู-นักเรียน) หลายรายการพร้อมกัน (batch)
+  static Future<void> bulkAddPackages(List<Map<String, dynamic>> packages) async {
+    var batch = _db.batch();
+    int ops = 0;
+    for (final p in packages) {
+      final ref = _db.collection('packages').doc();
+      batch.set(ref, {...p, 'createdAt': FieldValue.serverTimestamp()});
+      ops++;
+      if (ops >= 400) { await batch.commit(); batch = _db.batch(); ops = 0; }
+    }
+    if (ops > 0) await batch.commit();
   }
 
   static Future<void> updateUser(String id, Map<String, dynamic> data) async {

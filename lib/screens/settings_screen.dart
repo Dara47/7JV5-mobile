@@ -2,6 +2,7 @@
 import 'package:firebase_auth/firebase_auth.dart';
 import '../services/firestore_service.dart';
 import 'payroll_screen.dart';
+import 'import_users_screen.dart';
 
 class SettingsScreen extends StatefulWidget {
   const SettingsScreen({super.key});
@@ -183,6 +184,30 @@ class _SettingsScreenState extends State<SettingsScreen> {
                   label: const Text('เปิดหน้าบัญชีค่าจ้าง', style: TextStyle(fontSize: 16, fontWeight: FontWeight.bold, color: Color(0xFFF97316))),
                   style: OutlinedButton.styleFrom(
                     side: const BorderSide(color: Color(0xFFF97316)),
+                    shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(12)),
+                  ),
+                ),
+              ),
+              const SizedBox(height: 20),
+
+              // ── นำเข้าผู้ใช้ (Bulk Import) ────────────────────────────
+              const Divider(),
+              const SizedBox(height: 8),
+              _SectionHeader(icon: Icons.group_add_outlined, label: 'นำเข้าข้อมูล (Bulk Import)', color: const Color(0xFF2E7D32)),
+              const SizedBox(height: 4),
+              Text(
+                'อัปโหลด CSV / JSON: นำเข้าครู-นักเรียน และความสัมพันธ์ครู-นักเรียน (แพ็กเกจ+ตาราง) ทีละหลายคน — โอนย้ายข้อมูลจาก V4.1.2 คงรหัสเดิม S26xxxx ได้',
+                style: TextStyle(fontSize: 12, color: Colors.grey.shade600),
+              ),
+              const SizedBox(height: 8),
+              SizedBox(
+                height: 52,
+                child: OutlinedButton.icon(
+                  onPressed: () => Navigator.push(context, MaterialPageRoute(builder: (_) => const ImportUsersScreen())),
+                  icon: const Icon(Icons.upload_file, color: Color(0xFF2E7D32)),
+                  label: const Text('เปิดหน้านำเข้าข้อมูล', style: TextStyle(fontSize: 16, fontWeight: FontWeight.bold, color: Color(0xFF2E7D32))),
+                  style: OutlinedButton.styleFrom(
+                    side: const BorderSide(color: Color(0xFF2E7D32)),
                     shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(12)),
                   ),
                 ),

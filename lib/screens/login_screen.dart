@@ -18,6 +18,7 @@ class _LoginScreenState extends State<LoginScreen> {
   bool _codeLoading = false;
   String? _error;
   String? _codeError;
+  bool _adminMode = false; // false = ครู/นักเรียน (รหัส), true = ผู้ดูแล (อีเมล)
 
   @override
   void dispose() {
@@ -57,6 +58,74 @@ class _LoginScreenState extends State<LoginScreen> {
       if (mounted) setState(() => _codeLoading = false);
     }
   }
+
+  // ── ฟอร์ม "ครู / นักเรียน" (เข้าด้วยรหัส) ──
+  Widget _codeForm() => Column(
+    key: const ValueKey('code'),
+    children: [
+      _Field(
+        ctrl: _codeCtrl,
+        label: 'รหัสผู้ใช้',
+        hint: 'เช่น T270001 หรือ S270001',
+        icon: Icons.badge_outlined,
+        accent: const Color(0xFFF97316),
+        textCaps: TextCapitalization.characters,
+        onSubmit: _loginWithCode,
+        onChanged: () => setState(() {}),
+        clearBtn: _codeCtrl.text.isNotEmpty
+            ? () { _codeCtrl.clear(); setState(() {}); }
+            : null,
+      ),
+      if (_codeError != null) ...[
+        const SizedBox(height: 8),
+        _ErrorRow(_codeError!),
+      ],
+      const SizedBox(height: 14),
+      _ActionButton(
+        label: 'เข้าสู่ระบบด้วยรหัส',
+        loading: _codeLoading,
+        color: const Color(0xFFF97316),
+        icon: Icons.login_rounded,
+        onPressed: _loginWithCode,
+      ),
+      const SizedBox(height: 10),
+      Text('ใช้รหัสที่ได้รับจากศูนย์ — S270001 (นักเรียน) / T270001 (ครู)',
+          textAlign: TextAlign.center,
+          style: TextStyle(fontSize: 11, color: Colors.grey.shade500)),
+    ],
+  );
+
+  // ── ฟอร์ม "ผู้ดูแลระบบ" (อีเมล + รหัสผ่าน) ──
+  Widget _adminForm() => Column(
+    key: const ValueKey('admin'),
+    children: [
+      _Field(
+        ctrl: _emailCtrl, label: 'อีเมล',
+        icon: Icons.email_outlined,
+        type: TextInputType.emailAddress,
+        accent: const Color(0xFF1565C0),
+      ),
+      const SizedBox(height: 10),
+      _Field(
+        ctrl: _passCtrl, label: 'รหัสผ่าน',
+        icon: Icons.lock_outline, obscure: true,
+        accent: const Color(0xFF1565C0),
+        onSubmit: _login,
+      ),
+      if (_error != null) ...[
+        const SizedBox(height: 8),
+        _ErrorRow(_error!),
+      ],
+      const SizedBox(height: 14),
+      _ActionButton(
+        label: 'เข้าสู่ระบบ (Admin)',
+        loading: _loading,
+        color: const Color(0xFF1565C0),
+        icon: Icons.login_rounded,
+        onPressed: _login,
+      ),
+    ],
+  );
 
   @override
   Widget build(BuildContext context) {
@@ -125,78 +194,27 @@ class _LoginScreenState extends State<LoginScreen> {
                               style: TextStyle(fontSize: 13, color: Colors.grey)),
                           const SizedBox(height: 24),
 
-                          // ── ครู / นักเรียน ────────────────────────
-                          const _SectionBadge(
-                              label: 'ครู / นักเรียน',
-                              color: Color(0xFFF97316)),
-                          const SizedBox(height: 12),
-                          StatefulBuilder(builder: (_, setInner) => _Field(
-                            ctrl: _codeCtrl,
-                            label: 'รหัสผู้ใช้',
-                            hint: 'เช่น T270001 หรือ S270001',
-                            icon: Icons.badge_outlined,
-                            accent: const Color(0xFFF97316),
-                            textCaps: TextCapitalization.characters,
-                            onSubmit: _loginWithCode,
-                            onChanged: () => setInner(() {}),
-                            clearBtn: _codeCtrl.text.isNotEmpty
-                                ? () { _codeCtrl.clear(); setInner(() {}); }
-                                : null,
-                          )),
-                          if (_codeError != null) ...[
-                            const SizedBox(height: 8),
-                            _ErrorRow(_codeError!),
-                          ],
-                          const SizedBox(height: 14),
-                          _ActionButton(
-                            label: 'เข้าสู่ระบบด้วยรหัส',
-                            loading: _codeLoading,
-                            color: const Color(0xFFF97316),
-                            icon: Icons.person_pin_rounded,
-                            onPressed: _loginWithCode,
+                          // ── สลับโหมด: ครู/นักเรียน ↔ ผู้ดูแล ──────
+                          _ModeToggle(
+                            adminMode: _adminMode,
+                            onChanged: (v) => setState(() {
+                              _adminMode = v;
+                              _error = null;
+                              _codeError = null;
+                            }),
                           ),
-
-                          // ── Divider ───────────────────────────────
                           const SizedBox(height: 20),
-                          Row(children: [
-                            Expanded(child: Divider(color: Colors.grey.shade300)),
-                            Padding(
-                              padding: const EdgeInsets.symmetric(horizontal: 12),
-                              child: Text('หรือ',
-                                  style: TextStyle(
-                                      fontSize: 12, color: Colors.grey.shade500)),
+
+                          // ── ฟอร์มตามโหมด (สลับนุ่มด้วย AnimatedSwitcher) ──
+                          AnimatedSize(
+                            duration: const Duration(milliseconds: 250),
+                            curve: Curves.easeOut,
+                            child: AnimatedSwitcher(
+                              duration: const Duration(milliseconds: 220),
+                              transitionBuilder: (child, anim) =>
+                                  FadeTransition(opacity: anim, child: child),
+                              child: _adminMode ? _adminForm() : _codeForm(),
                             ),
-                            Expanded(child: Divider(color: Colors.grey.shade300)),
-                          ]),
-                          const SizedBox(height: 20),
-
-                          // ── Admin ─────────────────────────────────
-                          const _SectionBadge(
-                              label: 'ผู้ดูแลระบบ',
-                              color: Color(0xFF1565C0)),
-                          const SizedBox(height: 12),
-                          _Field(
-                              ctrl: _emailCtrl, label: 'อีเมล',
-                              icon: Icons.email_outlined,
-                              type: TextInputType.emailAddress,
-                              accent: const Color(0xFF1565C0)),
-                          const SizedBox(height: 10),
-                          _Field(
-                              ctrl: _passCtrl, label: 'รหัสผ่าน',
-                              icon: Icons.lock_outline, obscure: true,
-                              accent: const Color(0xFF1565C0),
-                              onSubmit: _login),
-                          if (_error != null) ...[
-                            const SizedBox(height: 8),
-                            _ErrorRow(_error!),
-                          ],
-                          const SizedBox(height: 14),
-                          _ActionButton(
-                            label: 'เข้าสู่ระบบ (Admin)',
-                            loading: _loading,
-                            color: const Color(0xFF1565C0),
-                            icon: Icons.login_rounded,
-                            onPressed: _login,
                           ),
                           const SizedBox(height: 4),
                         ],
@@ -322,22 +340,71 @@ class _Diamond extends StatelessWidget {
 
 // ── Form widgets ──────────────────────────────────────────────────────────────
 
-class _SectionBadge extends StatelessWidget {
-  final String label;
-  final Color color;
-  const _SectionBadge({required this.label, required this.color});
+/// สลับโหมดล็อกอินแบบ segmented (ครู/นักเรียน ↔ ผู้ดูแล)
+class _ModeToggle extends StatelessWidget {
+  final bool adminMode;
+  final ValueChanged<bool> onChanged;
+  const _ModeToggle({required this.adminMode, required this.onChanged});
+
+  static const _orange = Color(0xFFF97316);
+  static const _blue = Color(0xFF1565C0);
+
   @override
-  Widget build(BuildContext context) => Align(
-    alignment: Alignment.centerLeft,
-    child: Container(
-      padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 5),
+  Widget build(BuildContext context) => Container(
+    padding: const EdgeInsets.all(4),
+    decoration: BoxDecoration(
+      color: Colors.grey.shade100,
+      borderRadius: BorderRadius.circular(14),
+    ),
+    child: Row(children: [
+      Expanded(child: _seg(
+        label: 'ครู / นักเรียน',
+        icon: Icons.person_pin_rounded,
+        selected: !adminMode,
+        color: _orange,
+        onTap: () => onChanged(false),
+      )),
+      Expanded(child: _seg(
+        label: 'ผู้ดูแล',
+        icon: Icons.admin_panel_settings_rounded,
+        selected: adminMode,
+        color: _blue,
+        onTap: () => onChanged(true),
+      )),
+    ]),
+  );
+
+  Widget _seg({
+    required String label,
+    required IconData icon,
+    required bool selected,
+    required Color color,
+    required VoidCallback onTap,
+  }) => GestureDetector(
+    onTap: onTap,
+    behavior: HitTestBehavior.opaque,
+    child: AnimatedContainer(
+      duration: const Duration(milliseconds: 200),
+      curve: Curves.easeOut,
+      padding: const EdgeInsets.symmetric(vertical: 11),
       decoration: BoxDecoration(
-        color: color.withOpacity(0.10),
-        borderRadius: BorderRadius.circular(20),
-        border: Border.all(color: color.withOpacity(0.30)),
+        color: selected ? color : Colors.transparent,
+        borderRadius: BorderRadius.circular(11),
+        boxShadow: selected
+            ? [BoxShadow(color: color.withValues(alpha: 0.35), blurRadius: 8, offset: const Offset(0, 2))]
+            : null,
       ),
-      child: Text(label,
-          style: TextStyle(fontSize: 12, fontWeight: FontWeight.w700, color: color)),
+      child: Row(mainAxisAlignment: MainAxisAlignment.center, children: [
+        Icon(icon, size: 16, color: selected ? Colors.white : Colors.grey.shade500),
+        const SizedBox(width: 6),
+        Flexible(child: Text(label,
+            overflow: TextOverflow.ellipsis,
+            style: TextStyle(
+              fontSize: 13,
+              fontWeight: FontWeight.w700,
+              color: selected ? Colors.white : Colors.grey.shade600,
+            ))),
+      ]),
     ),
   );
 }

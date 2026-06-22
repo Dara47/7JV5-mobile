@@ -17,10 +17,11 @@ class _UserFormScreenState extends State<UserFormScreen> {
   final _meetCtrl = TextEditingController();
   final _sessionsCtrl = TextEditingController();
 
+  final _codeCtrl = TextEditingController();
   String _role = 'student';
-  String _generatedCode = '';
   bool _loadingCode = false;
   bool _saving = false;
+  String? _codeError;
 
   bool get _isEdit => widget.existing != null;
 
@@ -30,7 +31,7 @@ class _UserFormScreenState extends State<UserFormScreen> {
     if (_isEdit) {
       final u = widget.existing!;
       _role = u.role;
-      _generatedCode = u.code;
+      _codeCtrl.text = u.code;
       _nameCtrl.text = u.name;
       _ageCtrl.text = u.age?.toString() ?? '';
       _meetCtrl.text = u.googleMeetLink ?? '';
@@ -41,17 +42,38 @@ class _UserFormScreenState extends State<UserFormScreen> {
   }
 
   Future<void> _fetchCode(String role) async {
-    setState(() => _loadingCode = true);
+    setState(() { _loadingCode = true; _codeError = null; });
     final code = await FirestoreService.generateCode(role);
-    if (mounted) setState(() { _generatedCode = code; _loadingCode = false; });
+    if (mounted) setState(() { _codeCtrl.text = code; _loadingCode = false; });
   }
 
   Future<void> _save() async {
     if (!_formKey.currentState!.validate()) return;
-    setState(() => _saving = true);
+
+    // ── ตรวจรหัส: รูปแบบ (S=นักเรียน / T=ครู) + กันซ้ำ ──
+    final code = _codeCtrl.text.trim().toUpperCase();
+    final expectedPrefix = _role == 'student' ? 'S' : 'T';
+    final roleLabel = _role == 'student' ? 'นักเรียน' : 'ครู';
+    if (code.isEmpty) {
+      setState(() => _codeError = 'กรุณากรอกรหัสผู้ใช้');
+      return;
+    }
+    if (!code.startsWith(expectedPrefix) || code.length < 2 ||
+        int.tryParse(code.substring(1)) == null) {
+      setState(() => _codeError = 'รหัส$roleLabelต้องเป็น "$expectedPrefix" ตามด้วยตัวเลข (เช่น ${expectedPrefix}260001)');
+      return;
+    }
+
+    setState(() { _saving = true; _codeError = null; });
+
+    final taken = await FirestoreService.isCodeTaken(code, excludeId: widget.existing?.id);
+    if (taken) {
+      if (mounted) setState(() { _codeError = 'รหัส "$code" ถูกใช้แล้ว'; _saving = false; });
+      return;
+    }
 
     final data = {
-      'code': _generatedCode,
+      'code': code,
       'name': _nameCtrl.text.trim(),
       'role': _role,
       'status': 'active',
@@ -79,6 +101,7 @@ class _UserFormScreenState extends State<UserFormScreen> {
 
   @override
   void dispose() {
+    _codeCtrl.dispose();
     _nameCtrl.dispose(); _ageCtrl.dispose(); _meetCtrl.dispose(); _sessionsCtrl.dispose();
     super.dispose();
   }
@@ -122,34 +145,81 @@ class _UserFormScreenState extends State<UserFormScreen> {
           ]),
           const SizedBox(height: 20),
 
-          // Auto code display
-          _label('รหัสผู้ใช้ (อัตโนมัติ)'),
+          // รหัสผู้ใช้ — สร้างอัตโนมัติ หรือกรอกเอง (เช่น โอนย้ายข้อมูลเดิม S26xxxx)
+          _label('รหัสผู้ใช้ *'),
           const SizedBox(height: 8),
-          Container(
-            padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 14),
-            decoration: BoxDecoration(
-              color: Colors.white,
-              borderRadius: BorderRadius.circular(12),
-              border: Border.all(color: Colors.grey.shade300),
-            ),
-            child: Row(children: [
-              Icon(Icons.badge_outlined, color: Colors.grey.shade500, size: 20),
-              const SizedBox(width: 12),
-              _loadingCode
-                  ? const SizedBox(width: 16, height: 16, child: CircularProgressIndicator(strokeWidth: 2))
-                  : Text(_generatedCode,
-                      style: TextStyle(
-                        fontSize: 18, fontWeight: FontWeight.bold, letterSpacing: 1.5,
-                        color: _role == 'student' ? const Color(0xFFF97316) : const Color(0xFF2E7D32),
-                      )),
-              const Spacer(),
-              Container(
-                padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 3),
-                decoration: BoxDecoration(color: Colors.grey.shade100, borderRadius: BorderRadius.circular(6)),
-                child: Text('Auto', style: TextStyle(fontSize: 11, color: Colors.grey.shade600)),
+          if (_isEdit)
+            // โหมดแก้ไข: ล็อกรหัส (ผูกกับแพ็กเกจที่เก็บ studentCode/teacherCode ไว้)
+            Container(
+              padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 14),
+              decoration: BoxDecoration(
+                color: Colors.grey.shade100,
+                borderRadius: BorderRadius.circular(12),
+                border: Border.all(color: Colors.grey.shade300),
+              ),
+              child: Row(children: [
+                Icon(Icons.lock_outline, color: Colors.grey.shade500, size: 20),
+                const SizedBox(width: 12),
+                Text(_codeCtrl.text,
+                    style: TextStyle(
+                      fontSize: 18, fontWeight: FontWeight.bold, letterSpacing: 1.5,
+                      color: _role == 'student' ? const Color(0xFFF97316) : const Color(0xFF2E7D32),
+                    )),
+                const Spacer(),
+                Text('เปลี่ยนไม่ได้', style: TextStyle(fontSize: 11, color: Colors.grey.shade500)),
+              ]),
+            )
+          else ...[
+            Row(children: [
+              Expanded(
+                child: TextFormField(
+                  controller: _codeCtrl,
+                  enabled: !_loadingCode,
+                  textCapitalization: TextCapitalization.characters,
+                  onChanged: (_) { if (_codeError != null) setState(() => _codeError = null); },
+                  style: TextStyle(
+                    fontSize: 16, fontWeight: FontWeight.bold, letterSpacing: 1.2,
+                    color: _role == 'student' ? const Color(0xFFF97316) : const Color(0xFF2E7D32),
+                  ),
+                  decoration: InputDecoration(
+                    prefixIcon: Icon(Icons.badge_outlined, size: 20, color: Colors.grey.shade500),
+                    hintText: _role == 'student' ? 'เช่น S260001' : 'เช่น T260001',
+                    filled: true, fillColor: Colors.white,
+                    contentPadding: const EdgeInsets.symmetric(horizontal: 16, vertical: 14),
+                    border: OutlineInputBorder(borderRadius: BorderRadius.circular(12), borderSide: BorderSide(color: Colors.grey.shade300)),
+                    enabledBorder: OutlineInputBorder(borderRadius: BorderRadius.circular(12), borderSide: BorderSide(color: Colors.grey.shade300)),
+                    focusedBorder: OutlineInputBorder(borderRadius: BorderRadius.circular(12), borderSide: const BorderSide(color: Color(0xFFF97316), width: 2)),
+                  ),
+                ),
+              ),
+              const SizedBox(width: 8),
+              SizedBox(
+                height: 52, width: 52,
+                child: OutlinedButton(
+                  onPressed: _loadingCode ? null : () => _fetchCode(_role),
+                  style: OutlinedButton.styleFrom(
+                    padding: EdgeInsets.zero,
+                    shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(12)),
+                    side: BorderSide(color: Colors.grey.shade300),
+                  ),
+                  child: _loadingCode
+                      ? const SizedBox(width: 18, height: 18, child: CircularProgressIndicator(strokeWidth: 2))
+                      : const Icon(Icons.autorenew, color: Color(0xFFF97316)),
+                ),
               ),
             ]),
-          ),
+            if (_codeError != null) ...[
+              const SizedBox(height: 6),
+              Row(children: [
+                const Icon(Icons.error_outline, size: 14, color: Colors.red),
+                const SizedBox(width: 4),
+                Expanded(child: Text(_codeError!, style: const TextStyle(color: Colors.red, fontSize: 12))),
+              ]),
+            ],
+            const SizedBox(height: 6),
+            Text('กรอกเองได้สำหรับโอนย้ายข้อมูลเดิม (S26xxxx / T26xxxx) หรือกด ↻ เพื่อสร้างอัตโนมัติ',
+                style: TextStyle(fontSize: 11, color: Colors.grey.shade500)),
+          ],
           const SizedBox(height: 20),
 
           // Name

@@ -1,0 +1,7 @@
+code,name,role,age,sessions,meet
+S260001,สมชาย ใจดี,student,15,40,
+S260002,สมหญิง รักเรียน,student,12,20,
+T260001,ครูเอ มานะ,teacher,,,https://meet.google.com/abc-defg-hij
+T260002,ครูบี ใจดี,teacher,,,
+S270099,ทดสอบรหัสซ้ำ,student,10,10,
+X999999,รหัสผิดรูปแบบ,student,10,10,
