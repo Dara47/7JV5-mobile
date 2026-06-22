@@ -261,6 +261,7 @@ class _PackageFormSheetState extends State<_PackageFormSheet> {
           'slots': merged.map((s) => s.toMap()).toList(),
           if (_notesCtrl.text.isNotEmpty) 'notes': _notesCtrl.text.trim(),
         });
+        await FirestoreService.resyncPackageSchedule(_existingPkg!.id);
         if (mounted) Navigator.pop(context);
       } catch (e) {
         if (mounted) { _snack('เกิดข้อผิดพลาด: $e'); setState(() => _saving = false); }
@@ -298,6 +299,7 @@ class _PackageFormSheetState extends State<_PackageFormSheet> {
     try {
       if (_isEdit) {
         await FirestoreService.updatePackageFields(widget.existing!.id, data);
+        await FirestoreService.resyncPackageSchedule(widget.existing!.id);
       } else {
         await FirestoreService.addPackage(data);
       }

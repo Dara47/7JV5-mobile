@@ -2,6 +2,8 @@ import 'dart:async';
 import 'package:flutter/material.dart';
 import '../models/models.dart';
 import '../services/firestore_service.dart';
+import '../services/notification_service.dart';
+import '../widgets/upcoming_class_card.dart';
 import 'packages_screen.dart';
 import 'leave_request_screen.dart';
 
@@ -15,18 +17,29 @@ class TeacherDashboardScreen extends StatefulWidget {
 class _TeacherDashboardScreenState extends State<TeacherDashboardScreen> {
   List<PackageModel> _packages = [];
   StreamSubscription<List<PackageModel>>? _sub;
+  Timer? _ticker;
   bool _isEn = false;
 
   @override
   void initState() {
     super.initState();
+    ClassReminderService.ensurePermission();
     _sub = FirestoreService.watchPackagesForUser(widget.appUser.uid, 'teacher')
-        .listen((pkgs) => setState(() => _packages = pkgs));
+        .listen((pkgs) {
+      setState(() => _packages = pkgs);
+      ClassReminderService.checkAndNotify(pkgs, isTeacher: true);
+    });
+    _ticker = Timer.periodic(const Duration(seconds: 30), (_) {
+      if (!mounted) return;
+      ClassReminderService.checkAndNotify(_packages, isTeacher: true);
+      setState(() {});
+    });
   }
 
   @override
   void dispose() {
     _sub?.cancel();
+    _ticker?.cancel();
     super.dispose();
   }
 
@@ -37,6 +50,7 @@ class _TeacherDashboardScreenState extends State<TeacherDashboardScreen> {
     final totalSessions = _packages.fold(0, (s, p) => s + p.totalSessions);
     final usedSessions  = _packages.fold(0, (s, p) => s + p.usedSessions);
     final remaining     = _packages.fold(0, (s, p) => s + p.remainingSessions);
+    final next = ClassReminderService.nextToday(_packages);
 
     return Scaffold(
       backgroundColor: Colors.grey.shade100,
@@ -59,6 +73,12 @@ class _TeacherDashboardScreenState extends State<TeacherDashboardScreen> {
           // ── Profile card ─────────────────────────────────────────────
           _profileCard(),
           const SizedBox(height: 12),
+
+          // ── การ์ดเตือนคาบเรียนถัดไป ──────────────────────────────────
+          if (next != null) ...[
+            UpcomingClassCard(info: next, isTeacher: true),
+            const SizedBox(height: 12),
+          ],
 
           // ── Stats row ────────────────────────────────────────────────
           Row(children: [

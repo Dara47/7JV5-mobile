@@ -280,6 +280,99 @@ class FirestoreService {
     return created;
   }
 
+  /// ซิงก์ตารางล่วงหน้าของแพ็กเกจเดียวให้ตรงกับ slots ปัจจุบัน
+  /// - ลบ session 'scheduled' ที่ generate ไว้ (generated==true) แต่ไม่ตรงตารางใหม่แล้ว
+  /// - สร้าง session 'scheduled' ที่ขาดให้ตรง (จำกัดตาม remainingSessions)
+  /// - ไม่แตะ session ที่ completed/cancelled หรือที่สร้างเอง (generated != true)
+  /// เรียกหลังแก้/ย้าย/ลบ slot ของแพ็กเกจ เพื่อให้ปฏิทินล่วงหน้าตรงเสมอ
+  static Future<void> resyncPackageSchedule(String packageId, {int daysAhead = 30}) async {
+    final now = nowThai();
+    final today = DateTime(now.year, now.month, now.day);
+    final endDate = today.add(Duration(days: daysAhead));
+    final todayStr = toStorageDateStr(today);
+    final endStr = toStorageDateStr(endDate);
+
+    final doc = await _db.collection('packages').doc(packageId).get();
+    if (!doc.exists) return;
+    final pkg = PackageModel.fromDoc(doc);
+
+    // ── occurrence ที่ถูกต้องตามตารางปัจจุบัน (วันนี้→endDate) ──
+    const dayMap = {'อา': 7, 'จ': 1, 'อ': 2, 'พ': 3, 'พฤ': 4, 'ศ': 5, 'ส': 6};
+    final valid = <String, ({String date, SlotItem slot})>{}; // key date_startTime
+    if (pkg.status == 'active' && pkg.remainingSessions > 0) {
+      for (final slot in pkg.effectiveSlots) {
+        if (slot.date != null && slot.date!.isNotEmpty) {
+          final d = parseDateStr(slot.date!);
+          if (d != null) {
+            final dd = DateTime(d.year, d.month, d.day);
+            if (!dd.isBefore(today) && !dd.isAfter(endDate)) {
+              final ds = toStorageDateStr(dd);
+              valid['${ds}_${slot.startTime}'] = (date: ds, slot: slot);
+            }
+          }
+        } else {
+          final wd = dayMap[slot.day];
+          if (wd != null) {
+            for (var dt = today; !dt.isAfter(endDate); dt = dt.add(const Duration(days: 1))) {
+              if (dt.weekday == wd) {
+                final ds = toStorageDateStr(dt);
+                valid['${ds}_${slot.startTime}'] = (date: ds, slot: slot);
+              }
+            }
+          }
+        }
+      }
+    }
+
+    // ── session ของแพ็กเกจนี้ในช่วง วันนี้→endDate ──
+    final snap = await _db.collection('sessions')
+        .where('packageId', isEqualTo: packageId)
+        .where('date', isGreaterThanOrEqualTo: todayStr)
+        .where('date', isLessThanOrEqualTo: endStr)
+        .get();
+
+    final batch = _db.batch();
+    int ops = 0;
+    final existingValidKeys = <String>{};
+    for (final d in snap.docs) {
+      final m = d.data();
+      final key = '${m['date']}_${m['startTime']}';
+      final isScheduledGenerated =
+          (m['status'] as String?) == 'scheduled' && m['generated'] == true;
+      if (isScheduledGenerated && !valid.containsKey(key)) {
+        batch.delete(d.reference); // ตารางเปลี่ยน → ลบคาบที่ generate ไว้แต่ไม่ตรงแล้ว
+        ops++;
+      } else {
+        existingValidKeys.add(key); // มีอยู่แล้ว (ตรง) หรือเป็นคาบที่ตัด/สร้างเอง — กันสร้างซ้ำ
+      }
+    }
+
+    // ── สร้าง occurrence ที่ขาด (จำกัดตามโควตาที่เหลือ) ──
+    int allowed = pkg.remainingSessions - existingValidKeys.length;
+    final missing = valid.entries
+        .where((e) => !existingValidKeys.contains(e.key))
+        .toList()
+      ..sort((a, b) => a.key.compareTo(b.key));
+    for (final e in missing) {
+      if (allowed <= 0) break;
+      final slot = e.value.slot;
+      final ref = _db.collection('sessions').doc();
+      batch.set(ref, {
+        'packageId': pkg.id,
+        'studentId': pkg.studentId, 'teacherId': pkg.teacherId,
+        'studentName': pkg.studentName, 'teacherName': pkg.teacherName,
+        'date': e.value.date, 'startTime': slot.startTime, 'endTime': slot.endTime,
+        'status': 'scheduled', 'isLate': false, 'isAbsent': false,
+        'generated': true,
+        'createdAt': FieldValue.serverTimestamp(),
+      });
+      allowed--;
+      ops++;
+    }
+
+    if (ops > 0) await batch.commit();
+  }
+
   /// session ทั้งหมด (ทุกสถานะ) — สำหรับปฏิทิน admin
   static Stream<List<SessionModel>> watchAllSessions() {
     return _db.collection('sessions').snapshots()

@@ -208,7 +208,11 @@ class _UserList extends StatelessWidget {
           );
         }
 
-        return ListView.separated(
+        return StreamBuilder<List<SessionModel>>(
+          stream: role == 'student' ? FirestoreService.watchTodaySessions() : null,
+          builder: (context, sessSnap) {
+            final todaySessions = sessSnap.data ?? const <SessionModel>[];
+            return ListView.separated(
           padding: const EdgeInsets.fromLTRB(12, 8, 12, 80),
           itemCount: filtered.length,
           separatorBuilder: (_, __) => const SizedBox(height: 6),
@@ -282,56 +286,58 @@ class _UserList extends StatelessWidget {
                       final total = pkgs.fold(0, (s, p) => s + p.totalSessions);
                       final hasAdj = u.totalAdded > 0 || u.totalRemoved > 0;
 
-                      // ── คำนวณสถานะการเรียน ──
+                      // ── คำนวณสถานะการเรียน (รองรับหลาย slot ต่อแพ็กเกจ) ──
                       final now = nowThai();
                       const dayMap = {'อา': 7, 'จ': 1, 'อ': 2, 'พ': 3, 'พฤ': 4, 'ศ': 5, 'ส': 6};
-                      final todayStr = '${now.year}-${now.month.toString().padLeft(2,'0')}-${now.day.toString().padLeft(2,'0')}';
-                      final hasSchedule = pkgs.any((p) => p.scheduledDay != null && p.scheduledTime != null);
+                      final todayStr = todayThaiStr();
+                      final nowM = now.hour * 60 + now.minute;
+                      final hasSchedule = pkgs.any((p) => p.effectiveSlots.isNotEmpty);
 
                       String learnLabel = 'ว่าง';
                       Color learnColor = Colors.grey;
                       bool needsCut = false;
 
                       if (hasSchedule) {
-                        if (pkgs.any((p) => p.isCurrentlyInSession)) {
-                          learnLabel = 'กำลังเรียน';
-                          learnColor = Colors.green;
-                        } else {
-                          bool endedToday = false;
-                          for (final p in pkgs) {
-                            if (p.scheduledDay == null || p.scheduledTime == null) continue;
-                            if (p.scheduledDate != null && p.scheduledDate!.isNotEmpty) {
-                              if (p.scheduledDate != todayStr) continue;
-                            } else if (dayMap[p.scheduledDay] != now.weekday) continue;
+                        // วน slot ของวันนี้ทั้งหมดจากทุกแพ็กเกจ
+                        bool anyActive = false;   // อยู่ในช่วงเรียน
+                        bool anyUpcoming = false; // วันนี้ ยังไม่ถึงเวลา
+                        bool anyEnded = false;    // วันนี้ เลยเวลาแล้ว
+                        for (final p in pkgs) {
+                          for (final s in p.effectiveSlots) {
+                            if (s.date != null && s.date!.isNotEmpty) {
+                              if (s.date != todayStr) continue;
+                            } else if (dayMap[s.day] != now.weekday) continue;
                             try {
-                              final ep = (p.scheduledEndTime ?? p.scheduledTime!).split(':');
+                              final sp = s.startTime.split(':');
+                              final ep = (s.endTime.isNotEmpty ? s.endTime : s.startTime).split(':');
+                              final startM = int.parse(sp[0]) * 60 + int.parse(sp[1]);
                               final endM = int.parse(ep[0]) * 60 + int.parse(ep[1]);
-                              if (now.hour * 60 + now.minute >= endM) { endedToday = true; break; }
+                              if (nowM >= startM && nowM < endM) {
+                                anyActive = true;
+                              } else if (nowM < startM) {
+                                anyUpcoming = true;
+                              } else {
+                                anyEnded = true;
+                              }
                             } catch (_) {}
                           }
-                          if (endedToday) {
-                            learnLabel = 'เรียนแล้ว';
-                            learnColor = Colors.blue;
-                          } else {
-                            learnLabel = 'รอเรียน';
-                            learnColor = Colors.amber.shade700;
-                          }
+                        }
+                        // ลำดับความสำคัญ: กำลังเรียน > รอเรียน(ยังมีคาบวันนี้) > เรียนแล้ว
+                        if (anyActive) {
+                          learnLabel = 'กำลังเรียน';
+                          learnColor = Colors.green;
+                        } else if (anyUpcoming) {
+                          learnLabel = 'รอเรียน';
+                          learnColor = Colors.amber.shade700;
+                        } else if (anyEnded) {
+                          learnLabel = 'เรียนแล้ว';
+                          learnColor = Colors.blue;
                         }
 
-                        // ── รอตัดคาบ: วันตรง + เวลาผ่านแล้ว + ยังไม่ตัดวันนี้ ──
-                        for (final p in pkgs) {
-                          if (p.scheduledDay == null || p.scheduledTime == null) continue;
-                          if (p.scheduledDate != null && p.scheduledDate!.isNotEmpty) {
-                            if (p.scheduledDate != todayStr) continue;
-                          } else if (dayMap[p.scheduledDay] != now.weekday) continue;
-                          if (p.remainingSessions <= 0) continue;
-                          if (p.lastCutDate == todayStr) continue;
-                          try {
-                            final ep = (p.scheduledEndTime ?? p.scheduledTime!).split(':');
-                            final endM = int.parse(ep[0]) * 60 + int.parse(ep[1]);
-                            if (now.hour * 60 + now.minute >= endM) { needsCut = true; break; }
-                          } catch (_) {}
-                        }
+                        // ── รอตัดคาบ: ใช้ตรรกะเดียวกับหน้าตัดคาบ (รองรับหลาย slot + เช็ค session ตัดแล้ว) ──
+                        needsCut = FirestoreService
+                            .computePendingCuts(pkgs, todaySessions)
+                            .isNotEmpty;
                       }
 
                       return Padding(
@@ -378,6 +384,8 @@ class _UserList extends StatelessWidget {
                   ),
               ]),
             );
+          },
+        );
           },
         );
       },

@@ -1,9 +1,10 @@
 import 'dart:async';
-// ignore: avoid_web_libraries_in_flutter
-import 'dart:html' as html;
+import 'package:web/web.dart' as web;
 import 'package:flutter/material.dart';
 import '../models/models.dart';
 import '../services/firestore_service.dart';
+import '../services/notification_service.dart';
+import '../widgets/upcoming_class_card.dart';
 import 'leave_request_screen.dart';
 import 'schedule_calendar_screen.dart';
 
@@ -17,22 +18,35 @@ class StudentDashboardScreen extends StatefulWidget {
 class _StudentDashboardScreenState extends State<StudentDashboardScreen> {
   List<PackageModel> _packages = [];
   StreamSubscription<List<PackageModel>>? _sub;
+  Timer? _ticker;
 
   @override
   void initState() {
     super.initState();
+    ClassReminderService.ensurePermission();
     _sub = FirestoreService.watchPackagesForUser(widget.appUser.uid, 'student')
-        .listen((pkgs) => setState(() => _packages = pkgs));
+        .listen((pkgs) {
+      setState(() => _packages = pkgs);
+      ClassReminderService.checkAndNotify(pkgs, isTeacher: false);
+    });
+    // เดินนาฬิกาเพื่ออัปเดตเวลานับถอยหลัง + ยิงแจ้งเตือนเมื่อใกล้ถึงคาบ
+    _ticker = Timer.periodic(const Duration(seconds: 30), (_) {
+      if (!mounted) return;
+      ClassReminderService.checkAndNotify(_packages, isTeacher: false);
+      setState(() {});
+    });
   }
 
   @override
   void dispose() {
     _sub?.cancel();
+    _ticker?.cancel();
     super.dispose();
   }
 
   @override
   Widget build(BuildContext context) {
+    final next = ClassReminderService.nextToday(_packages);
     return Scaffold(
       backgroundColor: Colors.grey.shade100,
       appBar: AppBar(
@@ -57,6 +71,10 @@ class _StudentDashboardScreenState extends State<StudentDashboardScreen> {
         children: [
           _profileCard(),
           const SizedBox(height: 12),
+          if (next != null) ...[
+            UpcomingClassCard(info: next, isTeacher: false),
+            const SizedBox(height: 12),
+          ],
           if (_packages.isEmpty)
             _emptyCard()
           else
@@ -231,7 +249,7 @@ class _CourseCard extends StatelessWidget {
               final link = snap.data?.googleMeetLink;
               if (link == null || link.trim().isEmpty) return const SizedBox.shrink();
               return InkWell(
-                onTap: () => html.window.open(link.trim(), '_blank'),
+                onTap: () => web.window.open(link.trim(), '_blank'),
                 borderRadius: BorderRadius.circular(10),
                 child: Container(
                   padding: const EdgeInsets.symmetric(horizontal: 14, vertical: 11),

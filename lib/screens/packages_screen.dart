@@ -1,6 +1,5 @@
 ﻿import 'package:flutter/material.dart';
-// ignore: avoid_web_libraries_in_flutter
-import 'dart:html' as html;
+import 'package:web/web.dart' as web;
 import 'package:cloud_firestore/cloud_firestore.dart';
 import '../models/models.dart';
 import '../services/firestore_service.dart';
@@ -313,6 +312,7 @@ class PackageCard extends StatelessWidget {
               };
             }
             await FirestoreService.updatePackageFields(pkg.id, data);
+            await FirestoreService.resyncPackageSchedule(pkg.id);
           },
           style: ElevatedButton.styleFrom(backgroundColor: const Color(0xFFF97316), foregroundColor: Colors.white),
           child: const Text('บันทึก'),
@@ -541,7 +541,7 @@ class PackageCard extends StatelessWidget {
                   final link = snap.data?.googleMeetLink;
                   if (link == null || link.trim().isEmpty) return const SizedBox.shrink();
                   return InkWell(
-                    onTap: () => html.window.open(link.trim(), '_blank'),
+                    onTap: () => web.window.open(link.trim(), '_blank'),
                     borderRadius: BorderRadius.circular(10),
                     child: Container(
                       padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 10),
