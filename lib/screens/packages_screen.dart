@@ -226,6 +226,18 @@ class PackageCard extends StatelessWidget {
     ));
   }
 
+  void _tapReschedule(BuildContext context) {
+    // เงื่อนไข: ย้ายคาบได้เฉพาะก่อนถึงเวลาเรียนเท่านั้น
+    if (_scheduleStarted) {
+      ScaffoldMessenger.of(context).showSnackBar(const SnackBar(
+        content: Text('ย้ายคาบได้เฉพาะก่อนถึงเวลาเรียนเท่านั้น (คาบนี้เลยเวลาแล้ว)'),
+        backgroundColor: Colors.redAccent,
+      ));
+      return;
+    }
+    _showReschedule(context);
+  }
+
   void _showReschedule(BuildContext context) {
     String? day = pkg.scheduledDay;
     DateTime? date = pkg.scheduledDate != null ? parseDateStr(pkg.scheduledDate!) : null;
@@ -342,6 +354,27 @@ class PackageCard extends StatelessWidget {
 
   String _fmtTime(TimeOfDay t) => '${t.hour.toString().padLeft(2,'0')}:${t.minute.toString().padLeft(2,'0')}';
 
+  /// คาบนี้ถึง/เลยเวลาเริ่มเรียนแล้วหรือยัง — ใช้ห้ามย้ายคาบหลังถึงเวลาเรียน
+  bool get _scheduleStarted {
+    if (pkg.scheduledTime == null) return false;
+    final now = DateTime.now();
+    final sp = pkg.scheduledTime!.split(':');
+    if (sp.length != 2) return false;
+    final startMin = (int.tryParse(sp[0]) ?? 0) * 60 + (int.tryParse(sp[1]) ?? 0);
+
+    // วันที่เจาะจง → เทียบวันที่+เวลาตรงๆ
+    if (pkg.scheduledDate != null && pkg.scheduledDate!.isNotEmpty) {
+      final d = parseDateStr(pkg.scheduledDate!);
+      if (d == null) return false;
+      final lessonStart = DateTime(d.year, d.month, d.day, startMin ~/ 60, startMin % 60);
+      return !now.isBefore(lessonStart);
+    }
+    // ตารางประจำสัปดาห์ → ห้ามเฉพาะวันเรียนวันนี้ที่เลยเวลาเริ่มแล้ว (วันอื่นย้ายได้)
+    const dayMap = {'อา': 7, 'จ': 1, 'อ': 2, 'พ': 3, 'พฤ': 4, 'ศ': 5, 'ส': 6};
+    if (dayMap[pkg.scheduledDay] != now.weekday) return false;
+    return (now.hour * 60 + now.minute) >= startMin;
+  }
+
   @override
   Widget build(BuildContext context) {
     final pct = pkg.totalSessions > 0 ? (pkg.remainingSessions / pkg.totalSessions).clamp(0.0, 1.0) : 0.0;
@@ -406,7 +439,7 @@ class PackageCard extends StatelessWidget {
 
             // Schedule row
             GestureDetector(
-              onTap: canEdit ? () => _showReschedule(context) : null,
+              onTap: canEdit ? () => _tapReschedule(context) : null,
               child: Container(
                 padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 6),
                 decoration: BoxDecoration(color: const Color(0xFFE3F2FD), borderRadius: BorderRadius.circular(8)),
@@ -416,9 +449,15 @@ class PackageCard extends StatelessWidget {
                   Text(pkg.scheduleLabel, style: const TextStyle(fontSize: 13, color: Color(0xFFF97316), fontWeight: FontWeight.w600)),
                   if (canEdit) ...[
                     const Spacer(),
-                    const Icon(Icons.edit_calendar, size: 14, color: Color(0xFFF97316)),
-                    const SizedBox(width: 4),
-                    const Text('ย้าย', style: TextStyle(fontSize: 11, color: Color(0xFFF97316))),
+                    if (_scheduleStarted) ...[
+                      Icon(Icons.lock_clock, size: 14, color: Colors.grey.shade500),
+                      const SizedBox(width: 4),
+                      Text('เลยเวลา', style: TextStyle(fontSize: 11, color: Colors.grey.shade500)),
+                    ] else ...[
+                      const Icon(Icons.edit_calendar, size: 14, color: Color(0xFFF97316)),
+                      const SizedBox(width: 4),
+                      const Text('ย้าย', style: TextStyle(fontSize: 11, color: Color(0xFFF97316))),
+                    ],
                   ],
                 ]),
               ),
