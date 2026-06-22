@@ -1,6 +1,7 @@
 ﻿import 'package:flutter/material.dart';
 // ignore: avoid_web_libraries_in_flutter
 import 'dart:html' as html;
+import 'package:cloud_firestore/cloud_firestore.dart';
 import '../models/models.dart';
 import '../services/firestore_service.dart';
 import '../utils/date_format.dart';
@@ -273,6 +274,8 @@ class PackageCard extends StatelessWidget {
               if (day != null) 'scheduledDay': day,
               if (startTime != null) 'scheduledTime': _fmtTime(startTime!),
               if (endTime != null) 'scheduledEndTime': _fmtTime(endTime!),
+              // ย้ายวันแบบประจำ → ล้างวันที่เจาะจงให้ข้อมูลไม่ขัดกัน
+              if (pkg.scheduledDate != null) 'scheduledDate': FieldValue.delete(),
             };
             if (data.isNotEmpty) await FirestoreService.updatePackageFields(pkg.id, data);
           },
@@ -609,7 +612,9 @@ class _TeacherGroupView extends StatelessWidget {
             children: sorted.asMap().entries.map((e) => _StudentScheduleRow(
               index: e.key + 1,
               pkg: e.value,
-              dateLabel: _formatDate(e.value.scheduledDay),
+              dateLabel: (e.value.scheduledDate != null && e.value.scheduledDate!.isNotEmpty)
+                  ? thaiDateFromStr(e.value.scheduledDate!)
+                  : _formatDate(e.value.scheduledDay),
             )).toList(),
           ),
         );

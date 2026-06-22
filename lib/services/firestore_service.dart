@@ -62,6 +62,9 @@ class FirestoreService {
         .map((s) {
       return s.docs.map(PackageModel.fromDoc).where((pkg) {
         if (pkg.scheduledEndTime == null) return false;
+        // ถ้าตั้งวันที่เจาะจงไว้ ให้ตัดเฉพาะวันนั้นเท่านั้น (ไม่ใช่ทุก weekday ที่ตรง)
+        if (pkg.scheduledDate != null && pkg.scheduledDate!.isNotEmpty &&
+            pkg.scheduledDate != todayStr) return false;
         // show if already cut today OR still has sessions to cut
         final cutToday = pkg.lastCutDate == todayStr;
         if (!cutToday && pkg.remainingSessions <= 0) return false;

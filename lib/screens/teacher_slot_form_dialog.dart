@@ -1,6 +1,7 @@
 ﻿import 'package:flutter/material.dart';
 import '../models/models.dart';
 import '../services/firestore_service.dart';
+import '../utils/date_format.dart';
 
 const _kGreen = Color(0xFF2E7D32);
 
@@ -29,6 +30,7 @@ class _TeacherSlotSheetState extends State<_TeacherSlotSheet> {
 
   // New slot form state
   String? _newDay;
+  DateTime? _newDate;
   TimeOfDay? _newStart;
   TimeOfDay? _newEnd;
 
@@ -57,11 +59,32 @@ class _TeacherSlotSheetState extends State<_TeacherSlotSheet> {
       return;
     }
     setState(() {
-      _slots.add(SlotItem(day: _newDay!, startTime: _fmt(_newStart!), endTime: _fmt(_newEnd!)));
+      _slots.add(SlotItem(
+        day: _newDay!,
+        startTime: _fmt(_newStart!),
+        endTime: _fmt(_newEnd!),
+        date: _newDate != null ? toStorageDateStr(_newDate!) : null,
+      ));
       _newDay = null;
+      _newDate = null;
       _newStart = null;
       _newEnd = null;
     });
+  }
+
+  Future<void> _pickNewDate() async {
+    final d = await showDatePicker(
+      context: context,
+      initialDate: _newDate ?? DateTime.now(),
+      firstDate: DateTime(2020),
+      lastDate: DateTime(2030),
+    );
+    if (d != null) {
+      setState(() {
+        _newDate = d;
+        _newDay = thaiDayAbbr(d); // วันคำนวณอัตโนมัติจากวันที่
+      });
+    }
   }
 
   Future<void> _save() async {
@@ -198,8 +221,17 @@ class _TeacherSlotSheetState extends State<_TeacherSlotSheet> {
                         ),
                       ),
                       const SizedBox(width: 10),
-                      Expanded(child: Text('${s.startTime} – ${s.endTime}',
-                          style: const TextStyle(fontSize: 15, fontWeight: FontWeight.w600, color: _kGreen))),
+                      Expanded(child: Column(
+                        crossAxisAlignment: CrossAxisAlignment.start,
+                        mainAxisSize: MainAxisSize.min,
+                        children: [
+                          Text('${s.startTime} – ${s.endTime}',
+                              style: const TextStyle(fontSize: 15, fontWeight: FontWeight.w600, color: _kGreen)),
+                          if (s.date != null && s.date!.isNotEmpty)
+                            Text(thaiDateFromStr(s.date!),
+                                style: const TextStyle(fontSize: 11, color: Color(0xFF558B2F))),
+                        ],
+                      )),
                       IconButton(
                         onPressed: () => setState(() => _slots.removeAt(i)),
                         icon: const Icon(Icons.delete_outline, color: Colors.red, size: 20),
@@ -229,13 +261,58 @@ class _TeacherSlotSheetState extends State<_TeacherSlotSheet> {
                   ]),
                   const SizedBox(height: 12),
 
+                  // Date picker (optional — เลือกวันที่แล้ววันจะคำนวณให้)
+                  const Text('วันที่ (ถ้าระบุ วันจะคำนวณให้อัตโนมัติ)',
+                      style: TextStyle(fontSize: 12, color: Colors.grey)),
+                  const SizedBox(height: 6),
+                  GestureDetector(
+                    onTap: _pickNewDate,
+                    child: Container(
+                      width: double.infinity,
+                      padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 12),
+                      decoration: BoxDecoration(
+                        color: _newDate != null ? const Color(0xFFE3F2FD) : Colors.white,
+                        borderRadius: BorderRadius.circular(10),
+                        border: Border.all(
+                            color: _newDate != null
+                                ? const Color(0xFFF97316).withAlpha(100)
+                                : Colors.grey.shade300),
+                      ),
+                      child: Row(children: [
+                        Icon(Icons.calendar_month,
+                            size: 18,
+                            color: _newDate != null ? const Color(0xFFF97316) : Colors.grey),
+                        const SizedBox(width: 10),
+                        Expanded(
+                          child: Text(
+                            _newDate != null ? thaiDateFull(_newDate!) : 'แตะเพื่อเลือกวันที่ (ไม่บังคับ)',
+                            style: TextStyle(
+                              fontSize: 14,
+                              fontWeight: _newDate != null ? FontWeight.w600 : FontWeight.normal,
+                              color: _newDate != null ? const Color(0xFFF97316) : Colors.grey,
+                            ),
+                          ),
+                        ),
+                        if (_newDate != null)
+                          GestureDetector(
+                            onTap: () => setState(() => _newDate = null),
+                            child: const Icon(Icons.clear, size: 18, color: Colors.grey),
+                          ),
+                      ]),
+                    ),
+                  ),
+                  const SizedBox(height: 12),
+
                   // Day selector
                   const Text('วัน', style: TextStyle(fontSize: 12, color: Colors.grey)),
                   const SizedBox(height: 6),
                   Wrap(
                     spacing: 6, runSpacing: 6,
                     children: PackageModel.days.map((d) => GestureDetector(
-                      onTap: () => setState(() => _newDay = _newDay == d ? null : d),
+                      onTap: () => setState(() {
+                        _newDay = _newDay == d ? null : d;
+                        _newDate = null; // เลือกวันเองแบบประจำ → ล้างวันที่เจาะจง
+                      }),
                       child: AnimatedContainer(
                         duration: const Duration(milliseconds: 150),
                         width: 40, height: 40,

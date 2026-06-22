@@ -2,6 +2,7 @@
 import 'package:cloud_firestore/cloud_firestore.dart';
 import '../models/models.dart';
 import '../services/firestore_service.dart';
+import '../utils/date_format.dart';
 
 Future<void> showPackageForm(BuildContext context, {PackageModel? existing, String? preselectedStudentId}) {
   return showModalBottomSheet(
@@ -32,6 +33,7 @@ class _PackageFormSheetState extends State<_PackageFormSheet> {
   UserModel? _teacher;
 
   String? _scheduledDay;
+  DateTime? _scheduledDate;
   TimeOfDay? _startTime;
   TimeOfDay? _endTime;
   TeacherSlotModel? _teacherSlot;
@@ -52,6 +54,7 @@ class _PackageFormSheetState extends State<_PackageFormSheet> {
       _usedCtrl.text = p.usedSessions.toString();
       _notesCtrl.text = p.notes ?? '';
       _scheduledDay = p.scheduledDay;
+      if (p.scheduledDate != null) _scheduledDate = parseDateStr(p.scheduledDate!);
       if (p.scheduledTime != null) _startTime = _parseTime(p.scheduledTime!);
       if (p.scheduledEndTime != null) _endTime = _parseTime(p.scheduledEndTime!);
     }
@@ -81,13 +84,25 @@ class _PackageFormSheetState extends State<_PackageFormSheet> {
     return _takenSlotPackages.any((p) =>
         p.scheduledDay == s.day &&
         p.scheduledTime == s.startTime &&
-        p.scheduledEndTime == s.endTime);
+        p.scheduledEndTime == s.endTime &&
+        (p.scheduledDate ?? '') == (s.date ?? ''));
   }
 
   bool _isSlotPast(SlotItem s) {
     final now = DateTime.now();
-    const dayMap = {'อา': 7, 'จ': 1, 'อ': 2, 'พ': 3, 'พฤ': 4, 'ศ': 5, 'ส': 6};
-    if (dayMap[s.day] != now.weekday) return false;
+    // slot ที่ระบุวันที่เจาะจง
+    if (s.date != null && s.date!.isNotEmpty) {
+      final d = parseDateStr(s.date!);
+      if (d == null) return false;
+      final today = DateTime(now.year, now.month, now.day);
+      final slotDay = DateTime(d.year, d.month, d.day);
+      if (slotDay.isBefore(today)) return true;   // วันที่ผ่านมาแล้ว
+      if (slotDay.isAfter(today)) return false;    // ยังไม่ถึง
+      // วันนี้ → เทียบเวลา
+    } else {
+      const dayMap = {'อา': 7, 'จ': 1, 'อ': 2, 'พ': 3, 'พฤ': 4, 'ศ': 5, 'ส': 6};
+      if (dayMap[s.day] != now.weekday) return false;
+    }
     try {
       final ref = s.endTime.isNotEmpty ? s.endTime : s.startTime;
       final p = ref.split(':');
@@ -131,6 +146,21 @@ class _PackageFormSheetState extends State<_PackageFormSheet> {
 
   String _fmtTime(TimeOfDay t) => '${t.hour.toString().padLeft(2,'0')}:${t.minute.toString().padLeft(2,'0')}';
 
+  Future<void> _pickScheduledDate() async {
+    final d = await showDatePicker(
+      context: context,
+      initialDate: _scheduledDate ?? DateTime.now(),
+      firstDate: DateTime(2020),
+      lastDate: DateTime(2030),
+    );
+    if (d != null) {
+      setState(() {
+        _scheduledDate = d;
+        _scheduledDay = thaiDayAbbr(d); // วันคำนวณอัตโนมัติจากวันที่
+      });
+    }
+  }
+
   // Auto-calculate remaining = total - used
   int get _calcRemaining {
     final total = int.tryParse(_totalCtrl.text) ?? 0;
@@ -154,6 +184,7 @@ class _PackageFormSheetState extends State<_PackageFormSheet> {
       'remainingSessions': _calcRemaining,
       'status': 'active',
       if (_scheduledDay != null) 'scheduledDay': _scheduledDay,
+      if (_scheduledDate != null) 'scheduledDate': toStorageDateStr(_scheduledDate!),
       if (_startTime != null) 'scheduledTime': _fmtTime(_startTime!),
       if (_endTime != null) 'scheduledEndTime': _fmtTime(_endTime!),
       if (_notesCtrl.text.isNotEmpty) 'notes': _notesCtrl.text.trim(),
@@ -286,6 +317,8 @@ class _PackageFormSheetState extends State<_PackageFormSheet> {
                                   return GestureDetector(
                                     onTap: disabled ? null : () => setState(() {
                                       _scheduledDay = s.day;
+                                      _scheduledDate = (s.date != null && s.date!.isNotEmpty)
+                                          ? parseDateStr(s.date!) : null;
                                       _startTime = _parseTime(s.startTime);
                                       _endTime = _parseTime(s.endTime);
                                     }),
@@ -313,7 +346,8 @@ class _PackageFormSheetState extends State<_PackageFormSheet> {
                                             padding: EdgeInsets.only(right: 4),
                                             child: Icon(Icons.history, size: 12, color: Colors.orange),
                                           ),
-                                        Text('${s.day}  ${s.startTime}–${s.endTime}',
+                                        Text(
+                                            '${(s.date != null && s.date!.isNotEmpty) ? '${thaiShortDateFromStr(s.date!)} ' : ''}${s.day}  ${s.startTime}–${s.endTime}',
                                             style: TextStyle(
                                               fontSize: 12,
                                               color: taken
@@ -349,13 +383,59 @@ class _PackageFormSheetState extends State<_PackageFormSheet> {
                       ],
                       const SizedBox(height: 14),
 
+                      // ── วันที่ (ไม่บังคับ — ถ้าระบุ วันจะคำนวณให้) ──
+                      _label('🗓️ วันที่ (ถ้าระบุ วันจะคำนวณให้อัตโนมัติ)'),
+                      const SizedBox(height: 8),
+                      GestureDetector(
+                        onTap: _pickScheduledDate,
+                        child: Container(
+                          width: double.infinity,
+                          padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 12),
+                          decoration: BoxDecoration(
+                            color: _scheduledDate != null ? const Color(0xFFE3F2FD) : Colors.grey.shade50,
+                            borderRadius: BorderRadius.circular(10),
+                            border: Border.all(
+                                color: _scheduledDate != null
+                                    ? const Color(0xFFF97316).withAlpha(100)
+                                    : Colors.grey.shade300),
+                          ),
+                          child: Row(children: [
+                            Icon(Icons.calendar_month,
+                                size: 18,
+                                color: _scheduledDate != null ? const Color(0xFFF97316) : Colors.grey),
+                            const SizedBox(width: 10),
+                            Expanded(
+                              child: Text(
+                                _scheduledDate != null
+                                    ? thaiDateFull(_scheduledDate!)
+                                    : 'แตะเพื่อเลือกวันที่ (ไม่บังคับ)',
+                                style: TextStyle(
+                                  fontSize: 14,
+                                  fontWeight: _scheduledDate != null ? FontWeight.w600 : FontWeight.normal,
+                                  color: _scheduledDate != null ? const Color(0xFFF97316) : Colors.grey,
+                                ),
+                              ),
+                            ),
+                            if (_scheduledDate != null)
+                              GestureDetector(
+                                onTap: () => setState(() => _scheduledDate = null),
+                                child: const Icon(Icons.clear, size: 18, color: Colors.grey),
+                              ),
+                          ]),
+                        ),
+                      ),
+                      const SizedBox(height: 14),
+
                       // ── วัน ──
                       _label('📅 วันเรียนประจำ'),
                       const SizedBox(height: 8),
                       Wrap(
                         spacing: 8, runSpacing: 6,
                         children: PackageModel.days.map((d) => GestureDetector(
-                          onTap: () => setState(() => _scheduledDay = _scheduledDay == d ? null : d),
+                          onTap: () => setState(() {
+                            _scheduledDay = _scheduledDay == d ? null : d;
+                            _scheduledDate = null; // เลือกวันเองแบบประจำ → ล้างวันที่เจาะจง
+                          }),
                           child: AnimatedContainer(
                             duration: const Duration(milliseconds: 150),
                             width: 44, height: 44,

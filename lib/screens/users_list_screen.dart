@@ -299,7 +299,9 @@ class _UserList extends StatelessWidget {
                           bool endedToday = false;
                           for (final p in pkgs) {
                             if (p.scheduledDay == null || p.scheduledTime == null) continue;
-                            if (dayMap[p.scheduledDay] != now.weekday) continue;
+                            if (p.scheduledDate != null && p.scheduledDate!.isNotEmpty) {
+                              if (p.scheduledDate != todayStr) continue;
+                            } else if (dayMap[p.scheduledDay] != now.weekday) continue;
                             try {
                               final ep = (p.scheduledEndTime ?? p.scheduledTime!).split(':');
                               final endM = int.parse(ep[0]) * 60 + int.parse(ep[1]);
@@ -318,7 +320,9 @@ class _UserList extends StatelessWidget {
                         // ── รอตัดคาบ: วันตรง + เวลาผ่านแล้ว + ยังไม่ตัดวันนี้ ──
                         for (final p in pkgs) {
                           if (p.scheduledDay == null || p.scheduledTime == null) continue;
-                          if (dayMap[p.scheduledDay] != now.weekday) continue;
+                          if (p.scheduledDate != null && p.scheduledDate!.isNotEmpty) {
+                            if (p.scheduledDate != todayStr) continue;
+                          } else if (dayMap[p.scheduledDay] != now.weekday) continue;
                           if (p.remainingSessions <= 0) continue;
                           if (p.lastCutDate == todayStr) continue;
                           try {

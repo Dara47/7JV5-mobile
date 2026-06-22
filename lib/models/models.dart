@@ -58,6 +58,7 @@ class PackageModel {
   final int remainingSessions;
   final String status;
   final String? scheduledDay;      // 'อา','จ','อ','พ','พฤ','ศ','ส'
+  final String? scheduledDate;     // 'YYYY-MM-DD' (วันที่เจาะจง — optional)
   final String? scheduledTime;     // '16:00'
   final String? scheduledEndTime;  // '17:00'
   final String? notes;
@@ -68,7 +69,7 @@ class PackageModel {
     required this.studentName, required this.teacherName, required this.studentCode,
     required this.teacherCode, required this.totalSessions,
     required this.remainingSessions, required this.status,
-    this.scheduledDay, this.scheduledTime, this.scheduledEndTime, this.notes,
+    this.scheduledDay, this.scheduledDate, this.scheduledTime, this.scheduledEndTime, this.notes,
     this.lastCutDate,
   });
 
@@ -90,17 +91,25 @@ class PackageModel {
   }
 
   String get scheduleLabel {
-    if (scheduledDay == null) return '-';
+    if (scheduledDay == null && scheduledDate == null) return '-';
+    final datePart = (scheduledDate != null && scheduledDate!.isNotEmpty)
+        ? '${thaiShortDateFromStr(scheduledDate!)} ' : '';
     final t = scheduledTime ?? '';
     final e = scheduledEndTime != null ? '–$scheduledEndTime' : '';
-    return '$scheduledDay  $t$e';
+    return '$datePart${scheduledDay ?? ''}  $t$e'.trim();
   }
 
   bool get isCurrentlyInSession {
     if (scheduledDay == null || scheduledTime == null) return false;
     final now = DateTime.now();
-    const dayMap = {'อา': 7, 'จ': 1, 'อ': 2, 'พ': 3, 'พฤ': 4, 'ศ': 5, 'ส': 6};
-    if (dayMap[scheduledDay] != now.weekday) return false;
+    // ถ้ามีวันที่เจาะจง ต้องตรงวันนั้นเป๊ะ
+    if (scheduledDate != null && scheduledDate!.isNotEmpty) {
+      final today = '${now.year}-${now.month.toString().padLeft(2, '0')}-${now.day.toString().padLeft(2, '0')}';
+      if (scheduledDate != today) return false;
+    } else {
+      const dayMap = {'อา': 7, 'จ': 1, 'อ': 2, 'พ': 3, 'พฤ': 4, 'ศ': 5, 'ส': 6};
+      if (dayMap[scheduledDay] != now.weekday) return false;
+    }
     try {
       final sp = scheduledTime!.split(':');
       final startM = int.parse(sp[0]) * 60 + int.parse(sp[1]);
@@ -124,7 +133,8 @@ class PackageModel {
       studentCode: d['studentCode'] ?? '', teacherCode: d['teacherCode'] ?? '',
       totalSessions: d['totalSessions'] ?? 0, remainingSessions: d['remainingSessions'] ?? 0,
       status: d['status'] ?? 'active',
-      scheduledDay: d['scheduledDay'], scheduledTime: d['scheduledTime'],
+      scheduledDay: d['scheduledDay'], scheduledDate: d['scheduledDate'],
+      scheduledTime: d['scheduledTime'],
       scheduledEndTime: d['scheduledEndTime'], notes: d['notes'],
       lastCutDate: d['lastCutDate'],
     );
@@ -137,6 +147,7 @@ class PackageModel {
     'totalSessions': totalSessions, 'remainingSessions': remainingSessions,
     'status': status,
     if (scheduledDay != null) 'scheduledDay': scheduledDay,
+    if (scheduledDate != null) 'scheduledDate': scheduledDate,
     if (scheduledTime != null) 'scheduledTime': scheduledTime,
     if (scheduledEndTime != null) 'scheduledEndTime': scheduledEndTime,
     if (notes != null && notes!.isNotEmpty) 'notes': notes,
@@ -292,13 +303,20 @@ class SlotItem {
   final String day;
   final String startTime;
   final String endTime;
+  final String? date; // 'YYYY-MM-DD' (วันที่เจาะจง — optional)
 
-  const SlotItem({required this.day, required this.startTime, required this.endTime});
+  const SlotItem({required this.day, required this.startTime, required this.endTime, this.date});
 
   bool get isCurrentlyActive {
     final now = DateTime.now();
-    const dayMap = {'อา': 7, 'จ': 1, 'อ': 2, 'พ': 3, 'พฤ': 4, 'ศ': 5, 'ส': 6};
-    if (dayMap[day] != now.weekday) return false;
+    // ถ้ามีวันที่เจาะจง ต้องตรงวันนั้นเป๊ะ
+    if (date != null && date!.isNotEmpty) {
+      final today = '${now.year}-${now.month.toString().padLeft(2, '0')}-${now.day.toString().padLeft(2, '0')}';
+      if (date != today) return false;
+    } else {
+      const dayMap = {'อา': 7, 'จ': 1, 'อ': 2, 'พ': 3, 'พฤ': 4, 'ศ': 5, 'ส': 6};
+      if (dayMap[day] != now.weekday) return false;
+    }
     try {
       final sp = startTime.split(':');
       final ep = endTime.split(':');
@@ -309,12 +327,16 @@ class SlotItem {
     } catch (_) { return false; }
   }
 
-  Map<String, dynamic> toMap() => {'day': day, 'startTime': startTime, 'endTime': endTime};
+  Map<String, dynamic> toMap() => {
+    'day': day, 'startTime': startTime, 'endTime': endTime,
+    if (date != null && date!.isNotEmpty) 'date': date,
+  };
 
   factory SlotItem.fromMap(Map<String, dynamic> m) => SlotItem(
     day: m['day'] as String? ?? '',
     startTime: m['startTime'] as String? ?? '',
     endTime: m['endTime'] as String? ?? '',
+    date: m['date'] as String?,
   );
 }
 
@@ -334,7 +356,11 @@ class TeacherSlotModel {
 
   String get scheduleLabel {
     if (slots.isEmpty) return 'ยังไม่ได้ตั้งเวลา';
-    return slots.map((s) => '${s.day} ${s.startTime}–${s.endTime}').join(' / ');
+    return slots.map((s) {
+      final datePart = (s.date != null && s.date!.isNotEmpty)
+          ? '${thaiShortDateFromStr(s.date!)} ' : '';
+      return '$datePart${s.day} ${s.startTime}–${s.endTime}';
+    }).join(' / ');
   }
 
   factory TeacherSlotModel.fromDoc(DocumentSnapshot doc) {

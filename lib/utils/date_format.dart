@@ -10,7 +10,34 @@ const _thaiDayFull = {
   7: 'อาทิตย์',
 };
 
+/// ตัวย่อวันไทยตรงกับที่ใช้ใน Firestore ('อา','จ','อ','พ','พฤ','ศ','ส')
+const _thaiDayAbbr = {
+  1: 'จ',
+  2: 'อ',
+  3: 'พ',
+  4: 'พฤ',
+  5: 'ศ',
+  6: 'ส',
+  7: 'อา',
+};
+
 String _pad(int n) => n.toString().padLeft(2, '0');
+
+/// DateTime → ตัวย่อวันไทย เช่น อาทิตย์ → 'อา'
+String thaiDayAbbr(DateTime d) => _thaiDayAbbr[d.weekday] ?? '';
+
+/// "2025-06-21" → 'อา' (คืน '' ถ้าแปลงไม่ได้)
+String thaiDayAbbrFromStr(String dateStr) {
+  final d = parseDateStr(dateStr);
+  return d != null ? thaiDayAbbr(d) : '';
+}
+
+/// "2025-06-21" → "21/06/2569" (สั้น ไม่มีชื่อวัน)
+String thaiShortDateFromStr(String dateStr) {
+  final d = parseDateStr(dateStr);
+  if (d == null) return dateStr;
+  return '${_pad(d.day)}/${_pad(d.month)}/${d.year + 543}';
+}
 
 /// "วันอาทิตย์ที่ 21/06/2569"
 String thaiDateFull(DateTime d) {
