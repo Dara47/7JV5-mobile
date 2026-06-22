@@ -226,37 +226,117 @@ class PackageCard extends StatelessWidget {
     ));
   }
 
-  void _tapReschedule(BuildContext context) {
-    // เงื่อนไข: ย้ายคาบได้เฉพาะก่อนถึงเวลาเรียนเท่านั้น
-    if (_scheduleStarted) {
-      ScaffoldMessenger.of(context).showSnackBar(const SnackBar(
-        content: Text('ย้ายคาบได้เฉพาะก่อนถึงเวลาเรียนเท่านั้น (คาบนี้เลยเวลาแล้ว)'),
-        backgroundColor: Colors.redAccent,
-      ));
-      return;
-    }
-    _showReschedule(context);
-  }
+  void _tapReschedule(BuildContext context) => _showReschedule(context);
 
+  /// ตัวจัดการหลายช่วงเวลา — ย้าย/ลบ แต่ละ slot, ล็อกเฉพาะช่วงที่เลยเวลาแล้ว
   void _showReschedule(BuildContext context) {
-    String? day = pkg.scheduledDay;
-    DateTime? date = pkg.scheduledDate != null ? parseDateStr(pkg.scheduledDate!) : null;
-    TimeOfDay? startTime = pkg.scheduledTime != null ? _parseTime(pkg.scheduledTime!) : null;
-    TimeOfDay? endTime = pkg.scheduledEndTime != null ? _parseTime(pkg.scheduledEndTime!) : null;
-
+    List<SlotItem> slots = List.from(pkg.effectiveSlots);
     showDialog(context: context, builder: (ctx) => StatefulBuilder(builder: (ctx, setS) => AlertDialog(
       title: const Text('📅 ย้ายวัน/เวลาเรียน'),
+      content: SizedBox(
+        width: double.maxFinite,
+        child: slots.isEmpty
+            ? const Padding(padding: EdgeInsets.symmetric(vertical: 12),
+                child: Text('ยังไม่มีช่วงเวลา', style: TextStyle(color: Colors.grey)))
+            : Column(mainAxisSize: MainAxisSize.min, children: List.generate(slots.length, (i) {
+                final s = slots[i];
+                final past = _slotStarted(s);
+                return Container(
+                  margin: const EdgeInsets.only(bottom: 8),
+                  padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 8),
+                  decoration: BoxDecoration(
+                    color: past ? Colors.grey.shade100 : const Color(0xFFE3F2FD),
+                    borderRadius: BorderRadius.circular(10),
+                    border: Border.all(color: past ? Colors.grey.shade300 : const Color(0xFFF97316).withAlpha(80)),
+                  ),
+                  child: Row(children: [
+                    Container(
+                      width: 32, height: 32,
+                      decoration: BoxDecoration(color: past ? Colors.grey.shade400 : const Color(0xFFF97316), shape: BoxShape.circle),
+                      child: Center(child: Text(s.day, style: const TextStyle(color: Colors.white, fontSize: 12, fontWeight: FontWeight.bold))),
+                    ),
+                    const SizedBox(width: 8),
+                    Expanded(child: Column(crossAxisAlignment: CrossAxisAlignment.start, mainAxisSize: MainAxisSize.min, children: [
+                      Text('${s.startTime}–${s.endTime}',
+                          style: TextStyle(fontSize: 14, fontWeight: FontWeight.w600,
+                              color: past ? Colors.grey.shade600 : const Color(0xFFF97316))),
+                      if (s.date != null && s.date!.isNotEmpty)
+                        Text(thaiShortDateFromStr(s.date!), style: TextStyle(fontSize: 10, color: Colors.grey.shade600)),
+                    ])),
+                    if (past)
+                      Padding(padding: const EdgeInsets.symmetric(horizontal: 6),
+                          child: Row(mainAxisSize: MainAxisSize.min, children: [
+                            Icon(Icons.lock_clock, size: 13, color: Colors.grey.shade500),
+                            const SizedBox(width: 2),
+                            Text('เลยเวลา', style: TextStyle(fontSize: 10, color: Colors.grey.shade500)),
+                          ]))
+                    else
+                      IconButton(
+                        tooltip: 'ย้ายช่วงนี้',
+                        icon: const Icon(Icons.edit_calendar, size: 18, color: Color(0xFFF97316)),
+                        onPressed: () async {
+                          final edited = await _editSlotDialog(ctx, s);
+                          if (edited != null) setS(() => slots[i] = edited);
+                        },
+                      ),
+                    IconButton(
+                      tooltip: 'ลบช่วงนี้',
+                      icon: const Icon(Icons.delete_outline, size: 18, color: Colors.red),
+                      onPressed: () => setS(() => slots.removeAt(i)),
+                    ),
+                  ]),
+                );
+              })),
+      ),
+      actions: [
+        TextButton(onPressed: () => Navigator.pop(ctx), child: const Text('ยกเลิก')),
+        ElevatedButton(
+          onPressed: () async {
+            Navigator.pop(ctx);
+            final Map<String, dynamic> data;
+            if (slots.isEmpty) {
+              data = {
+                'slots': <Map<String, dynamic>>[],
+                'scheduledDay': FieldValue.delete(),
+                'scheduledTime': FieldValue.delete(),
+                'scheduledEndTime': FieldValue.delete(),
+                'scheduledDate': FieldValue.delete(),
+              };
+            } else {
+              final f = slots.first;
+              data = {
+                'slots': slots.map((s) => s.toMap()).toList(),
+                'scheduledDay': f.day,
+                'scheduledTime': f.startTime,
+                'scheduledEndTime': f.endTime,
+                'scheduledDate': (f.date != null && f.date!.isNotEmpty) ? f.date : FieldValue.delete(),
+              };
+            }
+            await FirestoreService.updatePackageFields(pkg.id, data);
+          },
+          style: ElevatedButton.styleFrom(backgroundColor: const Color(0xFFF97316), foregroundColor: Colors.white),
+          child: const Text('บันทึก'),
+        ),
+      ],
+    )));
+  }
+
+  /// แก้ไขช่วงเวลา 1 slot (วัน/วันที่/เวลา) — คืน SlotItem ใหม่หรือ null ถ้ายกเลิก
+  Future<SlotItem?> _editSlotDialog(BuildContext context, SlotItem initial) {
+    String? day = initial.day.isNotEmpty ? initial.day : null;
+    DateTime? date = (initial.date != null && initial.date!.isNotEmpty) ? parseDateStr(initial.date!) : null;
+    TimeOfDay? startTime = initial.startTime.isNotEmpty ? _parseTime(initial.startTime) : null;
+    TimeOfDay? endTime = initial.endTime.isNotEmpty ? _parseTime(initial.endTime) : null;
+
+    return showDialog<SlotItem>(context: context, builder: (ctx) => StatefulBuilder(builder: (ctx, setS) => AlertDialog(
+      title: const Text('ย้ายช่วงเวลา'),
       content: Column(mainAxisSize: MainAxisSize.min, crossAxisAlignment: CrossAxisAlignment.start, children: [
-        // Date picker (เลือกวันที่ → วันคำนวณอัตโนมัติ)
         const Text('วันที่ (ถ้าระบุ วันจะคำนวณให้)', style: TextStyle(fontSize: 12, color: Colors.grey)),
         const SizedBox(height: 6),
         GestureDetector(
           onTap: () async {
-            final d = await showDatePicker(
-              context: ctx,
-              initialDate: date ?? nowThai(),
-              firstDate: DateTime(2020), lastDate: DateTime(2030),
-            );
+            final d = await showDatePicker(context: ctx, initialDate: date ?? nowThai(),
+                firstDate: DateTime(2020), lastDate: DateTime(2030));
             if (d != null) setS(() { date = d; day = thaiDayAbbr(d); });
           },
           child: Container(
@@ -270,74 +350,56 @@ class PackageCard extends StatelessWidget {
             child: Row(children: [
               Icon(Icons.calendar_month, size: 18, color: date != null ? const Color(0xFFF97316) : Colors.grey),
               const SizedBox(width: 8),
-              Expanded(child: Text(
-                date != null ? thaiDateFull(date!) : 'แตะเพื่อเลือกวันที่ (ไม่บังคับ)',
-                style: TextStyle(
-                  fontSize: 13,
-                  fontWeight: date != null ? FontWeight.w600 : FontWeight.normal,
-                  color: date != null ? const Color(0xFFF97316) : Colors.grey,
-                ),
-              )),
+              Expanded(child: Text(date != null ? thaiDateFull(date!) : 'แตะเพื่อเลือกวันที่ (ไม่บังคับ)',
+                  style: TextStyle(fontSize: 13, fontWeight: date != null ? FontWeight.w600 : FontWeight.normal,
+                      color: date != null ? const Color(0xFFF97316) : Colors.grey))),
               if (date != null)
-                GestureDetector(
-                  onTap: () => setS(() => date = null),
-                  child: const Icon(Icons.clear, size: 18, color: Colors.grey),
-                ),
+                GestureDetector(onTap: () => setS(() => date = null), child: const Icon(Icons.clear, size: 18, color: Colors.grey)),
             ]),
           ),
         ),
         const SizedBox(height: 12),
         const Text('วัน', style: TextStyle(fontSize: 12, color: Colors.grey)),
         const SizedBox(height: 6),
-        // Day chips
         Wrap(spacing: 6, children: PackageModel.days.map((d) => ChoiceChip(
           label: Text(d),
           selected: day == d,
-          onSelected: (_) => setS(() { day = d; date = null; }), // เลือกวันเอง → ล้างวันที่เจาะจง
+          onSelected: (_) => setS(() { day = d; date = null; }),
           selectedColor: const Color(0xFFF97316),
           labelStyle: TextStyle(color: day == d ? Colors.white : Colors.black87, fontWeight: FontWeight.bold),
         )).toList()),
         const SizedBox(height: 12),
         Row(children: [
-          Expanded(child: _TimeTile(
-            label: 'เริ่ม',
-            time: startTime,
-            onTap: () async {
-              final t = await showTimePicker(context: ctx, initialTime: startTime ?? const TimeOfDay(hour: 9, minute: 0),
-                  builder: (c, child) => MediaQuery(data: MediaQuery.of(c).copyWith(alwaysUse24HourFormat: true), child: child!));
-              if (t != null) setS(() => startTime = t);
-            },
-          )),
+          Expanded(child: _TimeTile(label: 'เริ่ม', time: startTime, onTap: () async {
+            final t = await showTimePicker(context: ctx, initialTime: startTime ?? const TimeOfDay(hour: 9, minute: 0),
+                builder: (c, child) => MediaQuery(data: MediaQuery.of(c).copyWith(alwaysUse24HourFormat: true), child: child!));
+            if (t != null) setS(() => startTime = t);
+          })),
           const SizedBox(width: 8),
-          Expanded(child: _TimeTile(
-            label: 'สิ้นสุด',
-            time: endTime,
-            onTap: () async {
-              final t = await showTimePicker(context: ctx, initialTime: endTime ?? const TimeOfDay(hour: 10, minute: 0),
-                  builder: (c, child) => MediaQuery(data: MediaQuery.of(c).copyWith(alwaysUse24HourFormat: true), child: child!));
-              if (t != null) setS(() => endTime = t);
-            },
-          )),
+          Expanded(child: _TimeTile(label: 'สิ้นสุด', time: endTime, onTap: () async {
+            final t = await showTimePicker(context: ctx, initialTime: endTime ?? const TimeOfDay(hour: 10, minute: 0),
+                builder: (c, child) => MediaQuery(data: MediaQuery.of(c).copyWith(alwaysUse24HourFormat: true), child: child!));
+            if (t != null) setS(() => endTime = t);
+          })),
         ]),
       ]),
       actions: [
         TextButton(onPressed: () => Navigator.pop(ctx), child: const Text('ยกเลิก')),
         ElevatedButton(
-          onPressed: () async {
-            Navigator.pop(ctx);
-            final data = <String, dynamic>{
-              if (day != null) 'scheduledDay': day,
-              if (startTime != null) 'scheduledTime': _fmtTime(startTime!),
-              if (endTime != null) 'scheduledEndTime': _fmtTime(endTime!),
-              if (date != null)
-                'scheduledDate': toStorageDateStr(date!)
-              else if (pkg.scheduledDate != null)
-                'scheduledDate': FieldValue.delete(), // ล้างวันที่เจาะจงเดิม
-            };
-            if (data.isNotEmpty) await FirestoreService.updatePackageFields(pkg.id, data);
+          onPressed: () {
+            if (day == null || startTime == null) {
+              ScaffoldMessenger.of(ctx).showSnackBar(const SnackBar(content: Text('กรุณาเลือกวันและเวลาเริ่ม')));
+              return;
+            }
+            Navigator.pop(ctx, SlotItem(
+              day: day!,
+              startTime: _fmtTime(startTime!),
+              endTime: endTime != null ? _fmtTime(endTime!) : _fmtTime(startTime!),
+              date: date != null ? toStorageDateStr(date!) : null,
+            ));
           },
           style: ElevatedButton.styleFrom(backgroundColor: const Color(0xFFF97316), foregroundColor: Colors.white),
-          child: const Text('บันทึก'),
+          child: const Text('ตกลง'),
         ),
       ],
     )));
@@ -354,26 +416,28 @@ class PackageCard extends StatelessWidget {
 
   String _fmtTime(TimeOfDay t) => '${t.hour.toString().padLeft(2,'0')}:${t.minute.toString().padLeft(2,'0')}';
 
-  /// คาบนี้ถึง/เลยเวลาเริ่มเรียนแล้วหรือยัง — ใช้ห้ามย้ายคาบหลังถึงเวลาเรียน
-  bool get _scheduleStarted {
-    if (pkg.scheduledTime == null) return false;
+  /// ช่วงเวลานี้ถึง/เลยเวลาเริ่มแล้วหรือยัง — ใช้ล็อกการย้ายเฉพาะ slot ที่เลยเวลา
+  bool _slotStarted(SlotItem s) {
     final now = nowThai();
-    final sp = pkg.scheduledTime!.split(':');
+    final sp = s.startTime.split(':');
     if (sp.length != 2) return false;
     final startMin = (int.tryParse(sp[0]) ?? 0) * 60 + (int.tryParse(sp[1]) ?? 0);
 
     // วันที่เจาะจง → เทียบวันที่+เวลาตรงๆ
-    if (pkg.scheduledDate != null && pkg.scheduledDate!.isNotEmpty) {
-      final d = parseDateStr(pkg.scheduledDate!);
+    if (s.date != null && s.date!.isNotEmpty) {
+      final d = parseDateStr(s.date!);
       if (d == null) return false;
       final lessonStart = DateTime(d.year, d.month, d.day, startMin ~/ 60, startMin % 60);
       return !now.isBefore(lessonStart);
     }
-    // ตารางประจำสัปดาห์ → ห้ามเฉพาะวันเรียนวันนี้ที่เลยเวลาเริ่มแล้ว (วันอื่นย้ายได้)
+    // ตารางประจำสัปดาห์ → ล็อกเฉพาะวันเรียนวันนี้ที่เลยเวลาเริ่มแล้ว (วันอื่นย้ายได้)
     const dayMap = {'อา': 7, 'จ': 1, 'อ': 2, 'พ': 3, 'พฤ': 4, 'ศ': 5, 'ส': 6};
-    if (dayMap[pkg.scheduledDay] != now.weekday) return false;
+    if (dayMap[s.day] != now.weekday) return false;
     return (now.hour * 60 + now.minute) >= startMin;
   }
+
+  /// แพ็กเกจมีช่วงที่ยังย้ายได้ไหม (ยังไม่เลยเวลาอย่างน้อย 1 ช่วง)
+  bool get _hasMovableSlot => pkg.effectiveSlots.any((s) => !_slotStarted(s));
 
   @override
   Widget build(BuildContext context) {
@@ -446,18 +510,16 @@ class PackageCard extends StatelessWidget {
                 child: Row(children: [
                   const Icon(Icons.calendar_today, size: 14, color: Color(0xFFF97316)),
                   const SizedBox(width: 6),
-                  Text(pkg.scheduleLabel, style: const TextStyle(fontSize: 13, color: Color(0xFFF97316), fontWeight: FontWeight.w600)),
+                  Expanded(child: Text(pkg.scheduleLabel,
+                      style: const TextStyle(fontSize: 13, color: Color(0xFFF97316), fontWeight: FontWeight.w600))),
                   if (canEdit) ...[
-                    const Spacer(),
-                    if (_scheduleStarted) ...[
-                      Icon(Icons.lock_clock, size: 14, color: Colors.grey.shade500),
-                      const SizedBox(width: 4),
-                      Text('เลยเวลา', style: TextStyle(fontSize: 11, color: Colors.grey.shade500)),
-                    ] else ...[
-                      const Icon(Icons.edit_calendar, size: 14, color: Color(0xFFF97316)),
-                      const SizedBox(width: 4),
-                      const Text('ย้าย', style: TextStyle(fontSize: 11, color: Color(0xFFF97316))),
-                    ],
+                    const SizedBox(width: 6),
+                    Icon(_hasMovableSlot ? Icons.edit_calendar : Icons.lock_clock,
+                        size: 14, color: _hasMovableSlot ? const Color(0xFFF97316) : Colors.grey.shade500),
+                    const SizedBox(width: 4),
+                    Text(_hasMovableSlot ? 'จัดการ' : 'เลยเวลา',
+                        style: TextStyle(fontSize: 11,
+                            color: _hasMovableSlot ? const Color(0xFFF97316) : Colors.grey.shade500)),
                   ],
                 ]),
               ),
