@@ -2,6 +2,7 @@
 import '../models/models.dart';
 import '../services/firestore_service.dart';
 import 'teacher_slot_form_dialog.dart';
+import 'schedule_calendar_screen.dart';
 
 class TeacherScheduleScreen extends StatefulWidget {
   final String? filterTeacherId;
@@ -32,6 +33,18 @@ class _TeacherScheduleScreenState extends State<TeacherScheduleScreen> {
           title: const Text('ตารางสอนของฉัน'),
           backgroundColor: const Color(0xFF2E7D32),
           foregroundColor: Colors.white,
+          actions: [
+            IconButton(
+              icon: const Icon(Icons.calendar_month),
+              tooltip: 'ปฏิทินคาบเรียน',
+              onPressed: () => Navigator.push(context, MaterialPageRoute(
+                builder: (_) => ScheduleCalendarScreen(
+                  filterTeacherId: widget.filterTeacherId,
+                  title: 'ปฏิทินสอนของฉัน',
+                ),
+              )),
+            ),
+          ],
         ),
         body: StreamBuilder<UserModel?>(
           stream: Stream.fromFuture(FirestoreService.getUser(widget.filterTeacherId!)),
@@ -54,6 +67,15 @@ class _TeacherScheduleScreenState extends State<TeacherScheduleScreen> {
         title: const Text('เวลาว่างครู'),
         backgroundColor: const Color(0xFF2E7D32),
         foregroundColor: Colors.white,
+        actions: [
+          IconButton(
+            icon: const Icon(Icons.calendar_month),
+            tooltip: 'ปฏิทินคาบเรียน',
+            onPressed: () => Navigator.push(context, MaterialPageRoute(
+              builder: (_) => const ScheduleCalendarScreen(title: 'ปฏิทินคาบเรียน (ทั้งหมด)'),
+            )),
+          ),
+        ],
       ),
       body: Column(children: [
         Padding(
