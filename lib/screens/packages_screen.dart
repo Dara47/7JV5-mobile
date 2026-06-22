@@ -228,17 +228,60 @@ class PackageCard extends StatelessWidget {
 
   void _showReschedule(BuildContext context) {
     String? day = pkg.scheduledDay;
+    DateTime? date = pkg.scheduledDate != null ? parseDateStr(pkg.scheduledDate!) : null;
     TimeOfDay? startTime = pkg.scheduledTime != null ? _parseTime(pkg.scheduledTime!) : null;
     TimeOfDay? endTime = pkg.scheduledEndTime != null ? _parseTime(pkg.scheduledEndTime!) : null;
 
     showDialog(context: context, builder: (ctx) => StatefulBuilder(builder: (ctx, setS) => AlertDialog(
       title: const Text('📅 ย้ายวัน/เวลาเรียน'),
-      content: Column(mainAxisSize: MainAxisSize.min, children: [
+      content: Column(mainAxisSize: MainAxisSize.min, crossAxisAlignment: CrossAxisAlignment.start, children: [
+        // Date picker (เลือกวันที่ → วันคำนวณอัตโนมัติ)
+        const Text('วันที่ (ถ้าระบุ วันจะคำนวณให้)', style: TextStyle(fontSize: 12, color: Colors.grey)),
+        const SizedBox(height: 6),
+        GestureDetector(
+          onTap: () async {
+            final d = await showDatePicker(
+              context: ctx,
+              initialDate: date ?? DateTime.now(),
+              firstDate: DateTime(2020), lastDate: DateTime(2030),
+            );
+            if (d != null) setS(() { date = d; day = thaiDayAbbr(d); });
+          },
+          child: Container(
+            width: double.infinity,
+            padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 10),
+            decoration: BoxDecoration(
+              color: date != null ? const Color(0xFFE3F2FD) : Colors.grey.shade50,
+              borderRadius: BorderRadius.circular(10),
+              border: Border.all(color: date != null ? const Color(0xFFF97316) : Colors.grey.shade300),
+            ),
+            child: Row(children: [
+              Icon(Icons.calendar_month, size: 18, color: date != null ? const Color(0xFFF97316) : Colors.grey),
+              const SizedBox(width: 8),
+              Expanded(child: Text(
+                date != null ? thaiDateFull(date!) : 'แตะเพื่อเลือกวันที่ (ไม่บังคับ)',
+                style: TextStyle(
+                  fontSize: 13,
+                  fontWeight: date != null ? FontWeight.w600 : FontWeight.normal,
+                  color: date != null ? const Color(0xFFF97316) : Colors.grey,
+                ),
+              )),
+              if (date != null)
+                GestureDetector(
+                  onTap: () => setS(() => date = null),
+                  child: const Icon(Icons.clear, size: 18, color: Colors.grey),
+                ),
+            ]),
+          ),
+        ),
+        const SizedBox(height: 12),
+        const Text('วัน', style: TextStyle(fontSize: 12, color: Colors.grey)),
+        const SizedBox(height: 6),
         // Day chips
         Wrap(spacing: 6, children: PackageModel.days.map((d) => ChoiceChip(
           label: Text(d),
           selected: day == d,
-          onSelected: (_) => setS(() => day = d),
+          onSelected: (_) => setS(() { day = d; date = null; }), // เลือกวันเอง → ล้างวันที่เจาะจง
           selectedColor: const Color(0xFFF97316),
           labelStyle: TextStyle(color: day == d ? Colors.white : Colors.black87, fontWeight: FontWeight.bold),
         )).toList()),
@@ -274,8 +317,10 @@ class PackageCard extends StatelessWidget {
               if (day != null) 'scheduledDay': day,
               if (startTime != null) 'scheduledTime': _fmtTime(startTime!),
               if (endTime != null) 'scheduledEndTime': _fmtTime(endTime!),
-              // ย้ายวันแบบประจำ → ล้างวันที่เจาะจงให้ข้อมูลไม่ขัดกัน
-              if (pkg.scheduledDate != null) 'scheduledDate': FieldValue.delete(),
+              if (date != null)
+                'scheduledDate': toStorageDateStr(date!)
+              else if (pkg.scheduledDate != null)
+                'scheduledDate': FieldValue.delete(), // ล้างวันที่เจาะจงเดิม
             };
             if (data.isNotEmpty) await FirestoreService.updatePackageFields(pkg.id, data);
           },
