@@ -184,7 +184,10 @@ class _PackageFormSheetState extends State<_PackageFormSheet> {
       'remainingSessions': _calcRemaining,
       'status': 'active',
       if (_scheduledDay != null) 'scheduledDay': _scheduledDay,
-      if (_scheduledDate != null) 'scheduledDate': toStorageDateStr(_scheduledDate!),
+      if (_scheduledDate != null)
+        'scheduledDate': toStorageDateStr(_scheduledDate!)
+      else if (_isEdit && widget.existing!.scheduledDate != null)
+        'scheduledDate': FieldValue.delete(), // แก้ไขแล้วล้างวันที่ → ลบค่าเดิม
       if (_startTime != null) 'scheduledTime': _fmtTime(_startTime!),
       if (_endTime != null) 'scheduledEndTime': _fmtTime(_endTime!),
       if (_notesCtrl.text.isNotEmpty) 'notes': _notesCtrl.text.trim(),

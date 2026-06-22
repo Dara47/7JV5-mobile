@@ -557,7 +557,7 @@ class _TeacherGroupView extends StatelessWidget {
     final d = _nextDate(day);
     final dd = d.day.toString().padLeft(2, '0');
     final mm = d.month.toString().padLeft(2, '0');
-    return '${_dayFull[day]}ที่ $dd/$mm/${d.year}';
+    return '${_dayFull[day]}ที่ $dd/$mm/${d.year + 543}'; // พ.ศ.
   }
 
   @override
