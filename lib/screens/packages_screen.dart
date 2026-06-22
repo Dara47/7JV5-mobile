@@ -759,13 +759,20 @@ class _TeacherGroupView extends StatelessWidget {
               Text('${sorted.length} นักเรียน',
                   style: const TextStyle(color: Colors.grey, fontSize: 12)),
             ]),
-            children: sorted.asMap().entries.map((e) => _StudentScheduleRow(
-              index: e.key + 1,
-              pkg: e.value,
-              dateLabel: (e.value.scheduledDate != null && e.value.scheduledDate!.isNotEmpty)
-                  ? thaiDateFromStr(e.value.scheduledDate!)
-                  : _formatDate(e.value.scheduledDay),
-            )).toList(),
+            children: sorted.asMap().entries.map((e) {
+              final pkg = e.value;
+              // ทุกช่วงเวลา (slot) ของนักเรียน — แสดงครบทุกรายการ
+              final slotLabels = pkg.effectiveSlots.map((s) {
+                final date = (s.date != null && s.date!.isNotEmpty)
+                    ? thaiDateFromStr(s.date!)
+                    : _formatDate(s.day);
+                final time = s.startTime.isNotEmpty
+                    ? '${s.startTime}${s.endTime.isNotEmpty ? ' – ${s.endTime}' : ''} น.'
+                    : 'ยังไม่กำหนดเวลา';
+                return (date: date, time: time);
+              }).toList();
+              return _StudentScheduleRow(index: e.key + 1, pkg: pkg, slots: slotLabels);
+            }).toList(),
           ),
         );
       },
@@ -776,14 +783,35 @@ class _TeacherGroupView extends StatelessWidget {
 class _StudentScheduleRow extends StatelessWidget {
   final int index;
   final PackageModel pkg;
-  final String dateLabel;
-  const _StudentScheduleRow({required this.index, required this.pkg, required this.dateLabel});
+  final List<({String date, String time})> slots;
+  const _StudentScheduleRow({required this.index, required this.pkg, required this.slots});
 
   @override
   Widget build(BuildContext context) {
-    final timeLabel = pkg.scheduledTime != null
-        ? '${pkg.scheduledTime}${pkg.scheduledEndTime != null ? ' – ${pkg.scheduledEndTime}' : ''} น.'
-        : 'ยังไม่กำหนดเวลา';
+    final slotWidgets = slots.isEmpty
+        ? [const Row(children: [
+            Icon(Icons.calendar_today, size: 12, color: Color(0xFFF97316)),
+            SizedBox(width: 4),
+            Text('ยังไม่กำหนดเวลา', style: TextStyle(fontSize: 12, color: Colors.grey)),
+          ])]
+        : <Widget>[
+            for (int i = 0; i < slots.length; i++) ...[
+              if (i > 0) const SizedBox(height: 6),
+              Row(children: [
+                const Icon(Icons.calendar_today, size: 12, color: Color(0xFFF97316)),
+                const SizedBox(width: 4),
+                Expanded(child: Text(slots[i].date,
+                    style: const TextStyle(fontSize: 12, color: Color(0xFFF97316)))),
+              ]),
+              const SizedBox(height: 2),
+              Row(children: [
+                const Icon(Icons.access_time, size: 12, color: Colors.blueGrey),
+                const SizedBox(width: 4),
+                Text(slots[i].time,
+                    style: const TextStyle(fontSize: 12, color: Colors.blueGrey)),
+              ]),
+            ],
+          ];
 
     return Container(
       padding: const EdgeInsets.fromLTRB(16, 10, 16, 10),
@@ -814,19 +842,7 @@ class _StudentScheduleRow extends StatelessWidget {
                 style: const TextStyle(color: Color(0xFF1565C0), fontSize: 12, fontWeight: FontWeight.w500)),
           ]),
           const SizedBox(height: 4),
-          Row(children: [
-            const Icon(Icons.calendar_today, size: 12, color: Color(0xFFF97316)),
-            const SizedBox(width: 4),
-            Text(dateLabel,
-                style: const TextStyle(fontSize: 12, color: Color(0xFFF97316))),
-          ]),
-          const SizedBox(height: 2),
-          Row(children: [
-            const Icon(Icons.access_time, size: 12, color: Colors.blueGrey),
-            const SizedBox(width: 4),
-            Text(timeLabel,
-                style: const TextStyle(fontSize: 12, color: Colors.blueGrey)),
-          ]),
+          ...slotWidgets,
         ])),
       ]),
     );
