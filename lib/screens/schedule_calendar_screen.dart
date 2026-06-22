@@ -198,7 +198,11 @@ class _ScheduleCalendarBodyState extends State<ScheduleCalendarBody> {
     final daysInMonth = DateTime(year, month + 1, 0).day;
     final map = <int, List<_Occurrence>>{};
 
-    void add(int day, _Occurrence occ) => map.putIfAbsent(day, () => []).add(occ);
+    void add(int day, _Occurrence occ) {
+      // โหมดตัดคาบ: ซ่อนคาบที่จัดการแล้ว (เรียนแล้ว/ยกเลิก) ให้เหลือเฉพาะที่ยังต้องตัด
+      if (widget.enableCut && (occ.status == 'completed' || occ.status == 'cancelled')) return;
+      map.putIfAbsent(day, () => []).add(occ);
+    }
 
     String statusFor(String pkgId, int year, int month, int day, String start) {
       final ds = toStorageDateStr(DateTime(year, month, day));
