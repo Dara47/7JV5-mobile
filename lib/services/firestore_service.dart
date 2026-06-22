@@ -102,6 +102,40 @@ class FirestoreService {
     });
   }
 
+  /// ตัดคาบทั้งหมดที่ยังไม่ตัดวันนี้ในคลิกเดียว (batch) — คืนจำนวนที่ตัดสำเร็จ
+  static Future<int> cutAllPending(List<PackageModel> packages) async {
+    final today = todayThaiStr();
+    final batch = _db.batch();
+    int count = 0;
+    for (final pkg in packages) {
+      if (pkg.lastCutDate == today) continue;   // ตัดไปแล้ววันนี้
+      if (pkg.remainingSessions <= 0) continue;  // ไม่มีคาบเหลือ
+      final sessionRef = _db.collection('sessions').doc();
+      batch.set(sessionRef, {
+        'packageId': pkg.id,
+        'studentId': pkg.studentId,
+        'teacherId': pkg.teacherId,
+        'studentName': pkg.studentName,
+        'teacherName': pkg.teacherName,
+        'date': today,
+        'startTime': pkg.scheduledTime ?? '',
+        'endTime': pkg.scheduledEndTime ?? '',
+        'status': 'completed',
+        'isLate': false,
+        'isAbsent': false,
+        'createdAt': FieldValue.serverTimestamp(),
+      });
+      batch.update(_db.collection('packages').doc(pkg.id), {
+        'remainingSessions': FieldValue.increment(-1),
+        'lastCutDate': today,
+        'updatedAt': FieldValue.serverTimestamp(),
+      });
+      count++;
+    }
+    if (count > 0) await batch.commit();
+    return count;
+  }
+
   static Stream<List<SessionModel>> watchCompletedSessions() {
     return _db.collection('sessions')
         .where('status', isEqualTo: 'completed')

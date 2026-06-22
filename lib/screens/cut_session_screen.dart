@@ -48,6 +48,41 @@ class CutSessionScreen extends StatelessWidget {
     );
   }
 
+  void _confirmCutAll(BuildContext context, List<PackageModel> packages) {
+    final today = todayThaiStr();
+    final pending = packages.where((p) => p.lastCutDate != today && p.remainingSessions > 0).toList();
+    if (pending.isEmpty) return;
+    showDialog(
+      context: context,
+      builder: (_) => AlertDialog(
+        title: const Text('ตัดคาบทั้งหมด'),
+        content: Column(mainAxisSize: MainAxisSize.min, crossAxisAlignment: CrossAxisAlignment.start, children: [
+          Text('ยืนยันตัดคาบทั้งหมด ${pending.length} คาบ ในคลิกเดียว?'),
+          const SizedBox(height: 8),
+          const Text('ระบบจะ:\n• บันทึกผลการเรียนทุกคาบ\n• หักคาบที่เหลือคาบละ 1',
+              style: TextStyle(fontSize: 13, color: Colors.grey)),
+        ]),
+        actions: [
+          TextButton(onPressed: () => Navigator.pop(context), child: const Text('ยกเลิก')),
+          ElevatedButton(
+            onPressed: () async {
+              Navigator.pop(context);
+              final n = await FirestoreService.cutAllPending(pending);
+              if (context.mounted) {
+                ScaffoldMessenger.of(context).showSnackBar(SnackBar(
+                  content: Text('ตัดคาบทั้งหมด $n คาบเรียบร้อย'),
+                  backgroundColor: Colors.green,
+                ));
+              }
+            },
+            style: ElevatedButton.styleFrom(backgroundColor: const Color(0xFF6A1B9A), foregroundColor: Colors.white),
+            child: const Text('ยืนยันตัดทั้งหมด'),
+          ),
+        ],
+      ),
+    );
+  }
+
   @override
   Widget build(BuildContext context) {
     final todayStr = todayThaiStr();
@@ -106,6 +141,27 @@ class CutSessionScreen extends StatelessWidget {
                   ),
               ]),
             ),
+
+            // ปุ่มตัดคาบทั้งหมด (คลิกเดียว)
+            if (pendingCount > 0)
+              Padding(
+                padding: const EdgeInsets.fromLTRB(12, 10, 12, 0),
+                child: SizedBox(
+                  width: double.infinity,
+                  child: ElevatedButton.icon(
+                    onPressed: () => _confirmCutAll(context, packages),
+                    icon: const Icon(Icons.done_all, size: 18),
+                    label: Text('ตัดคาบทั้งหมด ($pendingCount คาบ)',
+                        style: const TextStyle(fontWeight: FontWeight.bold)),
+                    style: ElevatedButton.styleFrom(
+                      backgroundColor: const Color(0xFF6A1B9A),
+                      foregroundColor: Colors.white,
+                      padding: const EdgeInsets.symmetric(vertical: 12),
+                      shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(10)),
+                    ),
+                  ),
+                ),
+              ),
 
             // List
             Expanded(

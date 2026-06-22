@@ -72,20 +72,43 @@ class _PackageFormSheetState extends State<_PackageFormSheet> {
   }
 
   Future<void> _loadTakenSlots() async {
-    if (_student == null || _teacher == null) return;
-    final pkgs = await FirestoreService.getPackagesForUser(_student!.id, 'student');
+    if (_teacher == null) return;
+    // โหลด "ทุกแพ็กเกจของครูคนนี้" (ทุกนักเรียน) เพื่อกันจองเวลาชนกัน
+    final pkgs = await FirestoreService.getPackagesForUser(_teacher!.id, 'teacher');
     if (!mounted) return;
     setState(() {
-      _takenSlotPackages = pkgs.where((p) => p.teacherId == _teacher!.id).toList();
+      _takenSlotPackages = pkgs
+          .where((p) => !_isEdit || p.id != widget.existing!.id) // ไม่นับตัวเองตอนแก้ไข
+          .toList();
     });
   }
 
   bool _isSlotTaken(SlotItem s) {
-    return _takenSlotPackages.any((p) =>
-        p.scheduledDay == s.day &&
-        p.scheduledTime == s.startTime &&
-        p.scheduledEndTime == s.endTime &&
-        (p.scheduledDate ?? '') == (s.date ?? ''));
+    return _takenSlotPackages.any((p) => _conflicts(p, s.day, s.date, s.startTime, s.endTime));
+  }
+
+  /// เวลา 2 ช่วงทับซ้อนกันไหม ('HH:mm')
+  bool _timeOverlap(String s1, String e1, String s2, String e2) {
+    int m(String t) {
+      final p = t.split(':');
+      if (p.length != 2) return -1;
+      return (int.tryParse(p[0]) ?? 0) * 60 + (int.tryParse(p[1]) ?? 0);
+    }
+    final a1 = m(s1), b1 = m(e1.isEmpty ? s1 : e1);
+    final a2 = m(s2), b2 = m(e2.isEmpty ? s2 : e2);
+    if (a1 < 0 || a2 < 0) return false;
+    return a1 < b2 && a2 < b1;
+  }
+
+  /// แพ็กเกจ p ชนกับช่วง (day, date, start–end) ไหม
+  /// - ต้องวันเดียวกัน + เวลาทับซ้อน
+  /// - วันที่: ถ้าทั้งคู่ระบุวันที่เจาะจง ต้องตรงกันถึงชน / ถ้าฝ่ายใดเป็น recurring ถือว่าคลุมทุกสัปดาห์ = ชน
+  bool _conflicts(PackageModel p, String day, String? dateStr, String start, String end) {
+    if (p.scheduledDay != day) return false;
+    final pDate = p.scheduledDate ?? '';
+    final nDate = dateStr ?? '';
+    if (pDate.isNotEmpty && nDate.isNotEmpty && pDate != nDate) return false;
+    return _timeOverlap(p.scheduledTime ?? '', p.scheduledEndTime ?? '', start, end);
   }
 
   bool _isSlotPast(SlotItem s) {
@@ -174,6 +197,29 @@ class _PackageFormSheetState extends State<_PackageFormSheet> {
     if (_teacher == null) { _snack('กรุณาเลือกครู'); return; }
 
     setState(() => _saving = true);
+
+    // ── กันจองเวลาชนกัน (double-booking) ──
+    if (_scheduledDay != null && _startTime != null) {
+      final startStr = _fmtTime(_startTime!);
+      final endStr = _endTime != null ? _fmtTime(_endTime!) : startStr;
+      final dateStr = _scheduledDate != null ? toStorageDateStr(_scheduledDate!) : null;
+      try {
+        final teacherPkgs = await FirestoreService.getPackagesForUser(_teacher!.id, 'teacher');
+        PackageModel? conflict;
+        for (final p in teacherPkgs) {
+          if (_isEdit && p.id == widget.existing!.id) continue; // ข้ามตัวเอง
+          if (_conflicts(p, _scheduledDay!, dateStr, startStr, endStr)) { conflict = p; break; }
+        }
+        if (conflict != null) {
+          if (mounted) {
+            setState(() => _saving = false);
+            _snack('เวลานี้ครู ${_teacher!.name} ถูกจองโดย ${conflict.studentName} แล้ว');
+          }
+          return;
+        }
+      } catch (_) {/* ถ้าเช็คไม่ได้ ปล่อยให้บันทึกต่อ */}
+    }
+
     final total = int.tryParse(_totalCtrl.text) ?? 0;
 
     final data = {
