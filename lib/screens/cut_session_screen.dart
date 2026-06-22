@@ -65,6 +65,8 @@ class CutSessionScreen extends StatelessWidget {
             return const Center(child: CircularProgressIndicator());
           }
           final packages = snap.data ?? [];
+          // นับเฉพาะที่ยังไม่ตัดวันนี้ (งานค้างจริง)
+          final pendingCount = packages.where((p) => p.lastCutDate != todayStr).length;
 
           return Column(children: [
             // Header bar
@@ -74,10 +76,34 @@ class CutSessionScreen extends StatelessWidget {
               child: Row(children: [
                 Icon(Icons.content_cut, size: 18, color: Colors.purple.shade700),
                 const SizedBox(width: 8),
-                Text(
-                  '${_todayLabel()} — รอตัดคาบ ${packages.length} รายการ',
+                Expanded(child: Text(
+                  _todayLabel(),
                   style: TextStyle(fontWeight: FontWeight.w600, color: Colors.purple.shade700, fontSize: 13),
-                ),
+                  overflow: TextOverflow.ellipsis,
+                )),
+                const SizedBox(width: 8),
+                if (pendingCount > 0)
+                  Container(
+                    padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 3),
+                    decoration: BoxDecoration(color: Colors.red, borderRadius: BorderRadius.circular(12)),
+                    child: Row(mainAxisSize: MainAxisSize.min, children: [
+                      const Icon(Icons.notifications_active, size: 13, color: Colors.white),
+                      const SizedBox(width: 4),
+                      Text('รอตัด $pendingCount',
+                          style: const TextStyle(fontSize: 12, color: Colors.white, fontWeight: FontWeight.bold)),
+                    ]),
+                  )
+                else
+                  Container(
+                    padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 3),
+                    decoration: BoxDecoration(color: Colors.green, borderRadius: BorderRadius.circular(12)),
+                    child: const Row(mainAxisSize: MainAxisSize.min, children: [
+                      Icon(Icons.check_circle, size: 13, color: Colors.white),
+                      SizedBox(width: 4),
+                      Text('ตัดครบแล้ว',
+                          style: TextStyle(fontSize: 12, color: Colors.white, fontWeight: FontWeight.bold)),
+                    ]),
+                  ),
               ]),
             ),
 
