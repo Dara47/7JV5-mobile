@@ -81,37 +81,20 @@ class FirestoreService {
 
   static Future<void> cutPackageSession(PackageModel pkg) async {
     final today = todayThaiStr();
-    await _db.collection('sessions').add({
-      'packageId': pkg.id,
-      'studentId': pkg.studentId,
-      'teacherId': pkg.teacherId,
-      'studentName': pkg.studentName,
-      'teacherName': pkg.teacherName,
-      'date': today,
-      'startTime': pkg.scheduledTime ?? '',
-      'endTime': pkg.scheduledEndTime ?? '',
-      'status': 'completed',
-      'isLate': false,
-      'isAbsent': false,
-      'createdAt': FieldValue.serverTimestamp(),
-    });
-    await _db.collection('packages').doc(pkg.id).update({
-      'remainingSessions': FieldValue.increment(-1),
-      'lastCutDate': today,
-      'updatedAt': FieldValue.serverTimestamp(),
-    });
-  }
-
-  /// ตัดคาบทั้งหมดที่ยังไม่ตัดวันนี้ในคลิกเดียว (batch) — คืนจำนวนที่ตัดสำเร็จ
-  static Future<int> cutAllPending(List<PackageModel> packages) async {
-    final today = todayThaiStr();
-    final batch = _db.batch();
-    int count = 0;
-    for (final pkg in packages) {
-      if (pkg.lastCutDate == today) continue;   // ตัดไปแล้ววันนี้
-      if (pkg.remainingSessions <= 0) continue;  // ไม่มีคาบเหลือ
-      final sessionRef = _db.collection('sessions').doc();
-      batch.set(sessionRef, {
+    // ถ้ามี session ของวันนี้อยู่แล้ว (เช่นที่ generate ตารางล่วงหน้าไว้) → อัปเดตเป็น completed
+    final existing = await _db.collection('sessions')
+        .where('packageId', isEqualTo: pkg.id)
+        .where('date', isEqualTo: today)
+        .limit(1).get();
+    if (existing.docs.isNotEmpty) {
+      await existing.docs.first.reference.update({
+        'status': 'completed',
+        'startTime': pkg.scheduledTime ?? '',
+        'endTime': pkg.scheduledEndTime ?? '',
+        'updatedAt': FieldValue.serverTimestamp(),
+      });
+    } else {
+      await _db.collection('sessions').add({
         'packageId': pkg.id,
         'studentId': pkg.studentId,
         'teacherId': pkg.teacherId,
@@ -125,6 +108,54 @@ class FirestoreService {
         'isAbsent': false,
         'createdAt': FieldValue.serverTimestamp(),
       });
+    }
+    await _db.collection('packages').doc(pkg.id).update({
+      'remainingSessions': FieldValue.increment(-1),
+      'lastCutDate': today,
+      'updatedAt': FieldValue.serverTimestamp(),
+    });
+  }
+
+  /// ตัดคาบทั้งหมดที่ยังไม่ตัดวันนี้ในคลิกเดียว (batch) — คืนจำนวนที่ตัดสำเร็จ
+  static Future<int> cutAllPending(List<PackageModel> packages) async {
+    final today = todayThaiStr();
+    // โหลด session ของวันนี้ทั้งหมด เพื่อ reuse คาบที่ generate ตารางไว้ (กันซ้ำ)
+    final todaySnap = await _db.collection('sessions').where('date', isEqualTo: today).get();
+    final byPkg = <String, DocumentReference>{};
+    for (final d in todaySnap.docs) {
+      final pid = d.data()['packageId'] as String?;
+      if (pid != null && !byPkg.containsKey(pid)) byPkg[pid] = d.reference;
+    }
+    final batch = _db.batch();
+    int count = 0;
+    for (final pkg in packages) {
+      if (pkg.lastCutDate == today) continue;   // ตัดไปแล้ววันนี้
+      if (pkg.remainingSessions <= 0) continue;  // ไม่มีคาบเหลือ
+      final existingRef = byPkg[pkg.id];
+      if (existingRef != null) {
+        batch.update(existingRef, {
+          'status': 'completed',
+          'startTime': pkg.scheduledTime ?? '',
+          'endTime': pkg.scheduledEndTime ?? '',
+          'updatedAt': FieldValue.serverTimestamp(),
+        });
+      } else {
+        final sessionRef = _db.collection('sessions').doc();
+        batch.set(sessionRef, {
+          'packageId': pkg.id,
+          'studentId': pkg.studentId,
+          'teacherId': pkg.teacherId,
+          'studentName': pkg.studentName,
+          'teacherName': pkg.teacherName,
+          'date': today,
+          'startTime': pkg.scheduledTime ?? '',
+          'endTime': pkg.scheduledEndTime ?? '',
+          'status': 'completed',
+          'isLate': false,
+          'isAbsent': false,
+          'createdAt': FieldValue.serverTimestamp(),
+        });
+      }
       batch.update(_db.collection('packages').doc(pkg.id), {
         'remainingSessions': FieldValue.increment(-1),
         'lastCutDate': today,
@@ -134,6 +165,99 @@ class FirestoreService {
     }
     if (count > 0) await batch.commit();
     return count;
+  }
+
+  /// สร้างตารางคาบล่วงหน้า (status 'scheduled') จากแพ็กเกจ active สำหรับ N วันข้างหน้า
+  /// - กันซ้ำด้วย packageId+date / จำกัดไม่เกิน remainingSessions ต่อแพ็กเกจ
+  /// - คืนจำนวน session ที่สร้างใหม่
+  static Future<int> generateUpcomingSessions({int daysAhead = 30}) async {
+    final now = nowThai();
+    final today = DateTime(now.year, now.month, now.day);
+    final endDate = today.add(Duration(days: daysAhead));
+    final todayStr = toStorageDateStr(today);
+    final endStr = toStorageDateStr(endDate);
+
+    final pkgSnap = await _db.collection('packages').where('status', isEqualTo: 'active').get();
+    final packages = pkgSnap.docs.map(PackageModel.fromDoc).toList();
+
+    // session ที่มีอยู่ในช่วงนี้ → กันซ้ำ + นับ scheduled ที่มีอยู่แล้วต่อแพ็กเกจ
+    final sessSnap = await _db.collection('sessions')
+        .where('date', isGreaterThanOrEqualTo: todayStr)
+        .where('date', isLessThanOrEqualTo: endStr)
+        .get();
+    final existingKeys = <String>{};
+    final scheduledCount = <String, int>{};
+    for (final d in sessSnap.docs) {
+      final m = d.data();
+      final pid = m['packageId'] as String? ?? '';
+      final dt = m['date'] as String? ?? '';
+      existingKeys.add('${pid}_$dt');
+      if ((m['status'] as String?) == 'scheduled') {
+        scheduledCount[pid] = (scheduledCount[pid] ?? 0) + 1;
+      }
+    }
+
+    const dayMap = {'อา': 7, 'จ': 1, 'อ': 2, 'พ': 3, 'พฤ': 4, 'ศ': 5, 'ส': 6};
+    WriteBatch batch = _db.batch();
+    int batchOps = 0;
+    int created = 0;
+
+    for (final p in packages) {
+      if (p.scheduledTime == null) continue;
+      if (p.scheduledDay == null && p.scheduledDate == null) continue;
+      int allowed = p.remainingSessions - (scheduledCount[p.id] ?? 0);
+      if (allowed <= 0) continue;
+
+      // วันที่ที่จะเกิดคาบในช่วง
+      final dates = <DateTime>[];
+      if (p.scheduledDate != null && p.scheduledDate!.isNotEmpty) {
+        final d = parseDateStr(p.scheduledDate!);
+        if (d != null) {
+          final dd = DateTime(d.year, d.month, d.day);
+          if (!dd.isBefore(today) && !dd.isAfter(endDate)) dates.add(dd);
+        }
+      } else {
+        final wd = dayMap[p.scheduledDay];
+        if (wd != null) {
+          for (var dt = today; !dt.isAfter(endDate); dt = dt.add(const Duration(days: 1))) {
+            if (dt.weekday == wd) dates.add(dt);
+          }
+        }
+      }
+
+      for (final dt in dates) {
+        if (allowed <= 0) break;
+        final ds = toStorageDateStr(dt);
+        final key = '${p.id}_$ds';
+        if (existingKeys.contains(key)) continue;
+        final ref = _db.collection('sessions').doc();
+        batch.set(ref, {
+          'packageId': p.id,
+          'studentId': p.studentId, 'teacherId': p.teacherId,
+          'studentName': p.studentName, 'teacherName': p.teacherName,
+          'date': ds,
+          'startTime': p.scheduledTime ?? '',
+          'endTime': p.scheduledEndTime ?? '',
+          'status': 'scheduled',
+          'isLate': false, 'isAbsent': false,
+          'generated': true,
+          'createdAt': FieldValue.serverTimestamp(),
+        });
+        existingKeys.add(key);
+        allowed--;
+        created++;
+        batchOps++;
+        if (batchOps >= 400) { await batch.commit(); batch = _db.batch(); batchOps = 0; }
+      }
+    }
+    if (batchOps > 0) await batch.commit();
+    return created;
+  }
+
+  /// session ทั้งหมด (ทุกสถานะ) — สำหรับปฏิทิน admin
+  static Stream<List<SessionModel>> watchAllSessions() {
+    return _db.collection('sessions').snapshots()
+        .map((s) => s.docs.map(SessionModel.fromDoc).toList());
   }
 
   static Stream<List<SessionModel>> watchCompletedSessions() {

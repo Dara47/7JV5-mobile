@@ -14,11 +14,30 @@ const _weekdayHeaders = ['อา', 'จ', 'อ', 'พ', 'พฤ', 'ศ', 'ส'];
 // คอลัมน์ index (0=อา) → weekday ของ DateTime (1=จ..7=อา)
 const _dayAbbrWeekday = {'อา': 7, 'จ': 1, 'อ': 2, 'พ': 3, 'พฤ': 4, 'ศ': 5, 'ส': 6};
 
-/// occurrence ของคาบเรียนในวันหนึ่ง (ฉายจากแพ็กเกจ)
+/// occurrence ของคาบเรียนในวันหนึ่ง (ฉายจากแพ็กเกจ + overlay สถานะ session จริง)
 class _Occurrence {
   final PackageModel pkg;
   final bool isSpecificDate; // true = วันที่เจาะจง, false = ตารางประจำสัปดาห์
-  _Occurrence(this.pkg, this.isSpecificDate);
+  final String status; // 'planned'(ยังไม่ generate) | 'scheduled' | 'completed' | 'cancelled'
+  _Occurrence(this.pkg, this.isSpecificDate, this.status);
+}
+
+String _statusLabel(String s) {
+  switch (s) {
+    case 'completed': return 'เรียนแล้ว';
+    case 'scheduled': return 'มีนัด';
+    case 'cancelled': return 'ยกเลิก';
+    default: return 'วางแผน';
+  }
+}
+
+Color _statusColor(String s) {
+  switch (s) {
+    case 'completed': return const Color(0xFF2E7D32);
+    case 'scheduled': return const Color(0xFF1976D2);
+    case 'cancelled': return const Color(0xFFC62828);
+    default: return const Color(0xFF9E9E9E);
+  }
 }
 
 class ScheduleCalendarScreen extends StatefulWidget {
@@ -59,6 +78,16 @@ class _ScheduleCalendarScreenState extends State<ScheduleCalendarScreen> {
     return FirestoreService.watchAllPackages();
   }
 
+  Stream<List<SessionModel>> get _sessionStream {
+    if (widget.filterTeacherId != null) {
+      return FirestoreService.watchSessionsForUser(widget.filterTeacherId!, 'teacher');
+    }
+    if (widget.filterStudentId != null) {
+      return FirestoreService.watchSessionsForUser(widget.filterStudentId!, 'student');
+    }
+    return FirestoreService.watchAllSessions();
+  }
+
   void _changeMonth(int delta) {
     setState(() {
       _visibleMonth = DateTime(_visibleMonth.year, _visibleMonth.month + delta, 1);
@@ -74,13 +103,20 @@ class _ScheduleCalendarScreenState extends State<ScheduleCalendarScreen> {
   }
 
   /// แผนที่ วันที่(1..n) → รายการ occurrence ในเดือนที่แสดง
-  Map<int, List<_Occurrence>> _buildOccurrences(List<PackageModel> packages) {
+  /// statusMap: '{packageId}_{YYYY-MM-DD}' → สถานะ session จริง (ถ้ามี)
+  Map<int, List<_Occurrence>> _buildOccurrences(
+      List<PackageModel> packages, Map<String, String> statusMap) {
     final year = _visibleMonth.year;
     final month = _visibleMonth.month;
     final daysInMonth = DateTime(year, month + 1, 0).day;
     final map = <int, List<_Occurrence>>{};
 
     void add(int day, _Occurrence occ) => map.putIfAbsent(day, () => []).add(occ);
+
+    String statusFor(String pkgId, int year, int month, int day) {
+      final ds = toStorageDateStr(DateTime(year, month, day));
+      return statusMap['${pkgId}_$ds'] ?? 'planned';
+    }
 
     for (final p in packages) {
       if (p.status != 'active') continue;
@@ -90,7 +126,7 @@ class _ScheduleCalendarScreenState extends State<ScheduleCalendarScreen> {
       if (p.scheduledDate != null && p.scheduledDate!.isNotEmpty) {
         final d = parseDateStr(p.scheduledDate!);
         if (d != null && d.year == year && d.month == month) {
-          add(d.day, _Occurrence(p, true));
+          add(d.day, _Occurrence(p, true, statusFor(p.id, year, month, d.day)));
         }
         continue;
       }
@@ -100,7 +136,7 @@ class _ScheduleCalendarScreenState extends State<ScheduleCalendarScreen> {
         if (wd == null) continue;
         for (int day = 1; day <= daysInMonth; day++) {
           if (DateTime(year, month, day).weekday == wd) {
-            add(day, _Occurrence(p, false));
+            add(day, _Occurrence(p, false, statusFor(p.id, year, month, day)));
           }
         }
       }
@@ -131,22 +167,33 @@ class _ScheduleCalendarScreenState extends State<ScheduleCalendarScreen> {
       ),
       body: StreamBuilder<List<PackageModel>>(
         stream: _stream,
-        builder: (context, snap) {
-          if (snap.connectionState == ConnectionState.waiting) {
+        builder: (context, pkgSnap) {
+          if (pkgSnap.connectionState == ConnectionState.waiting) {
             return const Center(child: CircularProgressIndicator());
           }
-          final packages = snap.data ?? [];
-          final occ = _buildOccurrences(packages);
+          final packages = pkgSnap.data ?? [];
+          return StreamBuilder<List<SessionModel>>(
+            stream: _sessionStream,
+            builder: (context, sessSnap) {
+              final sessions = sessSnap.data ?? [];
+              // (packageId_date) → status ของ session จริง
+              final statusMap = <String, String>{};
+              for (final s in sessions) {
+                statusMap['${s.packageId}_${s.date}'] = s.status;
+              }
+              final occ = _buildOccurrences(packages, statusMap);
 
-          return Column(children: [
-            _monthHeader(),
-            _weekdayRow(),
-            Expanded(child: SingleChildScrollView(
-              padding: const EdgeInsets.fromLTRB(8, 4, 8, 12),
-              child: _calendarGrid(occ),
-            )),
-            _dayDetail(occ),
-          ]);
+              return Column(children: [
+                _monthHeader(),
+                _weekdayRow(),
+                Expanded(child: SingleChildScrollView(
+                  padding: const EdgeInsets.fromLTRB(8, 4, 8, 12),
+                  child: _calendarGrid(occ),
+                )),
+                _dayDetail(occ),
+              ]);
+            },
+          );
         },
       ),
     );
@@ -364,21 +411,25 @@ class _ScheduleCalendarScreenState extends State<ScheduleCalendarScreen> {
           ]),
         ])),
         const SizedBox(width: 6),
-        Container(
-          padding: const EdgeInsets.symmetric(horizontal: 7, vertical: 3),
-          decoration: BoxDecoration(
-            color: o.isSpecificDate ? const Color(0xFFE3F2FD) : Colors.grey.shade100,
-            borderRadius: BorderRadius.circular(8),
-          ),
-          child: Text(
-            o.isSpecificDate ? 'เจาะจง' : 'ประจำ',
-            style: TextStyle(
-              fontSize: 10,
-              color: o.isSpecificDate ? Colors.blue.shade700 : Colors.grey.shade600,
-              fontWeight: FontWeight.w600,
+        Column(crossAxisAlignment: CrossAxisAlignment.end, children: [
+          // สถานะ session จริง
+          Container(
+            padding: const EdgeInsets.symmetric(horizontal: 7, vertical: 3),
+            decoration: BoxDecoration(
+              color: _statusColor(o.status).withAlpha(28),
+              borderRadius: BorderRadius.circular(8),
+            ),
+            child: Text(
+              _statusLabel(o.status),
+              style: TextStyle(fontSize: 10, color: _statusColor(o.status), fontWeight: FontWeight.bold),
             ),
           ),
-        ),
+          const SizedBox(height: 3),
+          Text(
+            o.isSpecificDate ? 'เจาะจง' : 'ประจำ',
+            style: TextStyle(fontSize: 9, color: Colors.grey.shade500, fontWeight: FontWeight.w600),
+          ),
+        ]),
       ]),
     );
   }
