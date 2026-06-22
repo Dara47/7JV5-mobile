@@ -340,6 +340,20 @@ class _UserList extends StatelessWidget {
                             .isNotEmpty;
                       }
 
+                      // ── ตารางเรียน: วัน/วันที่ + เวลา ทุก slot (ดูได้ทันทีไม่ต้องคลิกเข้า) ──
+                      final scheduleLines = <String>[];
+                      for (final p in pkgs) {
+                        for (final s in p.effectiveSlots) {
+                          final datePart = (s.date != null && s.date!.isNotEmpty)
+                              ? '${thaiDayAbbrFromStr(s.date!)} ${thaiShortDateFromStr(s.date!)}'
+                              : 'ทุก${s.day}';
+                          final timePart = s.startTime.isNotEmpty
+                              ? '${s.startTime}${s.endTime.isNotEmpty ? '–${s.endTime}' : ''} น.'
+                              : '';
+                          scheduleLines.add('$datePart  $timePart'.trim());
+                        }
+                      }
+
                       return Padding(
                         padding: const EdgeInsets.fromLTRB(54, 0, 12, 10),
                         child: Column(crossAxisAlignment: CrossAxisAlignment.start, children: [
@@ -378,6 +392,19 @@ class _UserList extends StatelessWidget {
                                 Text('รอตัดคาบเรียน', style: TextStyle(fontSize: 11, color: Colors.orange.shade700, fontWeight: FontWeight.w600)),
                               ]),
                           ]),
+                          // แถว 3: ตารางเรียน (วัน/วันที่ + เวลา ทุก slot)
+                          if (scheduleLines.isNotEmpty) ...[
+                            const SizedBox(height: 4),
+                            ...scheduleLines.map((line) => Padding(
+                              padding: const EdgeInsets.only(top: 2),
+                              child: Row(children: [
+                                const Icon(Icons.event_outlined, size: 12, color: Color(0xFFF97316)),
+                                const SizedBox(width: 4),
+                                Expanded(child: Text(line,
+                                    style: const TextStyle(fontSize: 11.5, color: Colors.black54))),
+                              ]),
+                            )),
+                          ],
                         ]),
                       );
                     },
