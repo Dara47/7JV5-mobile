@@ -231,7 +231,7 @@ class _HomeButton extends StatelessWidget {
 
 // ── Menu popup (iOS-style app grid) ───────────────────────────────────────────
 
-class _MenuSheet extends StatelessWidget {
+class _MenuSheet extends StatefulWidget {
   final List<_NavItem> items;
   final int selectedIndex;
   final String roleLabel;
@@ -250,7 +250,45 @@ class _MenuSheet extends StatelessWidget {
   });
 
   @override
+  State<_MenuSheet> createState() => _MenuSheetState();
+}
+
+class _MenuSheetState extends State<_MenuSheet> with SingleTickerProviderStateMixin {
+  late final AnimationController _ctrl;
+
+  @override
+  void initState() {
+    super.initState();
+    _ctrl = AnimationController(vsync: this, duration: const Duration(milliseconds: 500))..forward();
+  }
+
+  @override
+  void dispose() {
+    _ctrl.dispose();
+    super.dispose();
+  }
+
+  /// pop-in แบบ staggered (scale + fade) ทีละไอคอนแบบ iOS
+  Widget _staggered(int i, int count, Widget child) {
+    final start = ((i / (count < 1 ? 1 : count)) * 0.55).clamp(0.0, 1.0);
+    final end = (start + 0.45).clamp(0.0, 1.0);
+    final anim = CurvedAnimation(parent: _ctrl, curve: Interval(start, end, curve: Curves.easeOutBack));
+    return AnimatedBuilder(
+      animation: anim,
+      builder: (_, c) {
+        final v = anim.value;
+        return Opacity(
+          opacity: v.clamp(0.0, 1.0),
+          child: Transform.scale(scale: 0.5 + 0.5 * v, child: c),
+        );
+      },
+      child: child,
+    );
+  }
+
+  @override
   Widget build(BuildContext context) {
+    final items = widget.items;
     final width = MediaQuery.of(context).size.width;
     final cols = width >= 700 ? 5 : 4;
 
@@ -290,8 +328,8 @@ class _MenuSheet extends StatelessWidget {
                   ),
                   const SizedBox(width: 10),
                   Expanded(child: Column(crossAxisAlignment: CrossAxisAlignment.start, children: [
-                    Text(roleLabel, style: const TextStyle(fontWeight: FontWeight.bold, fontSize: 15)),
-                    Text(userName, style: TextStyle(fontSize: 11, color: Colors.grey.shade600)),
+                    Text(widget.roleLabel, style: const TextStyle(fontWeight: FontWeight.bold, fontSize: 15)),
+                    Text(widget.userName, style: TextStyle(fontSize: 11, color: Colors.grey.shade600)),
                   ])),
                   IconButton(
                     onPressed: () => Navigator.pop(context),
@@ -313,11 +351,11 @@ class _MenuSheet extends StatelessWidget {
                     mainAxisSpacing: 12,
                   ),
                   itemCount: items.length,
-                  itemBuilder: (_, i) => _AppTile(
+                  itemBuilder: (_, i) => _staggered(i, items.length, _AppTile(
                     item: items[i],
-                    selected: selectedIndex == i,
-                    onTap: () => onSelect(i),
-                  ),
+                    selected: widget.selectedIndex == i,
+                    onTap: () => widget.onSelect(i),
+                  )),
                 ),
               ),
 
@@ -327,7 +365,7 @@ class _MenuSheet extends StatelessWidget {
                 padding: const EdgeInsets.fromLTRB(16, 6, 16, 8),
                 child: Row(children: [
                   Expanded(child: TextButton.icon(
-                    onPressed: onRefresh,
+                    onPressed: widget.onRefresh,
                     icon: const Icon(Icons.refresh, size: 18, color: Colors.grey),
                     label: const Text('รีเฟรช', style: TextStyle(fontSize: 13, color: Colors.grey)),
                     style: TextButton.styleFrom(alignment: Alignment.centerLeft),
@@ -335,7 +373,7 @@ class _MenuSheet extends StatelessWidget {
                   Text('Version 5.1.0', style: TextStyle(fontSize: 11, color: Colors.grey.shade400)),
                   const SizedBox(width: 8),
                   TextButton.icon(
-                    onPressed: onLogout,
+                    onPressed: widget.onLogout,
                     icon: const Icon(Icons.logout, size: 18, color: Colors.red),
                     label: const Text('ออก', style: TextStyle(fontSize: 13, color: Colors.red)),
                   ),
