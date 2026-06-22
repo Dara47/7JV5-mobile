@@ -11,7 +11,8 @@ class PackagesScreen extends StatefulWidget {
   final String? filterStudentName;
   final String? filterTeacherId;
   final String? filterTeacherName;
-  const PackagesScreen({super.key, this.filterStudentId, this.filterStudentName, this.filterTeacherId, this.filterTeacherName});
+  final bool teacherViewOnly; // เมนู "ตามครู": แสดงเฉพาะกลุ่มครู→นักเรียน (ไม่มีรายการ/จัดการคาบ)
+  const PackagesScreen({super.key, this.filterStudentId, this.filterStudentName, this.filterTeacherId, this.filterTeacherName, this.teacherViewOnly = false});
   @override
   State<PackagesScreen> createState() => _PackagesScreenState();
 }
@@ -24,6 +25,7 @@ class _PackagesScreenState extends State<PackagesScreen> {
   @override
   void initState() {
     super.initState();
+    _byTeacherView = widget.teacherViewOnly; // เมนูตามครู: เริ่ม (และล็อก) ที่มุมมองกลุ่มครู
     _searchCtrl.addListener(() => setState(() => _search = _searchCtrl.text.toLowerCase()));
   }
 
@@ -45,7 +47,9 @@ class _PackagesScreenState extends State<PackagesScreen> {
         ? (widget.filterStudentName ?? 'คาบเรียน')
         : isTeacherFilter
             ? (widget.filterTeacherName ?? 'ตารางสอน')
-            : 'จัดการคาบเรียน';
+            : widget.teacherViewOnly
+                ? 'ครู–ศิษย์'
+                : 'จัดการคาบเรียน';
 
     const canEdit = true;
 
@@ -55,7 +59,7 @@ class _PackagesScreenState extends State<PackagesScreen> {
         backgroundColor: const Color(0xFFF97316),
         foregroundColor: Colors.white,
         actions: [
-          if (!isFiltered)
+          if (!isFiltered && !widget.teacherViewOnly)
             TextButton.icon(
               onPressed: () => setState(() => _byTeacherView = !_byTeacherView),
               icon: Icon(_byTeacherView ? Icons.list_rounded : Icons.people_rounded,
@@ -65,7 +69,7 @@ class _PackagesScreenState extends State<PackagesScreen> {
             ),
         ],
       ),
-      floatingActionButton: canEdit
+      floatingActionButton: (canEdit && !widget.teacherViewOnly)
           ? FloatingActionButton.extended(
               heroTag: 'add_pkg',
               onPressed: () => _openForm(),

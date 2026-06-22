@@ -2,11 +2,18 @@ import 'package:flutter/material.dart';
 import '../models/models.dart';
 import '../services/firestore_service.dart';
 import '../utils/date_format.dart';
+import 'schedule_calendar_screen.dart';
 
 const _kPurple = Color(0xFF6A1B9A);
 
-class CutSessionScreen extends StatelessWidget {
+class CutSessionScreen extends StatefulWidget {
   const CutSessionScreen({super.key});
+  @override
+  State<CutSessionScreen> createState() => _CutSessionScreenState();
+}
+
+class _CutSessionScreenState extends State<CutSessionScreen> {
+  bool _calendarView = false;
 
   String _todayLabel() => thaiDateFull(nowThai());
 
@@ -86,8 +93,19 @@ class CutSessionScreen extends StatelessWidget {
         title: const Text('ตัดคาบเรียน'),
         backgroundColor: _kPurple,
         foregroundColor: Colors.white,
+        actions: [
+          TextButton.icon(
+            onPressed: () => setState(() => _calendarView = !_calendarView),
+            icon: Icon(_calendarView ? Icons.view_list_rounded : Icons.calendar_month,
+                color: Colors.white, size: 18),
+            label: Text(_calendarView ? 'รายการ' : 'ปฏิทิน',
+                style: const TextStyle(color: Colors.white, fontSize: 13)),
+          ),
+        ],
       ),
-      body: StreamBuilder<List<PendingCut>>(
+      body: _calendarView
+          ? const ScheduleCalendarBody(enableCut: true)
+          : StreamBuilder<List<PendingCut>>(
         stream: FirestoreService.watchPendingCuts(),
         builder: (context, snap) {
           if (snap.connectionState == ConnectionState.waiting) {

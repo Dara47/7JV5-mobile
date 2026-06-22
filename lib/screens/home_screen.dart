@@ -71,7 +71,7 @@ class _HomeScreenState extends State<HomeScreen> {
     if (u.isAdmin) {
       return [
         UsersListScreen(key: ValueKey('users_$k')),
-        PackagesScreen(key: ValueKey('packages_$k')),
+        PackagesScreen(key: ValueKey('packages_$k'), teacherViewOnly: true),
         CutSessionScreen(key: ValueKey('cut_$k')),
         TeacherScheduleScreen(key: ValueKey('schedule_$k')),
         LeaveRequestScreen(key: ValueKey('leave_$k'), appUser: u),
@@ -97,7 +97,7 @@ class _HomeScreenState extends State<HomeScreen> {
     if (u.isAdmin) {
       return [
         const _NavItem(Icons.people, 'ผู้ใช้', Color(0xFF3B82F6)),
-        const _NavItem(Icons.inventory_2, 'คาบเรียน', Color(0xFFF97316)),
+        const _NavItem(Icons.groups, 'ครู–ศิษย์', Color(0xFFF97316)),
         _NavItem(Icons.content_cut, 'ตัดคาบ', const Color(0xFF7E57C2), badge: _pendingCuts),
         const _NavItem(Icons.person_pin, 'เวลาครู', Color(0xFF2E7D32)),
         _NavItem(Icons.event_busy, 'ใบลา', const Color(0xFFE65100), badge: _pendingLeaves),

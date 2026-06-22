@@ -113,12 +113,13 @@ class FirestoreService {
   }
 
   /// ตัดคาบ 1 ช่วงเวลา (slot) ของแพ็กเกจ — หักโควตาคาบร่วม 1 คาบ
-  /// reuse session ที่มีอยู่ของวันนี้+เวลาเดียวกัน (เช่นที่ generate ไว้) ไม่สร้างซ้ำ
-  static Future<void> cutSlot(PackageModel pkg, SlotItem slot) async {
-    final today = todayThaiStr();
+  /// reuse session ที่มีอยู่ของวัน+เวลาเดียวกัน (เช่นที่ generate ไว้) ไม่สร้างซ้ำ
+  /// onDate: วันที่ของคาบ (ดีฟอลต์ = วันนี้) — ใช้ตัดคาบย้อนหลังจากปฏิทินได้
+  static Future<void> cutSlot(PackageModel pkg, SlotItem slot, {DateTime? onDate}) async {
+    final dateStr = onDate != null ? toStorageDateStr(onDate) : todayThaiStr();
     final existing = await _db.collection('sessions')
         .where('packageId', isEqualTo: pkg.id)
-        .where('date', isEqualTo: today)
+        .where('date', isEqualTo: dateStr)
         .where('startTime', isEqualTo: slot.startTime)
         .limit(1).get();
     if (existing.docs.isNotEmpty) {
@@ -132,14 +133,14 @@ class FirestoreService {
         'packageId': pkg.id,
         'studentId': pkg.studentId, 'teacherId': pkg.teacherId,
         'studentName': pkg.studentName, 'teacherName': pkg.teacherName,
-        'date': today, 'startTime': slot.startTime, 'endTime': slot.endTime,
+        'date': dateStr, 'startTime': slot.startTime, 'endTime': slot.endTime,
         'status': 'completed', 'isLate': false, 'isAbsent': false,
         'createdAt': FieldValue.serverTimestamp(),
       });
     }
     await _db.collection('packages').doc(pkg.id).update({
       'remainingSessions': FieldValue.increment(-1),
-      'lastCutDate': today,
+      'lastCutDate': dateStr,
       'updatedAt': FieldValue.serverTimestamp(),
     });
   }
@@ -324,11 +325,10 @@ class FirestoreService {
       }
     }
 
-    // ── session ของแพ็กเกจนี้ในช่วง วันนี้→endDate ──
+    // ── session ของแพ็กเกจนี้ (query เฉพาะ packageId แล้วกรองช่วงวันใน memory
+    //    เพื่อเลี่ยง composite index packageId+date) ──
     final snap = await _db.collection('sessions')
         .where('packageId', isEqualTo: packageId)
-        .where('date', isGreaterThanOrEqualTo: todayStr)
-        .where('date', isLessThanOrEqualTo: endStr)
         .get();
 
     final batch = _db.batch();
@@ -336,7 +336,9 @@ class FirestoreService {
     final existingValidKeys = <String>{};
     for (final d in snap.docs) {
       final m = d.data();
-      final key = '${m['date']}_${m['startTime']}';
+      final ds = m['date'] as String? ?? '';
+      if (ds.compareTo(todayStr) < 0 || ds.compareTo(endStr) > 0) continue; // นอกช่วง วันนี้→endDate
+      final key = '${ds}_${m['startTime']}';
       final isScheduledGenerated =
           (m['status'] as String?) == 'scheduled' && m['generated'] == true;
       if (isScheduledGenerated && !valid.containsKey(key)) {

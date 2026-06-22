@@ -5,6 +5,7 @@ import '../utils/date_format.dart';
 
 const _kOrange = Color(0xFFF97316);
 const _kGreen = Color(0xFF2E7D32);
+const _kPurple = Color(0xFF6A1B9A);
 
 const _thaiMonths = [
   '', 'มกราคม', 'กุมภาพันธ์', 'มีนาคม', 'เมษายน', 'พฤษภาคม', 'มิถุนายน',
@@ -41,7 +42,8 @@ Color _statusColor(String s) {
   }
 }
 
-class ScheduleCalendarScreen extends StatefulWidget {
+/// หน้าปฏิทินเต็ม (มี AppBar) — เปิดจากหน้าหลัก/ตารางสอน
+class ScheduleCalendarScreen extends StatelessWidget {
   /// ถ้าระบุ → กรองเฉพาะครู/นักเรียนคนนั้น (ไม่ระบุ = admin เห็นทั้งหมด)
   final String? filterTeacherId;
   final String? filterStudentId;
@@ -54,10 +56,40 @@ class ScheduleCalendarScreen extends StatefulWidget {
   });
 
   @override
-  State<ScheduleCalendarScreen> createState() => _ScheduleCalendarScreenState();
+  Widget build(BuildContext context) {
+    return Scaffold(
+      backgroundColor: const Color(0xFFF8FAFF),
+      appBar: AppBar(
+        title: Text(title),
+        backgroundColor: _kOrange,
+        foregroundColor: Colors.white,
+      ),
+      body: ScheduleCalendarBody(
+        filterTeacherId: filterTeacherId,
+        filterStudentId: filterStudentId,
+      ),
+    );
+  }
 }
 
-class _ScheduleCalendarScreenState extends State<ScheduleCalendarScreen> {
+/// เนื้อปฏิทิน (ไม่มี Scaffold/AppBar) — ใช้ฝังในหน้าอื่นได้ เช่น หน้าตัดคาบ
+/// enableCut=true → แอดมินแตะคาบที่เลยเวลาแล้วเพื่อตัดคาบได้เลย
+class ScheduleCalendarBody extends StatefulWidget {
+  final String? filterTeacherId;
+  final String? filterStudentId;
+  final bool enableCut;
+  const ScheduleCalendarBody({
+    super.key,
+    this.filterTeacherId,
+    this.filterStudentId,
+    this.enableCut = false,
+  });
+
+  @override
+  State<ScheduleCalendarBody> createState() => _ScheduleCalendarBodyState();
+}
+
+class _ScheduleCalendarBodyState extends State<ScheduleCalendarBody> {
   late DateTime _visibleMonth; // วันที่ 1 ของเดือนที่แสดง
   DateTime? _selectedDay;
 
@@ -103,8 +135,62 @@ class _ScheduleCalendarScreenState extends State<ScheduleCalendarScreen> {
     });
   }
 
+  /// เวลาสิ้นสุดของ slot บนวันที่ที่กำหนด (ใช้ endTime ถ้ามี ไม่งั้น startTime)
+  DateTime _slotEndDateTime(DateTime date, SlotItem slot) {
+    final ref = slot.endTime.isNotEmpty ? slot.endTime : slot.startTime;
+    try {
+      final p = ref.split(':');
+      return DateTime(date.year, date.month, date.day, int.parse(p[0]), int.parse(p[1]));
+    } catch (_) {
+      return DateTime(date.year, date.month, date.day, 23, 59);
+    }
+  }
+
+  /// คาบนี้กดตัดได้ไหม: เปิดโหมดตัด + ยังไม่ตัด/ไม่ยกเลิก + ยังมีโควตา + เลยเวลาสิ้นสุดแล้ว
+  bool _canCut(DateTime date, _Occurrence o) {
+    if (!widget.enableCut) return false;
+    if (o.status == 'completed' || o.status == 'cancelled') return false;
+    if (o.pkg.remainingSessions <= 0) return false;
+    return !nowThai().isBefore(_slotEndDateTime(date, o.slot)); // now >= end
+  }
+
+  void _confirmCut(DateTime date, _Occurrence o) {
+    final pkg = o.pkg;
+    showDialog(
+      context: context,
+      builder: (_) => AlertDialog(
+        title: const Text('ตัดคาบเรียน'),
+        content: Column(mainAxisSize: MainAxisSize.min, crossAxisAlignment: CrossAxisAlignment.start, children: [
+          Text('นักเรียน: ${pkg.studentName}'),
+          Text('ครู: ${pkg.teacherName}'),
+          Text(thaiDateTimeFull(date, startTime: o.slot.startTime, endTime: o.slot.endTime)),
+          const SizedBox(height: 8),
+          Text('คงเหลือก่อนตัด ${pkg.remainingSessions} คาบ → จะเหลือ ${pkg.remainingSessions - 1} คาบ',
+              style: const TextStyle(fontSize: 13, color: Colors.grey)),
+        ]),
+        actions: [
+          TextButton(onPressed: () => Navigator.pop(context), child: const Text('ยกเลิก')),
+          ElevatedButton(
+            onPressed: () async {
+              Navigator.pop(context);
+              await FirestoreService.cutSlot(pkg, o.slot, onDate: date);
+              if (mounted) {
+                ScaffoldMessenger.of(context).showSnackBar(SnackBar(
+                  content: Text('ตัดคาบ ${pkg.studentName} เรียบร้อย'),
+                  backgroundColor: Colors.green,
+                ));
+              }
+            },
+            style: ElevatedButton.styleFrom(backgroundColor: _kPurple, foregroundColor: Colors.white),
+            child: const Text('ยืนยันตัดคาบ'),
+          ),
+        ],
+      ),
+    );
+  }
+
   /// แผนที่ วันที่(1..n) → รายการ occurrence ในเดือนที่แสดง
-  /// statusMap: '{packageId}_{YYYY-MM-DD}' → สถานะ session จริง (ถ้ามี)
+  /// statusMap: '{packageId}_{YYYY-MM-DD}_{start}' → สถานะ session จริง (ถ้ามี)
   Map<int, List<_Occurrence>> _buildOccurrences(
       List<PackageModel> packages, Map<String, String> statusMap) {
     final year = _visibleMonth.year;
@@ -150,64 +236,50 @@ class _ScheduleCalendarScreenState extends State<ScheduleCalendarScreen> {
 
   @override
   Widget build(BuildContext context) {
-    return Scaffold(
-      backgroundColor: const Color(0xFFF8FAFF),
-      appBar: AppBar(
-        title: Text(widget.title),
-        backgroundColor: _kOrange,
-        foregroundColor: Colors.white,
-        actions: [
-          IconButton(
-            icon: const Icon(Icons.today),
-            tooltip: 'วันนี้',
-            onPressed: _goToday,
-          ),
-        ],
-      ),
-      body: StreamBuilder<List<PackageModel>>(
-        stream: _stream,
-        builder: (context, pkgSnap) {
-          if (pkgSnap.connectionState == ConnectionState.waiting) {
-            return const Center(child: CircularProgressIndicator());
-          }
-          final packages = pkgSnap.data ?? [];
-          return StreamBuilder<List<SessionModel>>(
-            stream: _sessionStream,
-            builder: (context, sessSnap) {
-              final sessions = sessSnap.data ?? [];
-              // (packageId_date) → status ของ session จริง
-              final statusMap = <String, String>{};
-              for (final s in sessions) {
-                statusMap['${s.packageId}_${s.date}_${s.startTime}'] = s.status;
-              }
-              final occ = _buildOccurrences(packages, statusMap);
+    return StreamBuilder<List<PackageModel>>(
+      stream: _stream,
+      builder: (context, pkgSnap) {
+        if (pkgSnap.connectionState == ConnectionState.waiting) {
+          return const Center(child: CircularProgressIndicator());
+        }
+        final packages = pkgSnap.data ?? [];
+        return StreamBuilder<List<SessionModel>>(
+          stream: _sessionStream,
+          builder: (context, sessSnap) {
+            final sessions = sessSnap.data ?? [];
+            // (packageId_date_start) → status ของ session จริง
+            final statusMap = <String, String>{};
+            for (final s in sessions) {
+              statusMap['${s.packageId}_${s.date}_${s.startTime}'] = s.status;
+            }
+            final occ = _buildOccurrences(packages, statusMap);
 
-              return Column(children: [
-                _monthHeader(),
-                _weekdayRow(),
-                Expanded(child: SingleChildScrollView(
-                  padding: const EdgeInsets.fromLTRB(8, 4, 8, 12),
-                  child: _calendarGrid(occ),
-                )),
-                _dayDetail(occ),
-              ]);
-            },
-          );
-        },
-      ),
+            return Column(children: [
+              _monthHeader(),
+              _weekdayRow(),
+              Expanded(child: SingleChildScrollView(
+                padding: const EdgeInsets.fromLTRB(8, 4, 8, 12),
+                child: _calendarGrid(occ),
+              )),
+              _dayDetail(occ),
+            ]);
+          },
+        );
+      },
     );
   }
 
   Widget _monthHeader() {
     return Container(
       color: Colors.white,
-      padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 8),
-      child: Row(mainAxisAlignment: MainAxisAlignment.spaceBetween, children: [
+      padding: const EdgeInsets.symmetric(horizontal: 4, vertical: 6),
+      child: Row(children: [
         IconButton(onPressed: () => _changeMonth(-1), icon: const Icon(Icons.chevron_left)),
-        Text(
+        Expanded(child: Center(child: Text(
           '${_thaiMonths[_visibleMonth.month]} ${_visibleMonth.year + 543}',
           style: const TextStyle(fontSize: 17, fontWeight: FontWeight.bold, color: _kOrange),
-        ),
+        ))),
+        IconButton(onPressed: _goToday, icon: const Icon(Icons.today, size: 22), tooltip: 'วันนี้'),
         IconButton(onPressed: () => _changeMonth(1), icon: const Icon(Icons.chevron_right)),
       ]),
     );
@@ -254,9 +326,13 @@ class _ScheduleCalendarScreenState extends State<ScheduleCalendarScreen> {
       final isToday = date.year == now.year && date.month == now.month && date.day == now.day;
       final isSelected = _selectedDay != null &&
           date.year == _selectedDay!.year && date.month == _selectedDay!.month && date.day == _selectedDay!.day;
-      final count = occ[day]?.length ?? 0;
+      final dayOcc = occ[day] ?? const <_Occurrence>[];
       final isPast = date.isBefore(DateTime(now.year, now.month, now.day));
-      cells.add(_dayCell(date, isToday: isToday, isSelected: isSelected, count: count, isPast: isPast));
+      // จุดเด่นเมื่อมีคาบรอตัดในวันนี้ (โหมดตัด)
+      final hasCuttable = dayOcc.any((o) => _canCut(date, o));
+      cells.add(_dayCell(date,
+          isToday: isToday, isSelected: isSelected, count: dayOcc.length,
+          isPast: isPast, hasCuttable: hasCuttable));
     }
     // เติมช่องท้ายให้ครบแถว
     while (cells.length % 7 != 0) {
@@ -271,7 +347,8 @@ class _ScheduleCalendarScreenState extends State<ScheduleCalendarScreen> {
   }
 
   Widget _dayCell(DateTime date,
-      {required bool isToday, required bool isSelected, required int count, required bool isPast}) {
+      {required bool isToday, required bool isSelected, required int count,
+      required bool isPast, required bool hasCuttable}) {
     final weekdayCol = date.weekday % 7; // 0=อา..6=ส
     final dateColor = weekdayCol == 0
         ? Colors.red.shade400
@@ -299,28 +376,39 @@ class _ScheduleCalendarScreenState extends State<ScheduleCalendarScreen> {
             width: isSelected || isToday ? 1.5 : 1,
           ),
         ),
-        child: Column(mainAxisAlignment: MainAxisAlignment.center, children: [
-          Text(
-            '${date.day}',
-            style: TextStyle(
-              fontSize: 14,
-              fontWeight: isToday || isSelected ? FontWeight.bold : FontWeight.w500,
-              color: isPast && !isToday ? dateColor.withAlpha(110) : dateColor,
-            ),
-          ),
-          const SizedBox(height: 2),
-          if (count > 0)
-            Container(
-              padding: const EdgeInsets.symmetric(horizontal: 6, vertical: 1),
-              decoration: BoxDecoration(
-                color: isPast && !isToday ? Colors.grey.shade400 : _kOrange,
-                borderRadius: BorderRadius.circular(8),
+        child: Stack(children: [
+          Center(child: Column(mainAxisAlignment: MainAxisAlignment.center, children: [
+            Text(
+              '${date.day}',
+              style: TextStyle(
+                fontSize: 14,
+                fontWeight: isToday || isSelected ? FontWeight.bold : FontWeight.w500,
+                color: isPast && !isToday ? dateColor.withAlpha(110) : dateColor,
               ),
-              child: Text('$count',
-                  style: const TextStyle(fontSize: 10, color: Colors.white, fontWeight: FontWeight.bold)),
-            )
-          else
-            const SizedBox(height: 14),
+            ),
+            const SizedBox(height: 2),
+            if (count > 0)
+              Container(
+                padding: const EdgeInsets.symmetric(horizontal: 6, vertical: 1),
+                decoration: BoxDecoration(
+                  color: isPast && !isToday ? Colors.grey.shade400 : _kOrange,
+                  borderRadius: BorderRadius.circular(8),
+                ),
+                child: Text('$count',
+                    style: const TextStyle(fontSize: 10, color: Colors.white, fontWeight: FontWeight.bold)),
+              )
+            else
+              const SizedBox(height: 14),
+          ])),
+          // จุดแดงมุมขวาบน = มีคาบรอตัดในวันนั้น (โหมดตัด)
+          if (hasCuttable)
+            Positioned(
+              right: 4, top: 4,
+              child: Container(
+                width: 8, height: 8,
+                decoration: const BoxDecoration(color: _kPurple, shape: BoxShape.circle),
+              ),
+            ),
         ]),
       ),
     );
@@ -370,22 +458,24 @@ class _ScheduleCalendarScreenState extends State<ScheduleCalendarScreen> {
                   shrinkWrap: true,
                   itemCount: list.length,
                   separatorBuilder: (_, __) => const SizedBox(height: 6),
-                  itemBuilder: (_, i) => _occTile(list[i]),
+                  itemBuilder: (_, i) => _occTile(sel, list[i]),
                 ),
         ),
       ]),
     );
   }
 
-  Widget _occTile(_Occurrence o) {
+  Widget _occTile(DateTime date, _Occurrence o) {
     final p = o.pkg;
     final time = '${o.slot.startTime}${o.slot.endTime.isNotEmpty ? '–${o.slot.endTime}' : ''}';
-    return Container(
+    final canCut = _canCut(date, o);
+
+    final tile = Container(
       padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 8),
       decoration: BoxDecoration(
         color: const Color(0xFFF8FAFF),
         borderRadius: BorderRadius.circular(10),
-        border: Border.all(color: Colors.grey.shade200),
+        border: Border.all(color: canCut ? _kPurple.withAlpha(90) : Colors.grey.shade200),
       ),
       child: Row(children: [
         Container(
@@ -410,26 +500,39 @@ class _ScheduleCalendarScreenState extends State<ScheduleCalendarScreen> {
           ]),
         ])),
         const SizedBox(width: 6),
-        Column(crossAxisAlignment: CrossAxisAlignment.end, children: [
-          // สถานะ session จริง
-          Container(
-            padding: const EdgeInsets.symmetric(horizontal: 7, vertical: 3),
-            decoration: BoxDecoration(
-              color: _statusColor(o.status).withAlpha(28),
-              borderRadius: BorderRadius.circular(8),
-            ),
-            child: Text(
-              _statusLabel(o.status),
-              style: TextStyle(fontSize: 10, color: _statusColor(o.status), fontWeight: FontWeight.bold),
-            ),
-          ),
-          const SizedBox(height: 3),
-          Text(
-            o.isSpecificDate ? 'เจาะจง' : 'ประจำ',
-            style: TextStyle(fontSize: 9, color: Colors.grey.shade500, fontWeight: FontWeight.w600),
-          ),
-        ]),
+        canCut
+            ? Container(
+                padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 7),
+                decoration: BoxDecoration(color: _kPurple, borderRadius: BorderRadius.circular(8)),
+                child: const Text('✂ ตัดคาบ',
+                    style: TextStyle(fontSize: 11, color: Colors.white, fontWeight: FontWeight.w600)),
+              )
+            : Column(crossAxisAlignment: CrossAxisAlignment.end, children: [
+                Container(
+                  padding: const EdgeInsets.symmetric(horizontal: 7, vertical: 3),
+                  decoration: BoxDecoration(
+                    color: _statusColor(o.status).withAlpha(28),
+                    borderRadius: BorderRadius.circular(8),
+                  ),
+                  child: Text(
+                    _statusLabel(o.status),
+                    style: TextStyle(fontSize: 10, color: _statusColor(o.status), fontWeight: FontWeight.bold),
+                  ),
+                ),
+                const SizedBox(height: 3),
+                Text(
+                  o.isSpecificDate ? 'เจาะจง' : 'ประจำ',
+                  style: TextStyle(fontSize: 9, color: Colors.grey.shade500, fontWeight: FontWeight.w600),
+                ),
+              ]),
       ]),
+    );
+
+    if (!canCut) return tile;
+    return InkWell(
+      onTap: () => _confirmCut(date, o),
+      borderRadius: BorderRadius.circular(10),
+      child: tile,
     );
   }
 }
