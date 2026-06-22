@@ -1,4 +1,5 @@
 import 'dart:async';
+import 'dart:ui';
 import 'package:flutter/material.dart';
 import 'package:firebase_auth/firebase_auth.dart';
 import '../models/models.dart';
@@ -16,15 +17,12 @@ import 'student_dashboard_screen.dart';
 
 const _kOrange = Color(0xFFF97316);
 
-/// breakpoint: จอกว้างกว่านี้ใช้ sidebar, แคบกว่าใช้ bottom bar
-const _kWideBreakpoint = 800.0;
-
 class _NavItem {
   final IconData icon;
-  final IconData selectedIcon;
   final String label;
+  final Color color;
   final int badge;
-  const _NavItem(this.icon, this.selectedIcon, this.label, {this.badge = 0});
+  const _NavItem(this.icon, this.label, this.color, {this.badge = 0});
 }
 
 class HomeScreen extends StatefulWidget {
@@ -91,7 +89,6 @@ class _HomeScreenState extends State<HomeScreen> {
         LeaveRequestScreen(key: ValueKey('tleave_$k'), appUser: u),
       ];
     }
-    // student
     return [
       StudentDashboardScreen(key: ValueKey('sdash_$k'), appUser: u),
       LeaveRequestScreen(key: ValueKey('sleave_$k'), appUser: u),
@@ -102,25 +99,25 @@ class _HomeScreenState extends State<HomeScreen> {
     final u = widget.appUser;
     if (u.isAdmin) {
       return [
-        const _NavItem(Icons.people_outline, Icons.people, 'ผู้ใช้'),
-        const _NavItem(Icons.inventory_2_outlined, Icons.inventory_2, 'คาบเรียน'),
-        _NavItem(Icons.content_cut_outlined, Icons.content_cut, 'ตัดคาบ', badge: _pendingCuts),
-        const _NavItem(Icons.person_pin_outlined, Icons.person_pin, 'เวลาครู'),
-        _NavItem(Icons.event_busy_outlined, Icons.event_busy, 'ใบลา', badge: _pendingLeaves),
-        const _NavItem(Icons.bar_chart_outlined, Icons.bar_chart, 'รายงาน'),
-        const _NavItem(Icons.settings_outlined, Icons.settings, 'ตั้งค่า'),
+        const _NavItem(Icons.people, 'ผู้ใช้', Color(0xFF3B82F6)),
+        const _NavItem(Icons.inventory_2, 'คาบเรียน', Color(0xFFF97316)),
+        _NavItem(Icons.content_cut, 'ตัดคาบ', const Color(0xFF7E57C2), badge: _pendingCuts),
+        const _NavItem(Icons.person_pin, 'เวลาครู', Color(0xFF2E7D32)),
+        _NavItem(Icons.event_busy, 'ใบลา', const Color(0xFFE65100), badge: _pendingLeaves),
+        const _NavItem(Icons.bar_chart, 'รายงาน', Color(0xFF00897B)),
+        const _NavItem(Icons.settings, 'ตั้งค่า', Color(0xFF607D8B)),
       ];
     }
     if (u.isTeacher) {
       return const [
-        _NavItem(Icons.home_outlined, Icons.home, 'หน้าหลัก'),
-        _NavItem(Icons.person_pin_outlined, Icons.person_pin, 'ตารางสอน'),
-        _NavItem(Icons.event_busy_outlined, Icons.event_busy, 'ใบลา'),
+        _NavItem(Icons.home, 'หน้าหลัก', Color(0xFFF97316)),
+        _NavItem(Icons.person_pin, 'ตารางสอน', Color(0xFF2E7D32)),
+        _NavItem(Icons.event_busy, 'ใบลา', Color(0xFFE65100)),
       ];
     }
     return const [
-      _NavItem(Icons.home_outlined, Icons.home, 'หน้าหลัก'),
-      _NavItem(Icons.event_busy_outlined, Icons.event_busy, 'ใบลา'),
+      _NavItem(Icons.home, 'หน้าหลัก', Color(0xFFF97316)),
+      _NavItem(Icons.event_busy, 'ใบลา', Color(0xFFE65100)),
     ];
   }
 
@@ -130,6 +127,8 @@ class _HomeScreenState extends State<HomeScreen> {
     if (u.isTeacher) return 'ครู';
     return 'นักเรียน';
   }
+
+  int get _totalBadge => _pendingCuts + _pendingLeaves;
 
   Future<void> _logout() async {
     final ok = await showDialog<bool>(context: context, builder: (_) => AlertDialog(
@@ -149,125 +148,102 @@ class _HomeScreenState extends State<HomeScreen> {
     }
   }
 
-  @override
-  Widget build(BuildContext context) {
-    final screens = _screens;
-    final items = _navItems;
-    if (_selectedIndex >= screens.length) _selectedIndex = 0;
-
-    final isWide = MediaQuery.of(context).size.width >= _kWideBreakpoint;
-
-    if (isWide) {
-      // ── Desktop / tablet: sidebar layout ──
-      return Scaffold(
-        body: Row(children: [
-          _Sidebar(
-            items: items,
-            selectedIndex: _selectedIndex,
-            roleLabel: _roleLabel,
-            userName: widget.isCodeLogin ? widget.appUser.name : null,
-            userCode: widget.isCodeLogin ? widget.appUser.code : null,
-            onSelect: (i) => setState(() => _selectedIndex = i),
-            onRefresh: _refresh,
-            onLogout: _logout,
-          ),
-          const VerticalDivider(width: 1),
-          Expanded(child: IndexedStack(index: _selectedIndex, children: screens)),
-        ]),
-      );
-    }
-
-    // ── Mobile: bottom navigation bar ──
-    return Scaffold(
-      body: IndexedStack(index: _selectedIndex, children: screens),
-      bottomNavigationBar: Column(
-        mainAxisSize: MainAxisSize.min,
-        children: [
-          Stack(
-            alignment: Alignment.centerRight,
-            children: [
-              NavigationBar(
-                selectedIndex: _selectedIndex,
-                onDestinationSelected: (i) => setState(() => _selectedIndex = i),
-                destinations: items.map((item) => NavigationDestination(
-                  icon: _badged(Icon(item.icon), item.badge),
-                  selectedIcon: _badged(Icon(item.selectedIcon), item.badge),
-                  label: item.label,
-                )).toList(),
-              ),
-              Padding(
-                padding: const EdgeInsets.only(right: 4),
-                child: IconButton(
-                  icon: const Icon(Icons.refresh, color: Colors.grey),
-                  tooltip: 'รีเฟรชข้อมูล',
-                  onPressed: _refresh,
-                ),
-              ),
-            ],
-          ),
-          if (widget.isCodeLogin)
-            Container(
-              color: Colors.white,
-              padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 4),
-              child: Row(
-                mainAxisAlignment: MainAxisAlignment.spaceBetween,
-                children: [
-                  Text(
-                    '${widget.appUser.name}  (${widget.appUser.code})',
-                    style: TextStyle(fontSize: 12, color: Colors.grey.shade600),
-                  ),
-                  TextButton.icon(
-                    onPressed: _logout,
-                    icon: const Icon(Icons.logout, size: 14, color: Colors.grey),
-                    label: const Text('ออกจากระบบ', style: TextStyle(fontSize: 12, color: Colors.grey)),
-                    style: TextButton.styleFrom(
-                      padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 2),
-                      tapTargetSize: MaterialTapTargetSize.shrinkWrap,
-                    ),
-                  ),
-                ],
-              ),
-            ),
-          Container(
-            color: Colors.white,
-            padding: const EdgeInsets.only(bottom: 4, top: 2),
-            child: const Text('Version 5.1.0',
-                textAlign: TextAlign.center,
-                style: TextStyle(fontSize: 12, color: Colors.grey)),
-          ),
-        ],
+  void _openMenu() {
+    showModalBottomSheet(
+      context: context,
+      backgroundColor: Colors.transparent,
+      isScrollControlled: true,
+      builder: (_) => _MenuSheet(
+        items: _navItems,
+        selectedIndex: _selectedIndex,
+        roleLabel: _roleLabel,
+        userName: '${widget.appUser.name} (${widget.appUser.code})',
+        onSelect: (i) {
+          Navigator.pop(context);
+          setState(() => _selectedIndex = i);
+        },
+        onRefresh: () { Navigator.pop(context); _refresh(); },
+        onLogout: () { Navigator.pop(context); _logout(); },
       ),
     );
   }
 
-  /// wrap icon ด้วย Badge เมื่อมีตัวเลขงานค้าง
-  static Widget _badged(Widget icon, int count) {
-    if (count <= 0) return icon;
-    return Badge(
-      label: Text('$count'),
-      backgroundColor: Colors.red,
-      child: icon,
+  @override
+  Widget build(BuildContext context) {
+    final screens = _screens;
+    if (_selectedIndex >= screens.length) _selectedIndex = 0;
+
+    return Scaffold(
+      body: IndexedStack(index: _selectedIndex, children: screens),
+      floatingActionButtonLocation: FloatingActionButtonLocation.centerFloat,
+      floatingActionButton: _HomeButton(badge: _totalBadge, onTap: _openMenu),
     );
   }
 }
 
-// ── Sidebar (desktop/tablet) ──────────────────────────────────────────────────
+// ── Home button (iPhone-style single launcher) ────────────────────────────────
 
-class _Sidebar extends StatelessWidget {
+class _HomeButton extends StatelessWidget {
+  final int badge;
+  final VoidCallback onTap;
+  const _HomeButton({required this.badge, required this.onTap});
+
+  @override
+  Widget build(BuildContext context) {
+    return GestureDetector(
+      onTap: onTap,
+      child: Stack(clipBehavior: Clip.none, children: [
+        Container(
+          width: 60, height: 60,
+          decoration: BoxDecoration(
+            gradient: const LinearGradient(
+              colors: [_kOrange, Color(0xFFFF8F00)],
+              begin: Alignment.topLeft, end: Alignment.bottomRight,
+            ),
+            shape: BoxShape.circle,
+            boxShadow: [
+              BoxShadow(color: _kOrange.withAlpha(110), blurRadius: 14, offset: const Offset(0, 5)),
+            ],
+          ),
+          child: const Icon(Icons.apps_rounded, color: Colors.white, size: 30),
+        ),
+        if (badge > 0)
+          Positioned(
+            right: -2, top: -2,
+            child: Container(
+              padding: const EdgeInsets.symmetric(horizontal: 6, vertical: 2),
+              constraints: const BoxConstraints(minWidth: 20),
+              decoration: BoxDecoration(
+                color: Colors.red,
+                shape: BoxShape.rectangle,
+                borderRadius: BorderRadius.circular(10),
+                border: Border.all(color: Colors.white, width: 1.5),
+              ),
+              child: Text('$badge',
+                  textAlign: TextAlign.center,
+                  style: const TextStyle(fontSize: 11, color: Colors.white, fontWeight: FontWeight.bold)),
+            ),
+          ),
+      ]),
+    );
+  }
+}
+
+// ── Menu popup (iOS-style app grid) ───────────────────────────────────────────
+
+class _MenuSheet extends StatelessWidget {
   final List<_NavItem> items;
   final int selectedIndex;
   final String roleLabel;
-  final String? userName;
-  final String? userCode;
+  final String userName;
   final ValueChanged<int> onSelect;
   final VoidCallback onRefresh;
   final VoidCallback onLogout;
-  const _Sidebar({
+  const _MenuSheet({
     required this.items,
     required this.selectedIndex,
     required this.roleLabel,
     required this.userName,
-    required this.userCode,
     required this.onSelect,
     required this.onRefresh,
     required this.onLogout,
@@ -275,146 +251,165 @@ class _Sidebar extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
-    return Container(
-      width: 240,
-      color: Colors.white,
-      child: SafeArea(
-        child: Column(children: [
-          // Brand header
-          Container(
-            width: double.infinity,
-            padding: const EdgeInsets.fromLTRB(16, 18, 16, 16),
-            child: Row(children: [
+    final width = MediaQuery.of(context).size.width;
+    final cols = width >= 700 ? 5 : 4;
+
+    return ClipRRect(
+      borderRadius: const BorderRadius.vertical(top: Radius.circular(24)),
+      child: BackdropFilter(
+        filter: ImageFilter.blur(sigmaX: 12, sigmaY: 12),
+        child: Container(
+          decoration: BoxDecoration(
+            color: Colors.white.withAlpha(245),
+            borderRadius: const BorderRadius.vertical(top: Radius.circular(24)),
+          ),
+          child: SafeArea(
+            top: false,
+            child: Column(mainAxisSize: MainAxisSize.min, children: [
+              // Handle
               Container(
-                width: 42, height: 42,
-                decoration: BoxDecoration(
-                  gradient: const LinearGradient(
-                    colors: [_kOrange, Color(0xFFFF8F00)],
-                    begin: Alignment.topLeft, end: Alignment.bottomRight,
+                margin: const EdgeInsets.only(top: 10, bottom: 4),
+                width: 40, height: 4,
+                decoration: BoxDecoration(color: Colors.grey.shade300, borderRadius: BorderRadius.circular(2)),
+              ),
+              // Header
+              Padding(
+                padding: const EdgeInsets.fromLTRB(20, 8, 12, 8),
+                child: Row(children: [
+                  Container(
+                    width: 36, height: 36,
+                    decoration: BoxDecoration(
+                      gradient: const LinearGradient(
+                        colors: [_kOrange, Color(0xFFFF8F00)],
+                        begin: Alignment.topLeft, end: Alignment.bottomRight,
+                      ),
+                      borderRadius: BorderRadius.circular(10),
+                    ),
+                    child: const Center(child: Text('7J',
+                        style: TextStyle(color: Colors.white, fontWeight: FontWeight.bold, fontSize: 13))),
                   ),
-                  borderRadius: BorderRadius.circular(12),
-                ),
-                child: const Center(child: Text('7J',
-                    style: TextStyle(color: Colors.white, fontWeight: FontWeight.bold, fontSize: 16))),
+                  const SizedBox(width: 10),
+                  Expanded(child: Column(crossAxisAlignment: CrossAxisAlignment.start, children: [
+                    Text(roleLabel, style: const TextStyle(fontWeight: FontWeight.bold, fontSize: 15)),
+                    Text(userName, style: TextStyle(fontSize: 11, color: Colors.grey.shade600)),
+                  ])),
+                  IconButton(
+                    onPressed: () => Navigator.pop(context),
+                    icon: const Icon(Icons.close, color: Colors.grey),
+                  ),
+                ]),
               ),
-              const SizedBox(width: 12),
-              Expanded(child: Column(crossAxisAlignment: CrossAxisAlignment.start, children: [
-                const Text('7J English',
-                    style: TextStyle(fontWeight: FontWeight.bold, fontSize: 16)),
-                Text(roleLabel,
-                    style: const TextStyle(fontSize: 12, color: _kOrange, fontWeight: FontWeight.w600)),
-              ])),
-            ]),
-          ),
-          if (userName != null)
-            Padding(
-              padding: const EdgeInsets.fromLTRB(16, 0, 16, 8),
-              child: Container(
-                width: double.infinity,
-                padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 6),
-                decoration: BoxDecoration(
-                  color: const Color(0xFFFFF3E0),
-                  borderRadius: BorderRadius.circular(8),
-                ),
-                child: Text('$userName ($userCode)',
-                    style: TextStyle(fontSize: 11, color: Colors.orange.shade800)),
-              ),
-            ),
-          const Divider(height: 1),
+              const Divider(height: 1),
 
-          // Menu items
-          Expanded(
-            child: ListView.builder(
-              padding: const EdgeInsets.symmetric(vertical: 8),
-              itemCount: items.length,
-              itemBuilder: (_, i) => _SidebarItem(
-                item: items[i],
-                selected: selectedIndex == i,
-                onTap: () => onSelect(i),
+              // App grid
+              Flexible(
+                child: GridView.builder(
+                  shrinkWrap: true,
+                  padding: const EdgeInsets.fromLTRB(12, 16, 12, 8),
+                  gridDelegate: SliverGridDelegateWithFixedCrossAxisCount(
+                    crossAxisCount: cols,
+                    childAspectRatio: 0.82,
+                    crossAxisSpacing: 4,
+                    mainAxisSpacing: 12,
+                  ),
+                  itemCount: items.length,
+                  itemBuilder: (_, i) => _AppTile(
+                    item: items[i],
+                    selected: selectedIndex == i,
+                    onTap: () => onSelect(i),
+                  ),
+                ),
               ),
-            ),
-          ),
 
-          const Divider(height: 1),
-          // Footer actions
-          Padding(
-            padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 6),
-            child: Row(children: [
-              Expanded(child: TextButton.icon(
-                onPressed: onRefresh,
-                icon: const Icon(Icons.refresh, size: 18, color: Colors.grey),
-                label: const Text('รีเฟรช', style: TextStyle(fontSize: 13, color: Colors.grey)),
-                style: TextButton.styleFrom(alignment: Alignment.centerLeft),
-              )),
-              IconButton(
-                onPressed: onLogout,
-                icon: const Icon(Icons.logout, size: 18, color: Colors.grey),
-                tooltip: 'ออกจากระบบ',
+              const Divider(height: 1),
+              // Footer
+              Padding(
+                padding: const EdgeInsets.fromLTRB(16, 6, 16, 8),
+                child: Row(children: [
+                  Expanded(child: TextButton.icon(
+                    onPressed: onRefresh,
+                    icon: const Icon(Icons.refresh, size: 18, color: Colors.grey),
+                    label: const Text('รีเฟรช', style: TextStyle(fontSize: 13, color: Colors.grey)),
+                    style: TextButton.styleFrom(alignment: Alignment.centerLeft),
+                  )),
+                  Text('Version 5.1.0', style: TextStyle(fontSize: 11, color: Colors.grey.shade400)),
+                  const SizedBox(width: 8),
+                  TextButton.icon(
+                    onPressed: onLogout,
+                    icon: const Icon(Icons.logout, size: 18, color: Colors.red),
+                    label: const Text('ออก', style: TextStyle(fontSize: 13, color: Colors.red)),
+                  ),
+                ]),
               ),
             ]),
           ),
-          const Padding(
-            padding: EdgeInsets.only(bottom: 8),
-            child: Text('Version 5.1.0',
-                style: TextStyle(fontSize: 11, color: Colors.grey)),
-          ),
-        ]),
+        ),
       ),
     );
   }
 }
 
-class _SidebarItem extends StatelessWidget {
+class _AppTile extends StatelessWidget {
   final _NavItem item;
   final bool selected;
   final VoidCallback onTap;
-  const _SidebarItem({required this.item, required this.selected, required this.onTap});
+  const _AppTile({required this.item, required this.selected, required this.onTap});
 
   @override
   Widget build(BuildContext context) {
-    return Padding(
-      padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 2),
-      child: Material(
-        color: selected ? _kOrange.withAlpha(24) : Colors.transparent,
-        borderRadius: BorderRadius.circular(10),
-        child: InkWell(
-          borderRadius: BorderRadius.circular(10),
-          onTap: onTap,
-          child: Padding(
-            padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 12),
-            child: Row(children: [
-              // accent bar
-              Container(
-                width: 3, height: 20,
-                margin: const EdgeInsets.only(right: 10),
-                decoration: BoxDecoration(
-                  color: selected ? _kOrange : Colors.transparent,
-                  borderRadius: BorderRadius.circular(2),
-                ),
+    return GestureDetector(
+      onTap: onTap,
+      child: Column(mainAxisSize: MainAxisSize.min, children: [
+        Stack(clipBehavior: Clip.none, children: [
+          Container(
+            width: 58, height: 58,
+            decoration: BoxDecoration(
+              gradient: LinearGradient(
+                colors: [item.color, Color.lerp(item.color, Colors.black, 0.18)!],
+                begin: Alignment.topLeft, end: Alignment.bottomRight,
               ),
-              Icon(selected ? item.selectedIcon : item.icon, size: 21,
-                  color: selected ? _kOrange : Colors.grey.shade600),
-              const SizedBox(width: 12),
-              Expanded(child: Text(item.label,
-                  style: TextStyle(
-                    fontSize: 14,
-                    fontWeight: selected ? FontWeight.bold : FontWeight.w500,
-                    color: selected ? _kOrange : Colors.black87,
-                  ))),
-              if (item.badge > 0)
-                Container(
-                  padding: const EdgeInsets.symmetric(horizontal: 7, vertical: 2),
-                  decoration: BoxDecoration(
-                    color: Colors.red,
-                    borderRadius: BorderRadius.circular(10),
-                  ),
-                  child: Text('${item.badge}',
-                      style: const TextStyle(fontSize: 11, color: Colors.white, fontWeight: FontWeight.bold)),
-                ),
-            ]),
+              borderRadius: BorderRadius.circular(16),
+              boxShadow: [
+                BoxShadow(color: item.color.withAlpha(90), blurRadius: 8, offset: const Offset(0, 3)),
+              ],
+              border: selected ? Border.all(color: Colors.white, width: 2) : null,
+            ),
+            child: Icon(item.icon, color: Colors.white, size: 28),
           ),
-        ),
-      ),
+          if (item.badge > 0)
+            Positioned(
+              right: -4, top: -4,
+              child: Container(
+                padding: const EdgeInsets.symmetric(horizontal: 6, vertical: 2),
+                constraints: const BoxConstraints(minWidth: 20),
+                decoration: BoxDecoration(
+                  color: Colors.red,
+                  borderRadius: BorderRadius.circular(10),
+                  border: Border.all(color: Colors.white, width: 1.5),
+                ),
+                child: Text('${item.badge}',
+                    textAlign: TextAlign.center,
+                    style: const TextStyle(fontSize: 11, color: Colors.white, fontWeight: FontWeight.bold)),
+              ),
+            ),
+          if (selected)
+            Positioned(
+              bottom: -3, left: 0, right: 0,
+              child: Center(child: Container(
+                width: 5, height: 5,
+                decoration: const BoxDecoration(color: _kOrange, shape: BoxShape.circle),
+              )),
+            ),
+        ]),
+        const SizedBox(height: 6),
+        Text(item.label,
+            maxLines: 1, overflow: TextOverflow.ellipsis,
+            style: TextStyle(
+              fontSize: 11.5,
+              fontWeight: selected ? FontWeight.bold : FontWeight.w500,
+              color: selected ? _kOrange : Colors.black87,
+            )),
+      ]),
     );
   }
 }
