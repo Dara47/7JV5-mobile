@@ -52,11 +52,35 @@ class _TeacherSlotSheetState extends State<_TeacherSlotSheet> {
   String _fmt(TimeOfDay t) =>
       '${t.hour.toString().padLeft(2, '0')}:${t.minute.toString().padLeft(2, '0')}';
 
+  /// slot ที่ระบุวันที่เจาะจง + เลยเวลาเริ่มไปแล้ว (recurring ไม่ถือว่าผ่าน)
+  bool _isSlotPast(SlotItem s) {
+    if (s.date == null || s.date!.isEmpty) return false;
+    final d = parseDateStr(s.date!);
+    if (d == null) return false;
+    final p = s.startTime.split(':');
+    if (p.length != 2) return false;
+    final start = DateTime(d.year, d.month, d.day,
+        int.tryParse(p[0]) ?? 0, int.tryParse(p[1]) ?? 0);
+    return DateTime.now().isAfter(start);
+  }
+
   void _addSlot() {
     if (_newDay == null || _newStart == null || _newEnd == null) {
       ScaffoldMessenger.of(context)
           .showSnackBar(const SnackBar(content: Text('กรุณาเลือกวันและเวลาให้ครบ')));
       return;
+    }
+    // เงื่อนไข: ตั้งเวลาว่างที่เลยวัน/เวลาปัจจุบันไปแล้วไม่ได้
+    if (_newDate != null) {
+      final start = DateTime(_newDate!.year, _newDate!.month, _newDate!.day,
+          _newStart!.hour, _newStart!.minute);
+      if (DateTime.now().isAfter(start)) {
+        ScaffoldMessenger.of(context).showSnackBar(const SnackBar(
+          content: Text('ตั้งเวลาว่างที่ผ่านไปแล้วไม่ได้ — เลือกวัน/เวลาในอนาคต'),
+          backgroundColor: Colors.redAccent,
+        ));
+        return;
+      }
     }
     setState(() {
       _slots.add(SlotItem(
@@ -73,10 +97,11 @@ class _TeacherSlotSheetState extends State<_TeacherSlotSheet> {
   }
 
   Future<void> _pickNewDate() async {
+    final now = DateTime.now();
     final d = await showDatePicker(
       context: context,
-      initialDate: _newDate ?? DateTime.now(),
-      firstDate: DateTime(2020),
+      initialDate: _newDate ?? now,
+      firstDate: DateTime(now.year, now.month, now.day), // ห้ามเลือกวันในอดีต
       lastDate: DateTime(2030),
     );
     if (d != null) {
@@ -203,18 +228,20 @@ class _TeacherSlotSheetState extends State<_TeacherSlotSheet> {
               else
                 ...List.generate(_slots.length, (i) {
                   final s = _slots[i];
+                  final past = _isSlotPast(s);
                   return Container(
                     margin: const EdgeInsets.only(bottom: 6),
                     padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 8),
                     decoration: BoxDecoration(
-                      color: const Color(0xFFE8F5E9),
+                      color: past ? Colors.grey.shade100 : const Color(0xFFE8F5E9),
                       borderRadius: BorderRadius.circular(10),
-                      border: Border.all(color: Colors.green.shade200),
+                      border: Border.all(color: past ? Colors.grey.shade300 : Colors.green.shade200),
                     ),
                     child: Row(children: [
                       Container(
                         width: 36, height: 36,
-                        decoration: BoxDecoration(color: _kGreen, shape: BoxShape.circle),
+                        decoration: BoxDecoration(
+                            color: past ? Colors.grey.shade400 : _kGreen, shape: BoxShape.circle),
                         child: Center(
                           child: Text(s.day,
                               style: const TextStyle(color: Colors.white, fontWeight: FontWeight.bold, fontSize: 13)),
@@ -225,11 +252,35 @@ class _TeacherSlotSheetState extends State<_TeacherSlotSheet> {
                         crossAxisAlignment: CrossAxisAlignment.start,
                         mainAxisSize: MainAxisSize.min,
                         children: [
-                          Text('${s.startTime} – ${s.endTime}',
-                              style: const TextStyle(fontSize: 15, fontWeight: FontWeight.w600, color: _kGreen)),
+                          Row(children: [
+                            Text('${s.startTime} – ${s.endTime}',
+                                style: TextStyle(
+                                  fontSize: 15, fontWeight: FontWeight.w600,
+                                  color: past ? Colors.grey.shade500 : _kGreen,
+                                  decoration: past ? TextDecoration.lineThrough : null,
+                                )),
+                            if (past) ...[
+                              const SizedBox(width: 8),
+                              Container(
+                                padding: const EdgeInsets.symmetric(horizontal: 6, vertical: 1),
+                                decoration: BoxDecoration(
+                                  color: Colors.grey.shade300,
+                                  borderRadius: BorderRadius.circular(6),
+                                ),
+                                child: Row(mainAxisSize: MainAxisSize.min, children: [
+                                  Icon(Icons.history, size: 11, color: Colors.grey.shade600),
+                                  const SizedBox(width: 2),
+                                  Text('ผ่านไปแล้ว',
+                                      style: TextStyle(fontSize: 10, color: Colors.grey.shade600, fontWeight: FontWeight.w600)),
+                                ]),
+                              ),
+                            ],
+                          ]),
                           if (s.date != null && s.date!.isNotEmpty)
                             Text(thaiDateFromStr(s.date!),
-                                style: const TextStyle(fontSize: 11, color: Color(0xFF558B2F))),
+                                style: TextStyle(
+                                    fontSize: 11,
+                                    color: past ? Colors.grey.shade500 : const Color(0xFF558B2F))),
                         ],
                       )),
                       IconButton(
