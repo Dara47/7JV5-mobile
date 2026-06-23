@@ -53,7 +53,7 @@ class _TeacherDashboardScreenState extends State<TeacherDashboardScreen> {
     final next = ClassReminderService.nextToday(_packages);
 
     return Scaffold(
-      backgroundColor: Colors.grey.shade100,
+      backgroundColor: Colors.transparent,
       appBar: AppBar(
         title: Text(_t('หน้าหลัก', 'Home')),
         backgroundColor: const Color(0xFFF97316),

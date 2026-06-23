@@ -48,7 +48,7 @@ class _StudentDashboardScreenState extends State<StudentDashboardScreen> {
   Widget build(BuildContext context) {
     final next = ClassReminderService.nextToday(_packages);
     return Scaffold(
-      backgroundColor: Colors.grey.shade100,
+      backgroundColor: Colors.transparent,
       appBar: AppBar(
         title: const Text('หน้าหลัก'),
         backgroundColor: const Color(0xFFF97316),

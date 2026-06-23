@@ -6,6 +6,7 @@ import 'models/models.dart';
 import 'services/firestore_service.dart';
 import 'screens/login_screen.dart';
 import 'screens/home_screen.dart';
+import 'widgets/app_watermark.dart';
 
 void main() async {
   WidgetsFlutterBinding.ensureInitialized();
@@ -25,7 +26,11 @@ class JV5App extends StatelessWidget {
         colorScheme: ColorScheme.fromSeed(seedColor: const Color(0xFFF97316)),
         useMaterial3: true,
         fontFamily: 'Roboto',
+        // โปร่งใส เพื่อให้ลายน้ำโลโก้ (AppWatermark) มองเห็นหลังทุกหน้า
+        scaffoldBackgroundColor: Colors.transparent,
       ),
+      // ลายน้ำโลโก้ครอบทั้งแอป — จุดเดียว ครบทุกเมนู
+      builder: (context, child) => AppWatermark(child: child ?? const SizedBox.shrink()),
       home: StreamBuilder<User?>(
         stream: FirebaseAuth.instance.authStateChanges(),
         builder: (context, snap) {
