@@ -16,7 +16,6 @@ class _SettingsScreenState extends State<SettingsScreen> {
   final _notesCtrl = TextEditingController();
   bool _saving = false;
   bool _loaded = false;
-  bool _generating = false;
 
   @override
   void dispose() {
@@ -53,45 +52,6 @@ class _SettingsScreenState extends State<SettingsScreen> {
       }
     } finally {
       if (mounted) setState(() => _saving = false);
-    }
-  }
-
-  Future<void> _generateSchedule() async {
-    final ok = await showDialog<bool>(
-      context: context,
-      builder: (_) => AlertDialog(
-        title: const Text('สร้างตารางล่วงหน้า'),
-        content: const Text(
-            'สร้างคาบเรียนล่วงหน้า 30 วันจากตารางประจำ/วันที่เจาะจง ลงปฏิทิน?\n\n'
-            '• กดซ้ำได้ ระบบกันคาบซ้ำให้\n'
-            '• สร้างไม่เกินจำนวนคาบที่เหลือของแต่ละแพ็กเกจ'),
-        actions: [
-          TextButton(onPressed: () => Navigator.pop(context, false), child: const Text('ยกเลิก')),
-          ElevatedButton(
-            onPressed: () => Navigator.pop(context, true),
-            style: ElevatedButton.styleFrom(backgroundColor: const Color(0xFF1976D2), foregroundColor: Colors.white),
-            child: const Text('สร้างเลย'),
-          ),
-        ],
-      ),
-    );
-    if (ok != true) return;
-    setState(() => _generating = true);
-    try {
-      final n = await FirestoreService.generateUpcomingSessions(daysAhead: 30);
-      if (mounted) {
-        ScaffoldMessenger.of(context).showSnackBar(SnackBar(
-          content: Text(n > 0 ? 'สร้างตารางล่วงหน้า $n คาบเรียบร้อย' : 'ไม่มีคาบใหม่ให้สร้าง (ครบแล้ว)'),
-          backgroundColor: Colors.green,
-        ));
-      }
-    } catch (e) {
-      if (mounted) {
-        ScaffoldMessenger.of(context).showSnackBar(
-          SnackBar(content: Text('เกิดข้อผิดพลาด: $e'), backgroundColor: Colors.red));
-      }
-    } finally {
-      if (mounted) setState(() => _generating = false);
     }
   }
 
@@ -208,34 +168,6 @@ class _SettingsScreenState extends State<SettingsScreen> {
                   label: const Text('เปิดหน้านำเข้าข้อมูล', style: TextStyle(fontSize: 16, fontWeight: FontWeight.bold, color: Color(0xFF2E7D32))),
                   style: OutlinedButton.styleFrom(
                     side: const BorderSide(color: Color(0xFF2E7D32)),
-                    shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(12)),
-                  ),
-                ),
-              ),
-              const SizedBox(height: 20),
-
-              // ── สร้างตารางล่วงหน้า ───────────────────────────────────
-              const Divider(),
-              const SizedBox(height: 8),
-              _SectionHeader(icon: Icons.event_repeat, label: 'ตารางคาบล่วงหน้า', color: const Color(0xFF1976D2)),
-              const SizedBox(height: 4),
-              Text(
-                'สร้างคาบเรียนล่วงหน้า 30 วันจากตารางประจำ ลงปฏิทิน (กดซ้ำได้ ระบบกันซ้ำให้)',
-                style: TextStyle(fontSize: 12, color: Colors.grey.shade600),
-              ),
-              const SizedBox(height: 8),
-              SizedBox(
-                height: 52,
-                child: ElevatedButton.icon(
-                  onPressed: _generating ? null : _generateSchedule,
-                  icon: _generating
-                      ? const SizedBox(width: 18, height: 18, child: CircularProgressIndicator(color: Colors.white, strokeWidth: 2))
-                      : const Icon(Icons.event_repeat),
-                  label: Text(_generating ? 'กำลังสร้าง...' : 'สร้างตารางล่วงหน้า 30 วัน',
-                      style: const TextStyle(fontSize: 16, fontWeight: FontWeight.bold)),
-                  style: ElevatedButton.styleFrom(
-                    backgroundColor: const Color(0xFF1976D2),
-                    foregroundColor: Colors.white,
                     shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(12)),
                   ),
                 ),

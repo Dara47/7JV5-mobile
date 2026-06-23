@@ -1,6 +1,7 @@
 ﻿import 'package:flutter/material.dart';
 import '../models/models.dart';
 import '../services/firestore_service.dart';
+import '../utils/date_format.dart';
 import 'teacher_slot_form_dialog.dart';
 import 'schedule_calendar_screen.dart';
 
@@ -54,7 +55,7 @@ class _TeacherScheduleScreenState extends State<TeacherScheduleScreen> {
             if (teacher == null) return const Center(child: Text('ไม่พบข้อมูลครู'));
             return ListView(
               padding: const EdgeInsets.all(12),
-              children: [_TeacherCard(teacher: teacher)],
+              children: [_TeacherCard(teacher: teacher, readOnly: true)],
             );
           },
         ),
@@ -134,7 +135,8 @@ class _TeacherScheduleScreenState extends State<TeacherScheduleScreen> {
 
 class _TeacherCard extends StatelessWidget {
   final UserModel teacher;
-  const _TeacherCard({required this.teacher});
+  final bool readOnly; // true = มุมมองครู (รายงานอ่านอย่างเดียว ไม่กระทบข้อมูล admin)
+  const _TeacherCard({required this.teacher, this.readOnly = false});
 
   @override
   Widget build(BuildContext context) {
@@ -220,7 +222,7 @@ class _TeacherCard extends StatelessWidget {
 
                     // Schedule slots
                     GestureDetector(
-                      onTap: () => showTeacherSlotForm(context, teacher: teacher, existing: slot),
+                      onTap: readOnly ? null : () => showTeacherSlotForm(context, teacher: teacher, existing: slot),
                       child: Container(
                         width: double.infinity,
                         padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 8),
@@ -239,32 +241,40 @@ class _TeacherCard extends StatelessWidget {
                                   Text('${slot.slots.length} ช่วงเวลา',
                                       style: TextStyle(fontSize: 12, color: Colors.green.shade700, fontWeight: FontWeight.w600)),
                                   const Spacer(),
-                                  Icon(Icons.edit_calendar, size: 14, color: Colors.green.shade600),
-                                  const SizedBox(width: 4),
-                                  Text('แก้ไข', style: TextStyle(fontSize: 11, color: Colors.green.shade600)),
+                                  if (!readOnly) ...[
+                                    Icon(Icons.edit_calendar, size: 14, color: Colors.green.shade600),
+                                    const SizedBox(width: 4),
+                                    Text('แก้ไข', style: TextStyle(fontSize: 11, color: Colors.green.shade600)),
+                                  ],
                                 ]),
                                 const SizedBox(height: 6),
                                 Wrap(
                                   spacing: 6, runSpacing: 6,
-                                  children: slot.slots.map((s) => Container(
-                                    padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 4),
-                                    decoration: BoxDecoration(
-                                      color: const Color(0xFF2E7D32),
-                                      borderRadius: BorderRadius.circular(6),
-                                    ),
-                                    child: Text('${s.day}  ${s.startTime}–${s.endTime}',
-                                        style: const TextStyle(fontSize: 12, color: Colors.white, fontWeight: FontWeight.w600)),
-                                  )).toList(),
+                                  children: slot.slots.map((s) {
+                                    final datePart = (s.date != null && s.date!.isNotEmpty)
+                                        ? '${thaiShortDateFromStr(s.date!)} ' : '';
+                                    return Container(
+                                      padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 4),
+                                      decoration: BoxDecoration(
+                                        color: const Color(0xFF2E7D32),
+                                        borderRadius: BorderRadius.circular(6),
+                                      ),
+                                      child: Text('$datePart${s.day}  ${s.startTime}–${s.endTime}',
+                                          style: const TextStyle(fontSize: 12, color: Colors.white, fontWeight: FontWeight.w600)),
+                                    );
+                                  }).toList(),
                                 ),
                               ])
                             : Row(children: [
                                 const Icon(Icons.calendar_today, size: 14, color: Colors.grey),
                                 const SizedBox(width: 6),
-                                const Expanded(child: Text('แตะเพื่อตั้งวัน/เวลา',
-                                    style: TextStyle(fontSize: 13, color: Colors.grey))),
-                                const Icon(Icons.add_circle_outline, size: 14, color: Colors.grey),
-                                const SizedBox(width: 4),
-                                Text('ตั้งค่า', style: TextStyle(fontSize: 11, color: Colors.grey.shade600)),
+                                Expanded(child: Text(readOnly ? 'ยังไม่ได้ตั้งวัน/เวลา' : 'แตะเพื่อตั้งวัน/เวลา',
+                                    style: const TextStyle(fontSize: 13, color: Colors.grey))),
+                                if (!readOnly) ...[
+                                  const Icon(Icons.add_circle_outline, size: 14, color: Colors.grey),
+                                  const SizedBox(width: 4),
+                                  Text('ตั้งค่า', style: TextStyle(fontSize: 11, color: Colors.grey.shade600)),
+                                ],
                               ]),
                       ),
                     ),
@@ -331,17 +341,20 @@ class _TeacherCard extends StatelessWidget {
                   ],
                 )),
 
-                // Action bar
-                Container(
-                  decoration: BoxDecoration(border: Border(top: BorderSide(color: Colors.grey.shade200)), borderRadius: const BorderRadius.vertical(bottom: Radius.circular(14))),
-                  child: Row(children: [
-                    _ActionBtn(icon: Icons.edit_outlined, label: 'Edit', color: const Color(0xFF2E7D32),
-                        onTap: () => showTeacherSlotForm(context, teacher: teacher, existing: slot)),
-                    _vDivider(),
-                    _ActionBtn(icon: Icons.delete_outline, label: 'ลบ', color: Colors.red,
-                        onTap: () => _confirmDelete(context, slot)),
-                  ]),
-                ),
+                // Action bar — เฉพาะ admin (มุมมองครูเป็นรายงานอ่านอย่างเดียว)
+                if (!readOnly)
+                  Container(
+                    decoration: BoxDecoration(border: Border(top: BorderSide(color: Colors.grey.shade200)), borderRadius: const BorderRadius.vertical(bottom: Radius.circular(14))),
+                    child: Row(children: [
+                      _ActionBtn(icon: Icons.edit_outlined, label: 'Edit', color: const Color(0xFF2E7D32),
+                          onTap: () => showTeacherSlotForm(context, teacher: teacher, existing: slot)),
+                      _vDivider(),
+                      _ActionBtn(icon: Icons.delete_outline, label: 'ลบ', color: Colors.red,
+                          onTap: () => _confirmDelete(context, slot)),
+                    ]),
+                  )
+                else
+                  const SizedBox(height: 6),
               ]),
             );
           },

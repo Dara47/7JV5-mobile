@@ -240,6 +240,24 @@ class _AdminLeaveCard extends StatelessWidget {
             const SizedBox(width: 4),
             Text('วันลา: ${leave.shortDate}', style: const TextStyle(fontSize: 13, color: Colors.black87)),
           ]),
+          if (leave.hasTeacher) ...[
+            const SizedBox(height: 4),
+            Row(children: [
+              const Icon(Icons.person_outline, size: 14, color: Color(0xFF2E7D32)),
+              const SizedBox(width: 4),
+              Expanded(child: Text('ลาเรียนของครู: ${leave.teacherLabel}',
+                  style: const TextStyle(fontSize: 13, color: Color(0xFF2E7D32), fontWeight: FontWeight.w600))),
+            ]),
+          ],
+          if (leave.hasStudent) ...[
+            const SizedBox(height: 4),
+            Row(children: [
+              const Icon(Icons.school_outlined, size: 14, color: Color(0xFFF97316)),
+              const SizedBox(width: 4),
+              Expanded(child: Text('ลาสอนของนักเรียน: ${leave.studentLabel}',
+                  style: const TextStyle(fontSize: 13, color: Color(0xFFF97316), fontWeight: FontWeight.w600))),
+            ]),
+          ],
           const SizedBox(height: 4),
           Row(crossAxisAlignment: CrossAxisAlignment.start, children: [
             const Icon(Icons.notes, size: 14, color: Colors.grey),
@@ -301,9 +319,41 @@ class _UserLeaveView extends StatefulWidget {
 }
 
 class _UserLeaveViewState extends State<_UserLeaveView> {
-  void _showSubmitForm() {
+  Future<void> _showSubmitForm() async {
     String? selectedDate;
     final reasonCtrl = TextEditingController();
+    final teacherNameCtrl = TextEditingController();
+    final teacherCodeCtrl = TextEditingController();
+    final studentNameCtrl = TextEditingController();
+    final studentCodeCtrl = TextEditingController();
+    final isStudent = widget.appUser.role == 'student';
+    final isTeacher = widget.appUser.role == 'teacher';
+
+    // โหลดรายชื่อ "อีกฝ่าย" จากแพ็กเกจ (ไว้ให้กดเลือกเร็ว ๆ)
+    // นักเรียน → เลือกครู, ครู → เลือกนักเรียน
+    List<({String name, String code})> myTeachers = [];
+    List<({String name, String code})> myStudents = [];
+    if (isStudent || isTeacher) {
+      try {
+        final pkgs = await FirestoreService.getPackagesForUser(widget.appUser.uid, widget.appUser.role);
+        final seen = <String>{};
+        for (final p in pkgs) {
+          if (isStudent) {
+            if (p.teacherName.isEmpty && p.teacherCode.isEmpty) continue;
+            if (seen.add('${p.teacherName}|${p.teacherCode}')) {
+              myTeachers.add((name: p.teacherName, code: p.teacherCode));
+            }
+          } else {
+            if (p.studentName.isEmpty && p.studentCode.isEmpty) continue;
+            if (seen.add('${p.studentName}|${p.studentCode}')) {
+              myStudents.add((name: p.studentName, code: p.studentCode));
+            }
+          }
+        }
+      } catch (_) {/* ใช้พิมพ์เองแทน */}
+    }
+    if (!mounted) return;
+
     showModalBottomSheet(
       context: context,
       isScrollControlled: true,
@@ -367,6 +417,134 @@ class _UserLeaveViewState extends State<_UserLeaveView> {
                 ),
                 const SizedBox(height: 14),
 
+                if (isStudent) ...[
+                  const Text('👩‍🏫 ครูที่จะลาเรียน', style: TextStyle(fontSize: 13, fontWeight: FontWeight.w600)),
+                  const SizedBox(height: 6),
+                  if (myTeachers.isNotEmpty) ...[
+                    Wrap(
+                      spacing: 6, runSpacing: 6,
+                      children: myTeachers.map((t) {
+                        final selected = teacherNameCtrl.text == t.name && teacherCodeCtrl.text == t.code;
+                        final label = t.code.isNotEmpty ? '${t.name} (${t.code})' : t.name;
+                        return GestureDetector(
+                          onTap: () => setSheet(() {
+                            teacherNameCtrl.text = t.name;
+                            teacherCodeCtrl.text = t.code;
+                          }),
+                          child: Container(
+                            padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 6),
+                            decoration: BoxDecoration(
+                              color: selected ? Colors.orange.shade50 : Colors.grey.shade50,
+                              borderRadius: BorderRadius.circular(20),
+                              border: Border.all(color: selected ? Colors.orange.shade400 : Colors.grey.shade300),
+                            ),
+                            child: Text(label, style: TextStyle(
+                              fontSize: 12,
+                              color: selected ? Colors.orange.shade800 : Colors.black87,
+                              fontWeight: selected ? FontWeight.w600 : FontWeight.normal,
+                            )),
+                          ),
+                        );
+                      }).toList(),
+                    ),
+                    const SizedBox(height: 8),
+                  ],
+                  Row(crossAxisAlignment: CrossAxisAlignment.start, children: [
+                    Expanded(
+                      flex: 3,
+                      child: TextField(
+                        controller: teacherNameCtrl,
+                        decoration: InputDecoration(
+                          hintText: 'ชื่อครู',
+                          filled: true, fillColor: Colors.grey.shade50,
+                          border: OutlineInputBorder(borderRadius: BorderRadius.circular(10), borderSide: BorderSide(color: Colors.grey.shade300)),
+                          enabledBorder: OutlineInputBorder(borderRadius: BorderRadius.circular(10), borderSide: BorderSide(color: Colors.grey.shade300)),
+                          contentPadding: const EdgeInsets.symmetric(horizontal: 12, vertical: 12),
+                        ),
+                      ),
+                    ),
+                    const SizedBox(width: 8),
+                    Expanded(
+                      flex: 2,
+                      child: TextField(
+                        controller: teacherCodeCtrl,
+                        decoration: InputDecoration(
+                          hintText: 'รหัสครู',
+                          filled: true, fillColor: Colors.grey.shade50,
+                          border: OutlineInputBorder(borderRadius: BorderRadius.circular(10), borderSide: BorderSide(color: Colors.grey.shade300)),
+                          enabledBorder: OutlineInputBorder(borderRadius: BorderRadius.circular(10), borderSide: BorderSide(color: Colors.grey.shade300)),
+                          contentPadding: const EdgeInsets.symmetric(horizontal: 12, vertical: 12),
+                        ),
+                      ),
+                    ),
+                  ]),
+                  const SizedBox(height: 14),
+                ],
+
+                if (isTeacher) ...[
+                  const Text('🎓 นักเรียนที่จะลาสอน', style: TextStyle(fontSize: 13, fontWeight: FontWeight.w600)),
+                  const SizedBox(height: 6),
+                  if (myStudents.isNotEmpty) ...[
+                    Wrap(
+                      spacing: 6, runSpacing: 6,
+                      children: myStudents.map((s) {
+                        final selected = studentNameCtrl.text == s.name && studentCodeCtrl.text == s.code;
+                        final label = s.code.isNotEmpty ? '${s.name} (${s.code})' : s.name;
+                        return GestureDetector(
+                          onTap: () => setSheet(() {
+                            studentNameCtrl.text = s.name;
+                            studentCodeCtrl.text = s.code;
+                          }),
+                          child: Container(
+                            padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 6),
+                            decoration: BoxDecoration(
+                              color: selected ? Colors.orange.shade50 : Colors.grey.shade50,
+                              borderRadius: BorderRadius.circular(20),
+                              border: Border.all(color: selected ? Colors.orange.shade400 : Colors.grey.shade300),
+                            ),
+                            child: Text(label, style: TextStyle(
+                              fontSize: 12,
+                              color: selected ? Colors.orange.shade800 : Colors.black87,
+                              fontWeight: selected ? FontWeight.w600 : FontWeight.normal,
+                            )),
+                          ),
+                        );
+                      }).toList(),
+                    ),
+                    const SizedBox(height: 8),
+                  ],
+                  Row(crossAxisAlignment: CrossAxisAlignment.start, children: [
+                    Expanded(
+                      flex: 3,
+                      child: TextField(
+                        controller: studentNameCtrl,
+                        decoration: InputDecoration(
+                          hintText: 'ชื่อนักเรียน',
+                          filled: true, fillColor: Colors.grey.shade50,
+                          border: OutlineInputBorder(borderRadius: BorderRadius.circular(10), borderSide: BorderSide(color: Colors.grey.shade300)),
+                          enabledBorder: OutlineInputBorder(borderRadius: BorderRadius.circular(10), borderSide: BorderSide(color: Colors.grey.shade300)),
+                          contentPadding: const EdgeInsets.symmetric(horizontal: 12, vertical: 12),
+                        ),
+                      ),
+                    ),
+                    const SizedBox(width: 8),
+                    Expanded(
+                      flex: 2,
+                      child: TextField(
+                        controller: studentCodeCtrl,
+                        decoration: InputDecoration(
+                          hintText: 'รหัสนักเรียน',
+                          filled: true, fillColor: Colors.grey.shade50,
+                          border: OutlineInputBorder(borderRadius: BorderRadius.circular(10), borderSide: BorderSide(color: Colors.grey.shade300)),
+                          enabledBorder: OutlineInputBorder(borderRadius: BorderRadius.circular(10), borderSide: BorderSide(color: Colors.grey.shade300)),
+                          contentPadding: const EdgeInsets.symmetric(horizontal: 12, vertical: 12),
+                        ),
+                      ),
+                    ),
+                  ]),
+                  const SizedBox(height: 14),
+                ],
+
                 const Text('📝 เหตุผล', style: TextStyle(fontSize: 13, fontWeight: FontWeight.w600)),
                 const SizedBox(height: 6),
                 TextField(
@@ -396,6 +574,16 @@ class _UserLeaveViewState extends State<_UserLeaveView> {
                           const SnackBar(content: Text('กรุณาระบุเหตุผล')));
                         return;
                       }
+                      if (isStudent && teacherNameCtrl.text.trim().isEmpty && teacherCodeCtrl.text.trim().isEmpty) {
+                        ScaffoldMessenger.of(context).showSnackBar(
+                          const SnackBar(content: Text('กรุณาระบุครูที่จะลาเรียน')));
+                        return;
+                      }
+                      if (isTeacher && studentNameCtrl.text.trim().isEmpty && studentCodeCtrl.text.trim().isEmpty) {
+                        ScaffoldMessenger.of(context).showSnackBar(
+                          const SnackBar(content: Text('กรุณาระบุนักเรียนที่จะลาสอน')));
+                        return;
+                      }
                       Navigator.pop(ctx);
                       await FirestoreService.addLeaveRequest({
                         'userId': widget.appUser.uid,
@@ -405,6 +593,10 @@ class _UserLeaveViewState extends State<_UserLeaveView> {
                         'date': selectedDate,
                         'reason': reasonCtrl.text.trim(),
                         'status': 'pending',
+                        'teacherName': teacherNameCtrl.text.trim(),
+                        'teacherCode': teacherCodeCtrl.text.trim(),
+                        'studentName': studentNameCtrl.text.trim(),
+                        'studentCode': studentCodeCtrl.text.trim(),
                       });
                       if (context.mounted) {
                         ScaffoldMessenger.of(context).showSnackBar(
@@ -514,6 +706,16 @@ class _UserLeaveViewState extends State<_UserLeaveView> {
                         ),
                       ],
                     ]),
+                    if (r.hasTeacher) ...[
+                      const SizedBox(height: 6),
+                      Text('ครู: ${r.teacherLabel}',
+                          style: const TextStyle(fontSize: 13, color: Color(0xFF2E7D32), fontWeight: FontWeight.w600)),
+                    ],
+                    if (r.hasStudent) ...[
+                      const SizedBox(height: 6),
+                      Text('นักเรียน: ${r.studentLabel}',
+                          style: const TextStyle(fontSize: 13, color: Color(0xFFF97316), fontWeight: FontWeight.w600)),
+                    ],
                     const SizedBox(height: 6),
                     Text('เหตุผล: ${r.reason}', style: const TextStyle(fontSize: 13, color: Colors.black87)),
                     if (r.adminNote != null && r.adminNote!.isNotEmpty) ...[

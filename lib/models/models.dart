@@ -260,11 +260,17 @@ class LeaveRequestModel {
   final String reason;
   final String status; // 'pending', 'approved', 'rejected'
   final String? adminNote;
+  final String teacherName; // ครูที่ลาเรียนในชั่วโมงสอน (สำหรับนักเรียน)
+  final String teacherCode;
+  final String studentName; // นักเรียนที่ลาสอนในชั่วโมงเรียน (สำหรับครู)
+  final String studentCode;
 
   LeaveRequestModel({
     required this.id, required this.userId, required this.userName,
     required this.userCode, required this.userRole, required this.date,
     required this.reason, required this.status, this.adminNote,
+    this.teacherName = '', this.teacherCode = '',
+    this.studentName = '', this.studentCode = '',
   });
 
   bool get isPending => status == 'pending';
@@ -305,7 +311,26 @@ class LeaveRequestModel {
       reason: d['reason'] ?? '',
       status: d['status'] ?? 'pending',
       adminNote: d['adminNote'],
+      teacherName: d['teacherName'] ?? '',
+      teacherCode: d['teacherCode'] ?? '',
+      studentName: d['studentName'] ?? '',
+      studentCode: d['studentCode'] ?? '',
     );
+  }
+
+  bool get hasTeacher => teacherName.isNotEmpty || teacherCode.isNotEmpty;
+  bool get hasStudent => studentName.isNotEmpty || studentCode.isNotEmpty;
+
+  /// "ชื่อครู (รหัส)" — สำหรับแสดงผล
+  String get teacherLabel {
+    if (teacherName.isNotEmpty && teacherCode.isNotEmpty) return '$teacherName ($teacherCode)';
+    return teacherName.isNotEmpty ? teacherName : teacherCode;
+  }
+
+  /// "ชื่อนักเรียน (รหัส)" — สำหรับแสดงผล
+  String get studentLabel {
+    if (studentName.isNotEmpty && studentCode.isNotEmpty) return '$studentName ($studentCode)';
+    return studentName.isNotEmpty ? studentName : studentCode;
   }
 }
 
