@@ -43,7 +43,7 @@ class _AdminLeaveViewState extends State<_AdminLeaveView> {
           ElevatedButton(
             onPressed: () async {
               Navigator.pop(context);
-              await FirestoreService.updateLeaveStatus(r.id, 'approved');
+              await FirestoreService.updateLeaveStatus(r.id, 'approved', who: '${r.userName} (${r.shortDate})');
               if (mounted) {
                 ScaffoldMessenger.of(context).showSnackBar(
                   const SnackBar(content: Text('อนุมัติแล้ว'), backgroundColor: Colors.green));
@@ -83,7 +83,7 @@ class _AdminLeaveViewState extends State<_AdminLeaveView> {
             onPressed: () async {
               final note = noteCtrl.text.trim();
               Navigator.pop(context);
-              await FirestoreService.updateLeaveStatus(r.id, 'rejected', adminNote: note);
+              await FirestoreService.updateLeaveStatus(r.id, 'rejected', adminNote: note, who: '${r.userName} (${r.shortDate})');
               if (mounted) {
                 ScaffoldMessenger.of(context).showSnackBar(
                   const SnackBar(content: Text('ปฏิเสธแล้ว'), backgroundColor: Colors.red));
@@ -108,7 +108,7 @@ class _AdminLeaveViewState extends State<_AdminLeaveView> {
           TextButton(
             onPressed: () async {
               Navigator.pop(context);
-              await FirestoreService.deleteLeaveRequest(r.id);
+              await FirestoreService.deleteLeaveRequest(r.id, who: '${r.userName} (${r.shortDate})');
             },
             child: const Text('ลบ', style: TextStyle(color: Colors.red)),
           ),

@@ -6,6 +6,9 @@ import '../utils/date_format.dart';
 class FirestoreService {
   static final _db = FirebaseFirestore.instance;
 
+  /// ผู้ใช้ที่ล็อกอินอยู่ตอนนี้ — ใช้แนบชื่อผู้ดูแลใน audit log
+  static AppUser? currentUser;
+
   static Stream<List<UserModel>> watchUsers({String? role}) {
     Query<Map<String, dynamic>> q = _db.collection('users');
     if (role != null) q = q.where('role', isEqualTo: role);
@@ -13,11 +16,63 @@ class FirestoreService {
       ..sort((a, b) => a.code.compareTo(b.code)));
   }
 
-  static Future<AppUser> getAppUser(String uid) async {
+  static Future<AppUser> getAppUser(String uid, {String email = ''}) async {
+    // ชื่อเริ่มต้นของ admin = ส่วนหน้าอีเมล (เช่น frame@7j.com → "frame")
+    final fallbackName = email.contains('@') ? email.split('@').first : 'Admin';
     final doc = await _db.collection('users').doc(uid).get();
-    if (!doc.exists) return AppUser(uid: uid, role: 'admin', name: 'Admin', code: 'A000');
-    final d = doc.data()!;
-    return AppUser(uid: uid, role: d['role'] ?? 'admin', name: d['name'] ?? '', code: d['code'] ?? '');
+    AppUser u;
+    if (!doc.exists) {
+      u = AppUser(uid: uid, role: 'admin', name: fallbackName, code: 'A000', email: email);
+    } else {
+      final d = doc.data()!;
+      final name = (d['name'] ?? '').toString().trim();
+      u = AppUser(
+        uid: uid, role: d['role'] ?? 'admin',
+        name: name.isEmpty ? fallbackName : name,
+        code: d['code'] ?? '', email: email,
+      );
+    }
+    currentUser = u;
+    return u;
+  }
+
+  /// บันทึก/แก้ชื่อผู้ดูแล (เขียน users/{uid}) — ให้ audit log รู้ว่าใคร
+  static Future<void> saveAdminName(String name) async {
+    final u = currentUser;
+    if (u == null) return;
+    await _db.collection('users').doc(u.uid).set({
+      'role': 'admin',
+      'name': name.trim(),
+      'email': u.email,
+      'code': u.code.isEmpty ? 'A000' : u.code,
+      'updatedAt': FieldValue.serverTimestamp(),
+    }, SetOptions(merge: true));
+    currentUser = AppUser(uid: u.uid, role: 'admin', name: name.trim(), code: u.code, email: u.email);
+  }
+
+  // ── Audit Log (ใครทำอะไร) ──────────────────────────────────────────────────
+  /// บันทึกการกระทำของผู้ดูแล — ทำงานเฉพาะเมื่อผู้ใช้ปัจจุบันเป็น admin
+  static Future<void> logAudit(String action, {String detail = ''}) async {
+    final u = currentUser;
+    if (u == null || !u.isAdmin) return;
+    try {
+      await _db.collection('auditLogs').add({
+        'action': action,
+        'detail': detail,
+        'adminName': u.name,
+        'adminEmail': u.email,
+        'adminUid': u.uid,
+        'createdAt': FieldValue.serverTimestamp(),
+      });
+    } catch (_) {/* อย่าให้ log ล้มแล้วกระทบงานหลัก */}
+  }
+
+  static Stream<List<AuditLogModel>> watchAuditLogs({int limit = 300}) {
+    return _db.collection('auditLogs')
+        .orderBy('createdAt', descending: true)
+        .limit(limit)
+        .snapshots()
+        .map((s) => s.docs.map(AuditLogModel.fromDoc).toList());
   }
 
   static Future<UserModel?> getUser(String id) async {
@@ -143,6 +198,8 @@ class FirestoreService {
       'lastCutDate': dateStr,
       'updatedAt': FieldValue.serverTimestamp(),
     });
+    await logAudit('ตัดคาบ',
+        detail: '${pkg.studentName} (${pkg.studentCode}) · ครู ${pkg.teacherName} · ${slot.startTime}–${slot.endTime} · $dateStr');
   }
 
   /// ตัดคาบหลาย slot ในคลิกเดียว (batch) — คืนจำนวนที่ตัดสำเร็จ
@@ -185,7 +242,10 @@ class FirestoreService {
         'updatedAt': FieldValue.serverTimestamp(),
       });
     });
-    if (count > 0) await batch.commit();
+    if (count > 0) {
+      await batch.commit();
+      await logAudit('ตัดคาบทั้งหมด', detail: '$count คาบ');
+    }
     return count;
   }
 
@@ -488,6 +548,7 @@ class FirestoreService {
 
   static Future<void> addUser(Map<String, dynamic> data) async {
     await _db.collection('users').add({...data, 'createdAt': FieldValue.serverTimestamp()});
+    await logAudit('เพิ่มผู้ใช้', detail: '${data['name'] ?? ''} (${data['code'] ?? ''}) · ${data['role'] ?? ''}');
   }
 
   /// รหัสผู้ใช้ทั้งหมดในระบบ (uppercase) — ใช้กันซ้ำตอน bulk import
@@ -510,6 +571,7 @@ class FirestoreService {
       if (ops >= 400) { await batch.commit(); batch = _db.batch(); ops = 0; }
     }
     if (ops > 0) await batch.commit();
+    await logAudit('นำเข้าผู้ใช้', detail: '${users.length} คน');
   }
 
   /// ดัชนี user ตามรหัส (uppercase) → {id, name, role} — ใช้ resolve รหัสตอน import ความสัมพันธ์
@@ -539,6 +601,7 @@ class FirestoreService {
       if (ops >= 400) { await batch.commit(); batch = _db.batch(); ops = 0; }
     }
     if (ops > 0) await batch.commit();
+    await logAudit('นำเข้าความสัมพันธ์', detail: '${packages.length} รายการ');
   }
 
   static Future<void> updateUser(String id, Map<String, dynamic> data) async {
@@ -577,6 +640,7 @@ class FirestoreService {
     }
 
     await batch.commit();
+    await logAudit('ลบผู้ใช้', detail: '$role · id $userId · ลบแพ็กเกจ ${pkgs.docs.length}');
   }
 
   // ── Leave Requests ───────────────────────────────────────────────────────
@@ -607,16 +671,19 @@ class FirestoreService {
     await _db.collection('leaveRequests').add({...data, 'createdAt': FieldValue.serverTimestamp()});
   }
 
-  static Future<void> updateLeaveStatus(String id, String status, {String? adminNote}) async {
+  static Future<void> updateLeaveStatus(String id, String status, {String? adminNote, String? who}) async {
     await _db.collection('leaveRequests').doc(id).update({
       'status': status,
       if (adminNote != null && adminNote.isNotEmpty) 'adminNote': adminNote,
       'updatedAt': FieldValue.serverTimestamp(),
     });
+    final label = status == 'approved' ? 'อนุมัติใบลา' : status == 'rejected' ? 'ปฏิเสธใบลา' : 'อัปเดตใบลา';
+    await logAudit(label, detail: who ?? id);
   }
 
-  static Future<void> deleteLeaveRequest(String id) async {
+  static Future<void> deleteLeaveRequest(String id, {String? who}) async {
     await _db.collection('leaveRequests').doc(id).delete();
+    await logAudit('ลบใบลา', detail: who ?? id);
   }
 
   // ── Teacher slots ─────────────────────────────────────────────────────────

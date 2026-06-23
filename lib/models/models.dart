@@ -7,10 +7,46 @@ class AppUser {
   final String role;
   final String name;
   final String code;
-  AppUser({required this.uid, required this.role, required this.name, required this.code});
+  final String email;
+  AppUser({required this.uid, required this.role, required this.name, required this.code, this.email = ''});
   bool get isAdmin => role == 'admin';
   bool get isTeacher => role == 'teacher';
   bool get isStudent => role == 'student';
+}
+
+/// บันทึกการกระทำของผู้ดูแล (ใครทำอะไร เมื่อไหร่)
+class AuditLogModel {
+  final String id;
+  final String action;     // เช่น 'ตัดคาบ', 'อนุมัติใบลา'
+  final String detail;     // รายละเอียดเป้าหมาย
+  final String adminName;
+  final String adminEmail;
+  final Timestamp? createdAt;
+
+  AuditLogModel({
+    required this.id, required this.action, required this.detail,
+    required this.adminName, required this.adminEmail, this.createdAt,
+  });
+
+  factory AuditLogModel.fromDoc(DocumentSnapshot doc) {
+    final d = doc.data() as Map<String, dynamic>;
+    return AuditLogModel(
+      id: doc.id,
+      action: d['action'] ?? '',
+      detail: d['detail'] ?? '',
+      adminName: d['adminName'] ?? '',
+      adminEmail: d['adminEmail'] ?? '',
+      createdAt: d['createdAt'] as Timestamp?,
+    );
+  }
+
+  /// 'dd/MM/yyyy(+543) HH:mm' เวลาไทย
+  String get timeLabel {
+    if (createdAt == null) return '-';
+    final t = createdAt!.toDate().toUtc().add(const Duration(hours: 7));
+    String p(int n) => n.toString().padLeft(2, '0');
+    return '${p(t.day)}/${p(t.month)}/${t.year + 543} ${p(t.hour)}:${p(t.minute)}';
+  }
 }
 
 class UserModel {

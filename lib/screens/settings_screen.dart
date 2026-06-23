@@ -3,6 +3,7 @@ import 'package:firebase_auth/firebase_auth.dart';
 import '../services/firestore_service.dart';
 import 'payroll_screen.dart';
 import 'import_users_screen.dart';
+import 'admin_profile_screen.dart';
 
 class SettingsScreen extends StatefulWidget {
   const SettingsScreen({super.key});
@@ -70,6 +71,30 @@ class _SettingsScreenState extends State<SettingsScreen> {
           return ListView(
             padding: const EdgeInsets.all(20),
             children: [
+
+              // ── โปรไฟล์ผู้ดูแล (ล็อกด้วยรหัส — เฉพาะเจ้าของระบบ) ──────
+              _SectionHeader(icon: Icons.lock_outline, label: 'โปรไฟล์ผู้ดูแล', color: const Color(0xFF37474F)),
+              const SizedBox(height: 4),
+              Text(
+                'เมนูเฉพาะเจ้าของระบบ — ต้องใส่รหัสก่อนเปิด (ตั้งชื่อผู้ดูแล + บันทึกการใช้งาน ใครทำอะไร)',
+                style: TextStyle(fontSize: 12, color: Colors.grey.shade600),
+              ),
+              const SizedBox(height: 8),
+              SizedBox(
+                height: 52,
+                child: OutlinedButton.icon(
+                  onPressed: () => openAdminProfileLocked(context),
+                  icon: const Icon(Icons.lock_outline, color: Color(0xFF37474F)),
+                  label: const Text('เปิดโปรไฟล์ผู้ดูแล (ใส่รหัส)', style: TextStyle(fontSize: 16, fontWeight: FontWeight.bold, color: Color(0xFF37474F))),
+                  style: OutlinedButton.styleFrom(
+                    side: const BorderSide(color: Color(0xFF37474F)),
+                    shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(12)),
+                  ),
+                ),
+              ),
+              const SizedBox(height: 24),
+              const Divider(),
+              const SizedBox(height: 16),
 
               // ── LINE ──────────────────────────────────────────────────
               _SectionHeader(icon: Icons.chat_bubble_outline, label: 'ลิงก์ LINE', color: const Color(0xFF00C300)),

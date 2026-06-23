@@ -39,7 +39,7 @@ class JV5App extends StatelessWidget {
           }
           if (snap.hasData) {
             return FutureBuilder<AppUser>(
-              future: FirestoreService.getAppUser(snap.data!.uid),
+              future: FirestoreService.getAppUser(snap.data!.uid, email: snap.data!.email ?? ''),
               builder: (context, userSnap) {
                 if (!userSnap.hasData) {
                   return const Scaffold(body: Center(child: CircularProgressIndicator()));
