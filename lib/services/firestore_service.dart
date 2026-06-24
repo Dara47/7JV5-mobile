@@ -206,6 +206,7 @@ class FirestoreService {
       if ((existing.docs.first.data()['status'] as String?) == 'completed') return; // ตัดไปแล้ว
       await existing.docs.first.reference.update({
         'status': 'completed', 'endTime': slot.endTime,
+        'studentCode': pkg.studentCode, 'teacherCode': pkg.teacherCode,
         'updatedAt': FieldValue.serverTimestamp(),
       });
     } else {
@@ -213,6 +214,7 @@ class FirestoreService {
         'packageId': pkg.id,
         'studentId': pkg.studentId, 'teacherId': pkg.teacherId,
         'studentName': pkg.studentName, 'teacherName': pkg.teacherName,
+        'studentCode': pkg.studentCode, 'teacherCode': pkg.teacherCode,
         'date': dateStr, 'startTime': slot.startTime, 'endTime': slot.endTime,
         'status': 'completed', 'isLate': false, 'isAbsent': false,
         'createdAt': FieldValue.serverTimestamp(),
@@ -246,13 +248,18 @@ class FirestoreService {
       final key = '${it.pkg.id}_${it.slot.startTime}';
       final ref = byKey[key];
       if (ref != null) {
-        batch.update(ref, {'status': 'completed', 'endTime': it.slot.endTime, 'updatedAt': FieldValue.serverTimestamp()});
+        batch.update(ref, {
+          'status': 'completed', 'endTime': it.slot.endTime,
+          'studentCode': it.pkg.studentCode, 'teacherCode': it.pkg.teacherCode,
+          'updatedAt': FieldValue.serverTimestamp(),
+        });
       } else {
         final sref = _db.collection('sessions').doc();
         batch.set(sref, {
           'packageId': it.pkg.id,
           'studentId': it.pkg.studentId, 'teacherId': it.pkg.teacherId,
           'studentName': it.pkg.studentName, 'teacherName': it.pkg.teacherName,
+          'studentCode': it.pkg.studentCode, 'teacherCode': it.pkg.teacherCode,
           'date': today, 'startTime': it.slot.startTime, 'endTime': it.slot.endTime,
           'status': 'completed', 'isLate': false, 'isAbsent': false,
           'createdAt': FieldValue.serverTimestamp(),

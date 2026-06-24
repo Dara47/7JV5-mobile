@@ -207,6 +207,8 @@ class SessionModel {
   final String teacherId;
   final String studentName;
   final String teacherName;
+  final String? studentCode;
+  final String? teacherCode;
   final String date;
   final String startTime;
   final String endTime;
@@ -220,6 +222,7 @@ class SessionModel {
   SessionModel({
     required this.id, required this.packageId, required this.studentId,
     required this.teacherId, required this.studentName, required this.teacherName,
+    this.studentCode, this.teacherCode,
     required this.date, required this.startTime, required this.endTime,
     required this.status, this.language, this.skill,
     this.isLate = false, this.isAbsent = false, this.notes,
@@ -266,6 +269,7 @@ class SessionModel {
       id: doc.id, packageId: d['packageId'] ?? '',
       studentId: d['studentId'] ?? '', teacherId: d['teacherId'] ?? '',
       studentName: d['studentName'] ?? '', teacherName: d['teacherName'] ?? '',
+      studentCode: d['studentCode'], teacherCode: d['teacherCode'],
       date: d['date'] ?? '', startTime: d['startTime'] ?? '',
       endTime: d['endTime'] ?? '', status: d['status'] ?? 'scheduled',
       language: d['language'], skill: d['skill'],
