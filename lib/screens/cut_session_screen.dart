@@ -14,8 +14,35 @@ class CutSessionScreen extends StatefulWidget {
 
 class _CutSessionScreenState extends State<CutSessionScreen> {
   bool _calendarView = false;
+  late DateTime _selectedDate;
 
-  String _todayLabel() => thaiDateFull(nowThai());
+  @override
+  void initState() {
+    super.initState();
+    final n = nowThai();
+    _selectedDate = DateTime(n.year, n.month, n.day);
+  }
+
+  bool get _isToday {
+    final n = nowThai();
+    return _selectedDate.year == n.year && _selectedDate.month == n.month && _selectedDate.day == n.day;
+  }
+
+  String _dateLabel() => thaiDateFull(_selectedDate);
+
+  Future<void> _pickDate() async {
+    final now = nowThai();
+    final picked = await showDatePicker(
+      context: context,
+      initialDate: _selectedDate,
+      firstDate: DateTime(now.year - 1),
+      lastDate: DateTime(now.year, now.month, now.day), // ตัดได้เฉพาะวันนี้/ย้อนหลัง
+      helpText: 'เลือกวันที่ต้องการตัดคาบ',
+    );
+    if (picked != null && mounted) {
+      setState(() => _selectedDate = DateTime(picked.year, picked.month, picked.day));
+    }
+  }
 
   void _confirmCut(BuildContext context, PendingCut item) {
     final now = nowThai();
@@ -37,7 +64,7 @@ class _CutSessionScreenState extends State<CutSessionScreen> {
           ElevatedButton(
             onPressed: () async {
               Navigator.pop(context);
-              await FirestoreService.cutSlot(pkg, item.slot);
+              await FirestoreService.cutSlot(pkg, item.slot, onDate: _selectedDate);
               if (context.mounted) {
                 ScaffoldMessenger.of(context).showSnackBar(SnackBar(
                   content: Text('ตัดคาบ ${pkg.studentName} เรียบร้อย'),
@@ -70,7 +97,7 @@ class _CutSessionScreenState extends State<CutSessionScreen> {
           ElevatedButton(
             onPressed: () async {
               Navigator.pop(context);
-              final n = await FirestoreService.cutAllSlots(items);
+              final n = await FirestoreService.cutAllSlots(items, onDate: _selectedDate);
               if (context.mounted) {
                 ScaffoldMessenger.of(context).showSnackBar(SnackBar(
                   content: Text('ตัดคาบทั้งหมด $n คาบเรียบร้อย'),
@@ -106,7 +133,7 @@ class _CutSessionScreenState extends State<CutSessionScreen> {
       body: _calendarView
           ? const ScheduleCalendarBody(enableCut: true)
           : StreamBuilder<List<PendingCut>>(
-        stream: FirestoreService.watchPendingCuts(),
+        stream: FirestoreService.watchPendingCutsForDate(_selectedDate),
         builder: (context, snap) {
           if (snap.connectionState == ConnectionState.waiting) {
             return const Center(child: CircularProgressIndicator());
@@ -115,17 +142,44 @@ class _CutSessionScreenState extends State<CutSessionScreen> {
           final pendingCount = items.length;
 
           return Column(children: [
-            // Header bar
+            // Header bar — แตะเพื่อเลือกวันที่
             Container(
               padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 8),
               color: const Color(0xFFF3E5F5),
               child: Row(children: [
                 Icon(Icons.content_cut, size: 18, color: Colors.purple.shade700),
                 const SizedBox(width: 8),
-                Expanded(child: Text(
-                  _todayLabel(),
-                  style: TextStyle(fontWeight: FontWeight.w600, color: Colors.purple.shade700, fontSize: 13),
-                  overflow: TextOverflow.ellipsis,
+                Expanded(child: InkWell(
+                  onTap: _pickDate,
+                  borderRadius: BorderRadius.circular(8),
+                  child: Padding(
+                    padding: const EdgeInsets.symmetric(vertical: 4),
+                    child: Row(children: [
+                      Flexible(child: Text(
+                        _dateLabel(),
+                        style: TextStyle(fontWeight: FontWeight.w600, color: Colors.purple.shade700, fontSize: 13),
+                        overflow: TextOverflow.ellipsis,
+                      )),
+                      const SizedBox(width: 4),
+                      Icon(Icons.edit_calendar, size: 15, color: Colors.purple.shade700),
+                      if (!_isToday) ...[
+                        const SizedBox(width: 6),
+                        InkWell(
+                          onTap: () {
+                            final n = nowThai();
+                            setState(() => _selectedDate = DateTime(n.year, n.month, n.day));
+                          },
+                          child: Container(
+                            padding: const EdgeInsets.symmetric(horizontal: 6, vertical: 1),
+                            decoration: BoxDecoration(
+                                color: Colors.purple.shade100, borderRadius: BorderRadius.circular(8)),
+                            child: Text('วันนี้',
+                                style: TextStyle(fontSize: 11, color: Colors.purple.shade700, fontWeight: FontWeight.w600)),
+                          ),
+                        ),
+                      ],
+                    ]),
+                  ),
                 )),
                 const SizedBox(width: 8),
                 if (pendingCount > 0)
@@ -181,11 +235,14 @@ class _CutSessionScreenState extends State<CutSessionScreen> {
                       child: Column(mainAxisSize: MainAxisSize.min, children: [
                         Icon(Icons.content_cut, size: 56, color: Colors.grey.shade300),
                         const SizedBox(height: 8),
-                        const Text('ไม่มีคาบที่ต้องตัดวันนี้', style: TextStyle(color: Colors.grey)),
+                        Text(_isToday ? 'ไม่มีคาบที่ต้องตัดวันนี้' : 'ไม่มีคาบที่ต้องตัดในวันนี้',
+                            style: const TextStyle(color: Colors.grey)),
                         const SizedBox(height: 4),
-                        const Text(
-                          'คาบที่แสดงคือคาบที่กำหนดวันนี้\nและเวลาสิ้นสุดได้ผ่านไปแล้ว',
-                          style: TextStyle(color: Colors.grey, fontSize: 12),
+                        Text(
+                          _isToday
+                              ? 'คาบที่แสดงคือคาบที่กำหนดวันนี้\nและเวลาสิ้นสุดได้ผ่านไปแล้ว'
+                              : 'คาบที่แสดงคือคาบที่กำหนดใน${_dateLabel()}',
+                          style: const TextStyle(color: Colors.grey, fontSize: 12),
                           textAlign: TextAlign.center,
                         ),
                       ]),

@@ -189,6 +189,41 @@ class _ScheduleCalendarBodyState extends State<ScheduleCalendarBody> {
     );
   }
 
+  /// ตัดคาบทั้งหมดของวันที่เลือก ในคลิกเดียว (เฉพาะคาบที่ตัดได้)
+  void _confirmCutAllForDay(DateTime date, List<_Occurrence> cuttable) {
+    if (cuttable.isEmpty) return;
+    final items = cuttable.map((o) => PendingCut(o.pkg, o.slot)).toList();
+    showDialog(
+      context: context,
+      builder: (_) => AlertDialog(
+        title: const Text('ตัดคาบทั้งหมด'),
+        content: Column(mainAxisSize: MainAxisSize.min, crossAxisAlignment: CrossAxisAlignment.start, children: [
+          Text('ยืนยันตัดคาบทั้งหมด ${items.length} คาบ ของ${thaiDateFull(date)} ในคลิกเดียว?'),
+          const SizedBox(height: 8),
+          const Text('ระบบจะ:\n• บันทึกผลการเรียนทุกคาบ\n• หักโควตาคาบที่เหลือคาบละ 1',
+              style: TextStyle(fontSize: 13, color: Colors.grey)),
+        ]),
+        actions: [
+          TextButton(onPressed: () => Navigator.pop(context), child: const Text('ยกเลิก')),
+          ElevatedButton(
+            onPressed: () async {
+              Navigator.pop(context);
+              final n = await FirestoreService.cutAllSlots(items, onDate: date);
+              if (mounted) {
+                ScaffoldMessenger.of(context).showSnackBar(SnackBar(
+                  content: Text('ตัดคาบทั้งหมด $n คาบเรียบร้อย'),
+                  backgroundColor: Colors.green,
+                ));
+              }
+            },
+            style: ElevatedButton.styleFrom(backgroundColor: _kPurple, foregroundColor: Colors.white),
+            child: const Text('ยืนยันตัดทั้งหมด'),
+          ),
+        ],
+      ),
+    );
+  }
+
   /// แผนที่ วันที่(1..n) → รายการ occurrence ในเดือนที่แสดง
   /// statusMap: '{packageId}_{YYYY-MM-DD}_{start}' → สถานะ session จริง (ถ้ามี)
   Map<int, List<_Occurrence>> _buildOccurrences(
@@ -423,6 +458,7 @@ class _ScheduleCalendarBodyState extends State<ScheduleCalendarBody> {
     if (sel == null) return const SizedBox();
     final inVisibleMonth = sel.year == _visibleMonth.year && sel.month == _visibleMonth.month;
     final list = inVisibleMonth ? (occ[sel.day] ?? const []) : const <_Occurrence>[];
+    final cuttable = list.where((o) => _canCut(sel, o)).toList();
 
     return Container(
       width: double.infinity,
@@ -450,6 +486,26 @@ class _ScheduleCalendarBodyState extends State<ScheduleCalendarBody> {
             ),
           ]),
         ),
+        // ปุ่มตัดคาบทั้งหมดของวันนี้ (คลิกเดียว) — เฉพาะโหมดตัดและมีคาบที่ตัดได้
+        if (widget.enableCut && cuttable.isNotEmpty)
+          Padding(
+            padding: const EdgeInsets.fromLTRB(12, 4, 12, 8),
+            child: SizedBox(
+              width: double.infinity,
+              child: ElevatedButton.icon(
+                onPressed: () => _confirmCutAllForDay(sel, cuttable),
+                icon: const Icon(Icons.done_all, size: 18),
+                label: Text('ตัดคาบทั้งหมด (${cuttable.length} คาบ)',
+                    style: const TextStyle(fontWeight: FontWeight.bold)),
+                style: ElevatedButton.styleFrom(
+                  backgroundColor: _kPurple,
+                  foregroundColor: Colors.white,
+                  padding: const EdgeInsets.symmetric(vertical: 10),
+                  shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(10)),
+                ),
+              ),
+            ),
+          ),
         const Divider(height: 1),
         Flexible(
           child: list.isEmpty

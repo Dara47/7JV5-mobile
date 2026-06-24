@@ -115,36 +115,52 @@ class FirestoreService {
   /// คำนวณคาบที่รอตัดวันนี้ (รองรับหลาย slot/วัน) จาก packages + session ของวันนี้
   static List<PendingCut> computePendingCuts(
       List<PackageModel> packages, List<SessionModel> todaySessions) {
+    return computePendingCutsForDate(packages, todaySessions, nowThai());
+  }
+
+  /// คำนวณคาบที่รอตัด "ในวันที่กำหนด" (รองรับหลาย slot/วัน) จาก packages + session ของวันนั้น
+  /// - อนาคต: ไม่มีคาบให้ตัด (ยังไม่เลยเวลา)
+  /// - อดีต: ทุกคาบของวันนั้นถือว่าเลยเวลาแล้ว
+  /// - วันนี้: เฉพาะคาบที่เลยเวลาสิ้นสุดแล้ว
+  static List<PendingCut> computePendingCutsForDate(
+      List<PackageModel> packages, List<SessionModel> daySessions, DateTime date) {
     final now = nowThai();
-    final todayStr = todayThaiStr();
-    final nowMinutes = now.hour * 60 + now.minute;
+    final dateStr = toStorageDateStr(date);
     const thaiDays = {1: 'จ', 2: 'อ', 3: 'พ', 4: 'พฤ', 5: 'ศ', 6: 'ส', 7: 'อา'};
-    final todayDay = thaiDays[now.weekday]!;
-    // slot ที่ "ตัดแล้ว" วันนี้ = มี session completed ที่ packageId+startTime ตรงกัน
+    final targetDay = thaiDays[date.weekday]!;
+    final nowMinutes = now.hour * 60 + now.minute;
+    final dOnly = DateTime(date.year, date.month, date.day);
+    final tOnly = DateTime(now.year, now.month, now.day);
+    final isFuture = dOnly.isAfter(tOnly);
+    final isPast = dOnly.isBefore(tOnly);
+    // slot ที่ "ตัดแล้ว" ในวันนั้น = มี session completed ที่ packageId+startTime ตรงกัน
     final completed = <String>{};
-    for (final s in todaySessions) {
+    for (final s in daySessions) {
       if (s.status == 'completed') completed.add('${s.packageId}_${s.startTime}');
     }
 
     final result = <PendingCut>[];
+    if (isFuture) return result; // คาบในอนาคตยังไม่เลยเวลา ตัดไม่ได้
     for (final pkg in packages) {
       if (pkg.status != 'active') continue;
       if (pkg.remainingSessions <= 0) continue;
       for (final slot in pkg.effectiveSlots) {
-        // ต้องเป็นช่วงของวันนี้
+        // ต้องเป็นช่วงของวันที่กำหนด
         if (slot.date != null && slot.date!.isNotEmpty) {
-          if (slot.date != todayStr) continue;
-        } else if (slot.day != todayDay) {
+          if (slot.date != dateStr) continue;
+        } else if (slot.day != targetDay) {
           continue;
         }
-        // เลยเวลาสิ้นสุดแล้ว
-        try {
-          final ref = slot.endTime.isNotEmpty ? slot.endTime : slot.startTime;
-          final ep = ref.split(':');
-          final endM = int.parse(ep[0]) * 60 + int.parse(ep[1]);
-          if (nowMinutes < endM) continue;
-        } catch (_) { continue; }
-        // ยังไม่ตัด slot นี้วันนี้
+        // วันนี้: ต้องเลยเวลาสิ้นสุดแล้ว (อดีตผ่านไปแล้วทุกคาบ)
+        if (!isPast) {
+          try {
+            final ref = slot.endTime.isNotEmpty ? slot.endTime : slot.startTime;
+            final ep = ref.split(':');
+            final endM = int.parse(ep[0]) * 60 + int.parse(ep[1]);
+            if (nowMinutes < endM) continue;
+          } catch (_) { continue; }
+        }
+        // ยังไม่ตัด slot นี้ในวันนั้น
         if (completed.contains('${pkg.id}_${slot.startTime}')) continue;
         result.add(PendingCut(pkg, slot));
       }
@@ -153,16 +169,25 @@ class FirestoreService {
     return result;
   }
 
+  /// session ของวันที่กำหนด
+  static Stream<List<SessionModel>> watchSessionsForDate(DateTime date) {
+    return _db.collection('sessions').where('date', isEqualTo: toStorageDateStr(date))
+        .snapshots().map((s) => s.docs.map(SessionModel.fromDoc).toList());
+  }
+
   /// stream คาบรอตัดวันนี้ (รวม packages + session ของวันนี้)
-  static Stream<List<PendingCut>> watchPendingCuts() {
+  static Stream<List<PendingCut>> watchPendingCuts() => watchPendingCutsForDate(nowThai());
+
+  /// stream คาบรอตัด "ในวันที่กำหนด" (รวม packages + session ของวันนั้น)
+  static Stream<List<PendingCut>> watchPendingCutsForDate(DateTime date) {
     final controller = StreamController<List<PendingCut>>();
     List<PackageModel>? pkgs;
     List<SessionModel>? sess;
     void emit() {
-      if (pkgs != null && sess != null) controller.add(computePendingCuts(pkgs!, sess!));
+      if (pkgs != null && sess != null) controller.add(computePendingCutsForDate(pkgs!, sess!, date));
     }
     final s1 = watchAllPackages().listen((p) { pkgs = p; emit(); });
-    final s2 = watchTodaySessions().listen((s) { sess = s; emit(); });
+    final s2 = watchSessionsForDate(date).listen((s) { sess = s; emit(); });
     controller.onCancel = () { s1.cancel(); s2.cancel(); };
     return controller.stream;
   }
@@ -203,8 +228,9 @@ class FirestoreService {
   }
 
   /// ตัดคาบหลาย slot ในคลิกเดียว (batch) — คืนจำนวนที่ตัดสำเร็จ
-  static Future<int> cutAllSlots(List<PendingCut> items) async {
-    final today = todayThaiStr();
+  /// onDate: วันที่ของคาบที่จะตัด (ดีฟอลต์ = วันนี้) — ใช้ตัดทั้งวันจากปฏิทินย้อนหลังได้
+  static Future<int> cutAllSlots(List<PendingCut> items, {DateTime? onDate}) async {
+    final today = onDate != null ? toStorageDateStr(onDate) : todayThaiStr();
     final todaySnap = await _db.collection('sessions').where('date', isEqualTo: today).get();
     // map packageId+startTime → ref (reuse session ที่ generate ไว้)
     final byKey = <String, DocumentReference>{};

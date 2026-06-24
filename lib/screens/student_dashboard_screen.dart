@@ -236,8 +236,8 @@ class _CourseCard extends StatelessWidget {
             child: Row(children: [
               const Icon(Icons.calendar_today, size: 14, color: Color(0xFFF97316)),
               const SizedBox(width: 6),
-              Text(pkg.scheduleLabel,
-                  style: const TextStyle(fontSize: 13, color: Color(0xFFF97316), fontWeight: FontWeight.w600)),
+              Expanded(child: Text(pkg.scheduleLabel,
+                  style: const TextStyle(fontSize: 13, color: Color(0xFFF97316), fontWeight: FontWeight.w600))),
             ]),
           ),
           const SizedBox(height: 10),
