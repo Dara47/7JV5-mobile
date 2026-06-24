@@ -29,11 +29,8 @@ class _TeacherSlotSheetState extends State<_TeacherSlotSheet> {
   List<PackageModel> _bookedPackages = []; // แพ็กเกจของครู (ใช้เช็คช่วงที่ถูกจองแล้ว)
   bool _saving = false;
 
-  // New slot form state
-  String? _newDay;
-  DateTime? _newDate;
-  TimeOfDay? _newStart;
-  TimeOfDay? _newEnd;
+  // แถวร่างสำหรับเพิ่มหลายช่วง — แต่ละแถวเลือกวันที่(ปฏิทิน)+เวลาเริ่ม/สิ้นสุดได้เอง
+  final List<_DraftSlot> _drafts = [_DraftSlot()];
 
   @override
   void initState() {
@@ -69,52 +66,165 @@ class _TeacherSlotSheetState extends State<_TeacherSlotSheet> {
     return nowThai().isAfter(start);
   }
 
-  void _addSlot() {
-    if (_newDay == null || _newStart == null || _newEnd == null) {
-      ScaffoldMessenger.of(context)
-          .showSnackBar(const SnackBar(content: Text('กรุณาเลือกวันและเวลาให้ครบ')));
-      return;
-    }
-    // เงื่อนไข: ตั้งเวลาว่างที่เลยวัน/เวลาปัจจุบันไปแล้วไม่ได้
-    if (_newDate != null) {
-      final start = DateTime(_newDate!.year, _newDate!.month, _newDate!.day,
-          _newStart!.hour, _newStart!.minute);
-      if (nowThai().isAfter(start)) {
-        ScaffoldMessenger.of(context).showSnackBar(const SnackBar(
-          content: Text('ตั้งเวลาว่างที่ผ่านไปแล้วไม่ได้ — เลือกวัน/เวลาในอนาคต'),
-          backgroundColor: Colors.redAccent,
-        ));
-        return;
+  /// เพิ่มทุกแถวร่างที่กรอกครบ เข้ารายการ "ช่วงเวลาสอน"
+  void _commitDrafts() {
+    final now = nowThai();
+    int added = 0, skipped = 0;
+    String? error;
+
+    // ตรวจก่อน: ทุกแถวที่ "เริ่มกรอกแล้ว" ต้องครบ (วันที่ + เริ่ม + สิ้นสุด)
+    for (final d in _drafts) {
+      if (d.isEmpty) continue;
+      if (!d.isComplete) {
+        error = 'มีแถวที่กรอกไม่ครบ — ต้องเลือกวันที่ เวลาเริ่ม และเวลาสิ้นสุด';
+        break;
       }
     }
+    if (error != null) {
+      ScaffoldMessenger.of(context).showSnackBar(SnackBar(
+        content: Text(error), backgroundColor: Colors.redAccent));
+      return;
+    }
+
     setState(() {
-      _slots.add(SlotItem(
-        day: _newDay!,
-        startTime: _fmt(_newStart!),
-        endTime: _fmt(_newEnd!),
-        date: _newDate != null ? toStorageDateStr(_newDate!) : null,
-      ));
-      _newDay = null;
-      _newDate = null;
-      _newStart = null;
-      _newEnd = null;
+      for (final d in _drafts) {
+        if (!d.isComplete) continue;
+        final dt = d.date!;
+        final start = _fmt(d.start!);
+        final startDt = DateTime(dt.year, dt.month, dt.day, d.start!.hour, d.start!.minute);
+        // ข้ามวัน/เวลาที่ผ่านไปแล้ว
+        if (now.isAfter(startDt)) { skipped++; continue; }
+        final dateStr = toStorageDateStr(dt);
+        // กันซ้ำกับช่วงที่มีอยู่แล้ว (วันที่ + เวลาเริ่ม เหมือนกัน)
+        if (_slots.any((s) => s.date == dateStr && s.startTime == start)) {
+          skipped++; continue;
+        }
+        _slots.add(SlotItem(
+          day: thaiDayAbbr(dt),
+          startTime: start,
+          endTime: _fmt(d.end!),
+          date: dateStr,
+        ));
+        added++;
+      }
+      // รีเซ็ตเหลือแถวว่าง 1 แถว
+      _drafts
+        ..clear()
+        ..add(_DraftSlot());
     });
+
+    if (added == 0 && skipped == 0) {
+      ScaffoldMessenger.of(context).showSnackBar(const SnackBar(
+        content: Text('ยังไม่มีแถวที่กรอก — เลือกวันที่และเวลาก่อน')));
+      return;
+    }
+    ScaffoldMessenger.of(context).showSnackBar(SnackBar(
+      content: Text(skipped > 0
+          ? 'เพิ่ม $added ช่วง (ข้ามที่ซ้ำ/ผ่านแล้ว $skipped ช่วง)'
+          : 'เพิ่ม $added ช่วง'),
+      backgroundColor: _kGreen,
+      duration: const Duration(seconds: 2),
+    ));
   }
 
-  Future<void> _pickNewDate() async {
+  Future<void> _pickDraftDate(_DraftSlot draft) async {
     final now = nowThai();
     final d = await showDatePicker(
       context: context,
-      initialDate: _newDate ?? now,
+      initialDate: draft.date ?? now,
       firstDate: DateTime(now.year, now.month, now.day), // ห้ามเลือกวันในอดีต
       lastDate: DateTime(2030),
     );
-    if (d != null) {
-      setState(() {
-        _newDate = d;
-        _newDay = thaiDayAbbr(d); // วันคำนวณอัตโนมัติจากวันที่
-      });
-    }
+    if (d != null) setState(() => draft.date = d);
+  }
+
+  Widget _buildDraftRow(int i) {
+    final d = _drafts[i];
+    final hasDate = d.date != null;
+    return Container(
+      margin: const EdgeInsets.only(bottom: 10),
+      padding: const EdgeInsets.all(10),
+      decoration: BoxDecoration(
+        color: Colors.white,
+        borderRadius: BorderRadius.circular(10),
+        border: Border.all(color: Colors.grey.shade300),
+      ),
+      child: Column(crossAxisAlignment: CrossAxisAlignment.start, children: [
+        Row(children: [
+          Container(
+            width: 22, height: 22,
+            decoration: const BoxDecoration(color: Color(0xFFF97316), shape: BoxShape.circle),
+            child: Center(
+              child: Text('${i + 1}',
+                  style: const TextStyle(color: Colors.white, fontSize: 12, fontWeight: FontWeight.bold)),
+            ),
+          ),
+          const SizedBox(width: 8),
+          Expanded(
+            child: GestureDetector(
+              onTap: () => _pickDraftDate(d),
+              child: Container(
+                padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 10),
+                decoration: BoxDecoration(
+                  color: hasDate ? const Color(0xFFE3F2FD) : Colors.white,
+                  borderRadius: BorderRadius.circular(8),
+                  border: Border.all(
+                      color: hasDate ? const Color(0xFFF97316).withAlpha(100) : Colors.grey.shade300),
+                ),
+                child: Row(children: [
+                  Icon(Icons.calendar_month, size: 16,
+                      color: hasDate ? const Color(0xFFF97316) : Colors.grey),
+                  const SizedBox(width: 8),
+                  Expanded(
+                    child: Text(
+                      hasDate ? thaiDateFull(d.date!) : 'แตะเลือกวันที่',
+                      style: TextStyle(
+                        fontSize: 13,
+                        fontWeight: hasDate ? FontWeight.w600 : FontWeight.normal,
+                        color: hasDate ? const Color(0xFFF97316) : Colors.grey,
+                      ),
+                    ),
+                  ),
+                ]),
+              ),
+            ),
+          ),
+          if (_drafts.length > 1)
+            IconButton(
+              onPressed: () => setState(() => _drafts.removeAt(i)),
+              icon: const Icon(Icons.close, color: Colors.red, size: 18),
+              padding: const EdgeInsets.only(left: 4),
+              constraints: const BoxConstraints(),
+            ),
+        ]),
+        const SizedBox(height: 8),
+        Row(children: [
+          Expanded(child: _TimeTile(
+            label: 'เริ่ม',
+            time: d.start,
+            onTap: () async {
+              final t = await _pickTime(d.start ?? const TimeOfDay(hour: 9, minute: 0));
+              if (t != null) setState(() {
+                d.start = t;
+                d.end ??= TimeOfDay(hour: (t.hour + 1) % 24, minute: t.minute);
+              });
+            },
+          )),
+          const Padding(
+            padding: EdgeInsets.symmetric(horizontal: 8),
+            child: Text('–', style: TextStyle(fontSize: 18, color: Colors.grey)),
+          ),
+          Expanded(child: _TimeTile(
+            label: 'สิ้นสุด',
+            time: d.end,
+            onTap: () async {
+              final t = await _pickTime(d.end ?? const TimeOfDay(hour: 10, minute: 0));
+              if (t != null) setState(() => d.end = t);
+            },
+          )),
+        ]),
+      ]),
+    );
   }
 
   Future<void> _save() async {
@@ -330,120 +440,37 @@ class _TeacherSlotSheetState extends State<_TeacherSlotSheet> {
                   const Row(children: [
                     Icon(Icons.add_circle_outline, size: 16, color: Color(0xFFF97316)),
                     SizedBox(width: 6),
-                    Text('เพิ่มช่วงเวลาใหม่',
-                        style: TextStyle(fontSize: 13, fontWeight: FontWeight.w600, color: Color(0xFFF97316))),
+                    Expanded(
+                      child: Text('เพิ่มช่วงเวลา (เลือกวันที่ + เวลา ได้หลายแถว)',
+                          style: TextStyle(fontSize: 13, fontWeight: FontWeight.w600, color: Color(0xFFF97316))),
+                    ),
                   ]),
                   const SizedBox(height: 12),
 
-                  // Date picker (optional — เลือกวันที่แล้ววันจะคำนวณให้)
-                  const Text('วันที่ (ถ้าระบุ วันจะคำนวณให้อัตโนมัติ)',
-                      style: TextStyle(fontSize: 12, color: Colors.grey)),
-                  const SizedBox(height: 6),
-                  GestureDetector(
-                    onTap: _pickNewDate,
-                    child: Container(
-                      width: double.infinity,
-                      padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 12),
-                      decoration: BoxDecoration(
-                        color: _newDate != null ? const Color(0xFFE3F2FD) : Colors.white,
-                        borderRadius: BorderRadius.circular(10),
-                        border: Border.all(
-                            color: _newDate != null
-                                ? const Color(0xFFF97316).withAlpha(100)
-                                : Colors.grey.shade300),
-                      ),
-                      child: Row(children: [
-                        Icon(Icons.calendar_month,
-                            size: 18,
-                            color: _newDate != null ? const Color(0xFFF97316) : Colors.grey),
-                        const SizedBox(width: 10),
-                        Expanded(
-                          child: Text(
-                            _newDate != null ? thaiDateFull(_newDate!) : 'แตะเพื่อเลือกวันที่ (ไม่บังคับ)',
-                            style: TextStyle(
-                              fontSize: 14,
-                              fontWeight: _newDate != null ? FontWeight.w600 : FontWeight.normal,
-                              color: _newDate != null ? const Color(0xFFF97316) : Colors.grey,
-                            ),
-                          ),
-                        ),
-                        if (_newDate != null)
-                          GestureDetector(
-                            onTap: () => setState(() => _newDate = null),
-                            child: const Icon(Icons.clear, size: 18, color: Colors.grey),
-                          ),
-                      ]),
+                  // แถวร่าง — แต่ละแถว = วันที่(ปฏิทิน) + เวลาเริ่ม/สิ้นสุด
+                  ...List.generate(_drafts.length, _buildDraftRow),
+
+                  // ปุ่มเพิ่มแถว
+                  Align(
+                    alignment: Alignment.centerLeft,
+                    child: TextButton.icon(
+                      onPressed: () => setState(() => _drafts.add(_DraftSlot())),
+                      icon: const Icon(Icons.add, size: 18, color: Color(0xFFF97316)),
+                      label: const Text('เพิ่มวัน/เวลา',
+                          style: TextStyle(color: Color(0xFFF97316), fontWeight: FontWeight.w600)),
+                      style: TextButton.styleFrom(
+                          padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 4)),
                     ),
                   ),
-                  const SizedBox(height: 12),
+                  const SizedBox(height: 8),
 
-                  // Day selector
-                  const Text('วัน', style: TextStyle(fontSize: 12, color: Colors.grey)),
-                  const SizedBox(height: 6),
-                  Wrap(
-                    spacing: 6, runSpacing: 6,
-                    children: PackageModel.days.map((d) => GestureDetector(
-                      onTap: () => setState(() {
-                        _newDay = _newDay == d ? null : d;
-                        _newDate = null; // เลือกวันเองแบบประจำ → ล้างวันที่เจาะจง
-                      }),
-                      child: AnimatedContainer(
-                        duration: const Duration(milliseconds: 150),
-                        width: 40, height: 40,
-                        decoration: BoxDecoration(
-                          color: _newDay == d ? const Color(0xFFF97316) : Colors.white,
-                          shape: BoxShape.circle,
-                          border: Border.all(
-                              color: _newDay == d ? const Color(0xFFF97316) : Colors.grey.shade300),
-                        ),
-                        child: Center(child: Text(d,
-                            style: TextStyle(
-                              fontWeight: FontWeight.bold,
-                              fontSize: 13,
-                              color: _newDay == d ? Colors.white : Colors.black87,
-                            ))),
-                      ),
-                    )).toList(),
-                  ),
-                  const SizedBox(height: 12),
-
-                  // Time pickers
-                  const Text('เวลา', style: TextStyle(fontSize: 12, color: Colors.grey)),
-                  const SizedBox(height: 6),
-                  Row(children: [
-                    Expanded(child: _TimeTile(
-                      label: 'เริ่ม',
-                      time: _newStart,
-                      onTap: () async {
-                        final t = await _pickTime(_newStart ?? const TimeOfDay(hour: 9, minute: 0));
-                        if (t != null) setState(() {
-                          _newStart = t;
-                          _newEnd ??= TimeOfDay(hour: t.hour + 1, minute: t.minute);
-                        });
-                      },
-                    )),
-                    const Padding(
-                      padding: EdgeInsets.symmetric(horizontal: 10),
-                      child: Text('–', style: TextStyle(fontSize: 20, color: Colors.grey)),
-                    ),
-                    Expanded(child: _TimeTile(
-                      label: 'สิ้นสุด',
-                      time: _newEnd,
-                      onTap: () async {
-                        final t = await _pickTime(_newEnd ?? const TimeOfDay(hour: 10, minute: 0));
-                        if (t != null) setState(() => _newEnd = t);
-                      },
-                    )),
-                  ]),
-                  const SizedBox(height: 12),
-
-                  // Add button
+                  // ปุ่มยืนยันเข้ารายการ
                   SizedBox(
                     width: double.infinity,
                     child: ElevatedButton.icon(
-                      onPressed: _addSlot,
-                      icon: const Icon(Icons.add, size: 18),
-                      label: const Text('เพิ่มช่วงเวลานี้'),
+                      onPressed: _commitDrafts,
+                      icon: const Icon(Icons.playlist_add_check, size: 18),
+                      label: const Text('เพิ่มเข้ารายการ'),
                       style: ElevatedButton.styleFrom(
                         backgroundColor: const Color(0xFFF97316),
                         foregroundColor: Colors.white,
@@ -501,6 +528,15 @@ class _TeacherSlotSheetState extends State<_TeacherSlotSheet> {
       ]),
     );
   }
+}
+
+/// แถวร่างสำหรับกรอกช่วงเวลาใหม่ (วันที่ + เวลาเริ่ม/สิ้นสุด)
+class _DraftSlot {
+  DateTime? date;
+  TimeOfDay? start;
+  TimeOfDay? end;
+  bool get isEmpty => date == null && start == null && end == null;
+  bool get isComplete => date != null && start != null && end != null;
 }
 
 class _TimeTile extends StatelessWidget {
