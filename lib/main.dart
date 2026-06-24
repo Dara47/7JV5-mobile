@@ -1,7 +1,7 @@
 ﻿import 'package:flutter/material.dart';
 import 'package:firebase_core/firebase_core.dart';
 import 'package:firebase_auth/firebase_auth.dart';
-import 'firebase_options.dart';
+import 'firebase_env.dart';
 import 'models/models.dart';
 import 'services/firestore_service.dart';
 import 'screens/login_screen.dart';
@@ -10,7 +10,7 @@ import 'widgets/app_watermark.dart';
 
 void main() async {
   WidgetsFlutterBinding.ensureInitialized();
-  await Firebase.initializeApp(options: DefaultFirebaseOptions.currentPlatform);
+  await Firebase.initializeApp(options: firebaseOptionsForEnv);
   runApp(const JV5App());
 }
 
@@ -30,7 +30,19 @@ class JV5App extends StatelessWidget {
         scaffoldBackgroundColor: Colors.transparent,
       ),
       // ลายน้ำโลโก้ครอบทั้งแอป — จุดเดียว ครบทุกเมนู
-      builder: (context, child) => AppWatermark(child: child ?? const SizedBox.shrink()),
+      // โหมดทดสอบ (APP_ENV=test) แปะป้าย "TEST" มุมขวาบน กันสับสนกับ production
+      builder: (context, child) {
+        Widget app = AppWatermark(child: child ?? const SizedBox.shrink());
+        if (isTestEnv) {
+          app = Banner(
+            message: 'TEST',
+            location: BannerLocation.topEnd,
+            color: Colors.red.shade700,
+            child: app,
+          );
+        }
+        return app;
+      },
       home: StreamBuilder<User?>(
         stream: FirebaseAuth.instance.authStateChanges(),
         builder: (context, snap) {

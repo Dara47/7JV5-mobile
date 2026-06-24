@@ -1,0 +1,8 @@
+{
+  "buildCommand": "bash vercel_build.sh",
+  "outputDirectory": "build/web",
+  "installCommand": "echo skip-default-install",
+  "rewrites": [
+    { "source": "/(.*)", "destination": "/index.html" }
+  ]
+}
