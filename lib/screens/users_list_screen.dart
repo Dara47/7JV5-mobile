@@ -405,12 +405,17 @@ class _UserList extends StatelessWidget {
                           // แถว 3: ตารางเรียน (วัน/วันที่ + เวลา ทุก slot)
                           if (scheduleLines.isNotEmpty) ...[
                             const SizedBox(height: 4),
-                            ...scheduleLines.map((line) => Padding(
+                            ...scheduleLines.asMap().entries.map((e) => Padding(
                               padding: const EdgeInsets.only(top: 2),
-                              child: Row(children: [
+                              child: Row(crossAxisAlignment: CrossAxisAlignment.start, children: [
+                                SizedBox(
+                                  width: 20,
+                                  child: Text('${e.key + 1}.',
+                                      style: TextStyle(fontSize: 11.5, fontWeight: FontWeight.bold, color: Colors.grey.shade500)),
+                                ),
                                 const Icon(Icons.event_outlined, size: 12, color: Color(0xFFF97316)),
                                 const SizedBox(width: 4),
-                                Expanded(child: Text(line,
+                                Expanded(child: Text(e.value,
                                     style: const TextStyle(fontSize: 11.5, color: Colors.black54))),
                               ]),
                             )),
