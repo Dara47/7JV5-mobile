@@ -200,6 +200,33 @@ class PendingCut {
   PendingCut(this.pkg, this.slot);
 }
 
+/// ช่วงเวลาว่างของครู (SlotItem) ถูกจองไปแล้วไหม — มีแพ็กเกจใดที่วันเดียวกัน + เวลาทับซ้อน
+/// ใช้แสดงสถานะ "เทา = ถูกเลือกไปแล้ว" ให้ตรงกับหน้าเพิ่มคาบ
+bool slotTakenByPackages(List<PackageModel> packages, SlotItem s) {
+  for (final p in packages) {
+    for (final sl in p.effectiveSlots) {
+      if (sl.day != s.day) continue;
+      final pDate = sl.date ?? '';
+      final nDate = s.date ?? '';
+      if (pDate.isNotEmpty && nDate.isNotEmpty && pDate != nDate) continue;
+      if (_timeRangesOverlap(sl.startTime, sl.endTime, s.startTime, s.endTime)) return true;
+    }
+  }
+  return false;
+}
+
+bool _timeRangesOverlap(String s1, String e1, String s2, String e2) {
+  int m(String t) {
+    final p = t.split(':');
+    if (p.length != 2) return -1;
+    return (int.tryParse(p[0]) ?? 0) * 60 + (int.tryParse(p[1]) ?? 0);
+  }
+  final a1 = m(s1), b1 = m(e1.isEmpty ? s1 : e1);
+  final a2 = m(s2), b2 = m(e2.isEmpty ? s2 : e2);
+  if (a1 < 0 || a2 < 0) return false;
+  return a1 < b2 && a2 < b1;
+}
+
 class SessionModel {
   final String id;
   final String packageId;

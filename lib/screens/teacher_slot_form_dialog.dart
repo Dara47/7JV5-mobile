@@ -26,6 +26,7 @@ class _TeacherSlotSheet extends StatefulWidget {
 class _TeacherSlotSheetState extends State<_TeacherSlotSheet> {
   final _notesCtrl = TextEditingController();
   List<SlotItem> _slots = [];
+  List<PackageModel> _bookedPackages = []; // แพ็กเกจของครู (ใช้เช็คช่วงที่ถูกจองแล้ว)
   bool _saving = false;
 
   // New slot form state
@@ -41,6 +42,10 @@ class _TeacherSlotSheetState extends State<_TeacherSlotSheet> {
       _slots = List.from(widget.existing!.slots);
       _notesCtrl.text = widget.existing!.notes ?? '';
     }
+    // โหลดแพ็กเกจของครู เพื่อแสดงช่วงที่ "ถูกจองแล้ว" เป็นสีเทา
+    FirestoreService.getPackagesForUser(widget.teacher.id, 'teacher').then((pkgs) {
+      if (mounted) setState(() => _bookedPackages = pkgs);
+    });
   }
 
   @override
@@ -229,19 +234,22 @@ class _TeacherSlotSheetState extends State<_TeacherSlotSheet> {
                 ...List.generate(_slots.length, (i) {
                   final s = _slots[i];
                   final past = _isSlotPast(s);
+                  // ถูกจองโดยนักเรียนแล้ว → เทา (ตรงกับหน้าเพิ่มคาบ)
+                  final taken = !past && slotTakenByPackages(_bookedPackages, s);
+                  final dim = past || taken;
                   return Container(
                     margin: const EdgeInsets.only(bottom: 6),
                     padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 8),
                     decoration: BoxDecoration(
-                      color: past ? Colors.grey.shade100 : const Color(0xFFE8F5E9),
+                      color: dim ? Colors.grey.shade100 : const Color(0xFFE8F5E9),
                       borderRadius: BorderRadius.circular(10),
-                      border: Border.all(color: past ? Colors.grey.shade300 : Colors.green.shade200),
+                      border: Border.all(color: dim ? Colors.grey.shade300 : Colors.green.shade200),
                     ),
                     child: Row(children: [
                       Container(
                         width: 36, height: 36,
                         decoration: BoxDecoration(
-                            color: past ? Colors.grey.shade400 : _kGreen, shape: BoxShape.circle),
+                            color: dim ? Colors.grey.shade400 : _kGreen, shape: BoxShape.circle),
                         child: Center(
                           child: Text(s.day,
                               style: const TextStyle(color: Colors.white, fontWeight: FontWeight.bold, fontSize: 13)),
@@ -256,8 +264,8 @@ class _TeacherSlotSheetState extends State<_TeacherSlotSheet> {
                             Text('${s.startTime} – ${s.endTime}',
                                 style: TextStyle(
                                   fontSize: 15, fontWeight: FontWeight.w600,
-                                  color: past ? Colors.grey.shade500 : _kGreen,
-                                  decoration: past ? TextDecoration.lineThrough : null,
+                                  color: dim ? Colors.grey.shade500 : _kGreen,
+                                  decoration: dim ? TextDecoration.lineThrough : null,
                                 )),
                             if (past) ...[
                               const SizedBox(width: 8),
@@ -274,13 +282,28 @@ class _TeacherSlotSheetState extends State<_TeacherSlotSheet> {
                                       style: TextStyle(fontSize: 10, color: Colors.grey.shade600, fontWeight: FontWeight.w600)),
                                 ]),
                               ),
+                            ] else if (taken) ...[
+                              const SizedBox(width: 8),
+                              Container(
+                                padding: const EdgeInsets.symmetric(horizontal: 6, vertical: 1),
+                                decoration: BoxDecoration(
+                                  color: Colors.grey.shade300,
+                                  borderRadius: BorderRadius.circular(6),
+                                ),
+                                child: Row(mainAxisSize: MainAxisSize.min, children: [
+                                  Icon(Icons.block, size: 11, color: Colors.grey.shade600),
+                                  const SizedBox(width: 2),
+                                  Text('จองแล้ว',
+                                      style: TextStyle(fontSize: 10, color: Colors.grey.shade600, fontWeight: FontWeight.w600)),
+                                ]),
+                              ),
                             ],
                           ]),
                           if (s.date != null && s.date!.isNotEmpty)
                             Text(thaiDateFromStr(s.date!),
                                 style: TextStyle(
                                     fontSize: 11,
-                                    color: past ? Colors.grey.shade500 : const Color(0xFF558B2F))),
+                                    color: dim ? Colors.grey.shade500 : const Color(0xFF558B2F))),
                         ],
                       )),
                       IconButton(

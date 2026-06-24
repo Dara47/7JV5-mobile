@@ -253,14 +253,25 @@ class _TeacherCard extends StatelessWidget {
                                   children: slot.slots.map((s) {
                                     final datePart = (s.date != null && s.date!.isNotEmpty)
                                         ? '${thaiShortDateFromStr(s.date!)} ' : '';
+                                    // ถูกจองไปแล้ว → เทา (ตรงกับหน้าเพิ่มคาบ)
+                                    final taken = slotTakenByPackages(packages, s);
                                     return Container(
                                       padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 4),
                                       decoration: BoxDecoration(
-                                        color: const Color(0xFF2E7D32),
+                                        color: taken ? Colors.grey.shade400 : const Color(0xFF2E7D32),
                                         borderRadius: BorderRadius.circular(6),
                                       ),
-                                      child: Text('$datePart${s.day}  ${s.startTime}–${s.endTime}',
-                                          style: const TextStyle(fontSize: 12, color: Colors.white, fontWeight: FontWeight.w600)),
+                                      child: Row(mainAxisSize: MainAxisSize.min, children: [
+                                        if (taken) ...[
+                                          const Icon(Icons.block, size: 11, color: Colors.white),
+                                          const SizedBox(width: 3),
+                                        ],
+                                        Text('$datePart${s.day}  ${s.startTime}–${s.endTime}',
+                                            style: TextStyle(
+                                              fontSize: 12, color: Colors.white, fontWeight: FontWeight.w600,
+                                              decoration: taken ? TextDecoration.lineThrough : null,
+                                            )),
+                                      ]),
                                     );
                                   }).toList(),
                                 ),
