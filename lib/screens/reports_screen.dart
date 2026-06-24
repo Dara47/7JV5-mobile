@@ -15,6 +15,19 @@ class _ReportsScreenState extends State<ReportsScreen> {
   final _searchCtrl = TextEditingController();
   String _query = '';
   DateTimeRange? _range; // null = ทุกวัน (เลือกช่วง: จากวันที่ → ถึงวันที่)
+  Map<String, String> _idToCode = {}; // userId → code (เติมรหัสให้ session เก่าที่ไม่มีรหัสฝังไว้)
+
+  @override
+  void initState() {
+    super.initState();
+    // โหลด map รหัสผู้ใช้ เพื่อเติมรหัสให้ session ที่ยังไม่มี studentCode/teacherCode
+    FirestoreService.userIndexByCode().then((idx) {
+      if (!mounted) return;
+      final m = <String, String>{};
+      idx.forEach((code, rec) => m[rec.id] = code);
+      setState(() => _idToCode = m);
+    });
+  }
 
   @override
   void dispose() {
@@ -25,6 +38,12 @@ class _ReportsScreenState extends State<ReportsScreen> {
   String _fullDate(String date) => thaiDateFromStr(date);
   String _fullDateTime(String date, String start, String end) =>
       thaiDateTimeFromStr(date, startTime: start, endTime: end);
+
+  /// รหัสนักเรียน/ครู — ใช้ที่ฝังใน session ก่อน ถ้าไม่มีค่อย lookup จาก id
+  String? _sCode(SessionModel s) =>
+      (s.studentCode != null && s.studentCode!.isNotEmpty) ? s.studentCode : _idToCode[s.studentId];
+  String? _tCode(SessionModel s) =>
+      (s.teacherCode != null && s.teacherCode!.isNotEmpty) ? s.teacherCode : _idToCode[s.teacherId];
 
   /// กรองตามช่วงวันที่ + คำค้น (ชื่อ/รหัส ครู+นักเรียน)
   List<SessionModel> _filter(List<SessionModel> all) {
@@ -38,7 +57,7 @@ class _ReportsScreenState extends State<ReportsScreen> {
       }
       if (q.isEmpty) return true;
       final hay = '${s.studentName} ${s.teacherName} '
-          '${s.studentCode ?? ''} ${s.teacherCode ?? ''}'.toLowerCase();
+          '${_sCode(s) ?? ''} ${_tCode(s) ?? ''}'.toLowerCase();
       return hay.contains(q);
     }).toList();
   }
@@ -253,8 +272,8 @@ class _ReportsScreenState extends State<ReportsScreen> {
                                   Expanded(child: Text(s.studentName,
                                       style: const TextStyle(fontWeight: FontWeight.w600, fontSize: 14),
                                       overflow: TextOverflow.ellipsis)),
-                                  if (s.studentCode != null && s.studentCode!.isNotEmpty)
-                                    _codeChip(s.studentCode!, _kOrange),
+                                  if (_sCode(s) != null && _sCode(s)!.isNotEmpty)
+                                    _codeChip(_sCode(s)!, _kOrange),
                                 ]),
                                 const SizedBox(height: 2),
                                 Row(children: [
@@ -263,8 +282,8 @@ class _ReportsScreenState extends State<ReportsScreen> {
                                   Expanded(child: Text(s.teacherName,
                                       style: const TextStyle(fontSize: 12, color: Colors.black87),
                                       overflow: TextOverflow.ellipsis)),
-                                  if (s.teacherCode != null && s.teacherCode!.isNotEmpty)
-                                    _codeChip(s.teacherCode!, const Color(0xFF2E7D32)),
+                                  if (_tCode(s) != null && _tCode(s)!.isNotEmpty)
+                                    _codeChip(_tCode(s)!, const Color(0xFF2E7D32)),
                                 ]),
                                 const SizedBox(height: 4),
                                 Row(children: [
