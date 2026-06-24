@@ -226,14 +226,24 @@ class _UserList extends StatelessWidget {
               child: Column(crossAxisAlignment: CrossAxisAlignment.stretch, children: [
                 ListTile(
                   contentPadding: const EdgeInsets.symmetric(horizontal: 12, vertical: 4),
-                  leading: CircleAvatar(
-                    backgroundColor: color,
-                    radius: 22,
-                    child: Text(
-                      u.name.isNotEmpty ? u.name[0] : '?',
-                      style: const TextStyle(color: Colors.white, fontWeight: FontWeight.bold, fontSize: 16),
+                  leading: Row(mainAxisSize: MainAxisSize.min, children: [
+                    // เลขลำดับ (เรียงตามผลค้นหา)
+                    SizedBox(
+                      width: 24,
+                      child: Text('${i + 1}',
+                          textAlign: TextAlign.center,
+                          style: TextStyle(fontSize: 14, fontWeight: FontWeight.bold, color: Colors.grey.shade500)),
                     ),
-                  ),
+                    const SizedBox(width: 6),
+                    CircleAvatar(
+                      backgroundColor: color,
+                      radius: 22,
+                      child: Text(
+                        u.name.isNotEmpty ? u.name[0] : '?',
+                        style: const TextStyle(color: Colors.white, fontWeight: FontWeight.bold, fontSize: 16),
+                      ),
+                    ),
+                  ]),
                   title: Text(u.name, style: const TextStyle(fontWeight: FontWeight.w600)),
                   subtitle: Row(children: [
                     Text(u.code, style: TextStyle(color: color, fontWeight: FontWeight.w500, fontSize: 13)),
