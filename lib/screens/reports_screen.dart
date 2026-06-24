@@ -14,7 +14,7 @@ class ReportsScreen extends StatefulWidget {
 class _ReportsScreenState extends State<ReportsScreen> {
   final _searchCtrl = TextEditingController();
   String _query = '';
-  DateTime? _selectedDate; // null = ทุกวัน
+  DateTimeRange? _range; // null = ทุกวัน (เลือกช่วง: จากวันที่ → ถึงวันที่)
 
   @override
   void dispose() {
@@ -26,12 +26,16 @@ class _ReportsScreenState extends State<ReportsScreen> {
   String _fullDateTime(String date, String start, String end) =>
       thaiDateTimeFromStr(date, startTime: start, endTime: end);
 
-  /// กรองตามวันที่ + คำค้น (ชื่อ/รหัส ครู+นักเรียน)
+  /// กรองตามช่วงวันที่ + คำค้น (ชื่อ/รหัส ครู+นักเรียน)
   List<SessionModel> _filter(List<SessionModel> all) {
     final q = _query.trim().toLowerCase();
-    final dateStr = _selectedDate != null ? toStorageDateStr(_selectedDate!) : null;
+    // วันที่เก็บเป็น 'YYYY-MM-DD' → เทียบ string ได้ตรงตามลำดับเวลา
+    final fromStr = _range != null ? toStorageDateStr(_range!.start) : null;
+    final toStr = _range != null ? toStorageDateStr(_range!.end) : null;
     return all.where((s) {
-      if (dateStr != null && s.date != dateStr) return false;
+      if (fromStr != null && (s.date.compareTo(fromStr) < 0 || s.date.compareTo(toStr!) > 0)) {
+        return false;
+      }
       if (q.isEmpty) return true;
       final hay = '${s.studentName} ${s.teacherName} '
           '${s.studentCode ?? ''} ${s.teacherCode ?? ''}'.toLowerCase();
@@ -39,17 +43,21 @@ class _ReportsScreenState extends State<ReportsScreen> {
     }).toList();
   }
 
-  Future<void> _pickDate() async {
+  Future<void> _pickRange() async {
     final now = nowThai();
-    final picked = await showDatePicker(
+    final picked = await showDateRangePicker(
       context: context,
-      initialDate: _selectedDate ?? DateTime(now.year, now.month, now.day),
+      initialDateRange: _range,
       firstDate: DateTime(now.year - 2),
       lastDate: DateTime(now.year + 1),
-      helpText: 'เลือกวันที่ต้องการดูรายงาน',
+      helpText: 'เลือกช่วงวันที่ (จาก – ถึง)',
+      saveText: 'ตกลง',
     );
     if (picked != null && mounted) {
-      setState(() => _selectedDate = DateTime(picked.year, picked.month, picked.day));
+      setState(() => _range = DateTimeRange(
+            start: DateTime(picked.start.year, picked.start.month, picked.start.day),
+            end: DateTime(picked.end.year, picked.end.month, picked.end.day),
+          ));
     }
   }
 
@@ -121,7 +129,7 @@ class _ReportsScreenState extends State<ReportsScreen> {
           }
 
           final sessions = _filter(all);
-          final isFiltering = _query.trim().isNotEmpty || _selectedDate != null;
+          final isFiltering = _query.trim().isNotEmpty || _range != null;
 
           return Column(children: [
             // ── แถบค้นหา + เลือกวันที่ ──
@@ -153,12 +161,12 @@ class _ReportsScreenState extends State<ReportsScreen> {
                 Row(children: [
                   Expanded(
                     child: OutlinedButton.icon(
-                      onPressed: _pickDate,
-                      icon: const Icon(Icons.calendar_today, size: 16),
+                      onPressed: _pickRange,
+                      icon: const Icon(Icons.date_range, size: 16),
                       label: Text(
-                        _selectedDate != null
-                            ? _fullDate(toStorageDateStr(_selectedDate!))
-                            : 'ทุกวัน (แตะเลือกวันที่)',
+                        _range != null
+                            ? '${_fullDate(toStorageDateStr(_range!.start))}  ถึง  ${_fullDate(toStorageDateStr(_range!.end))}'
+                            : 'ทุกวัน (แตะเลือกช่วงวันที่)',
                         overflow: TextOverflow.ellipsis,
                       ),
                       style: OutlinedButton.styleFrom(
@@ -169,12 +177,12 @@ class _ReportsScreenState extends State<ReportsScreen> {
                       ),
                     ),
                   ),
-                  if (_selectedDate != null) ...[
+                  if (_range != null) ...[
                     const SizedBox(width: 6),
                     IconButton(
-                      onPressed: () => setState(() => _selectedDate = null),
+                      onPressed: () => setState(() => _range = null),
                       icon: const Icon(Icons.close, size: 18),
-                      tooltip: 'ล้างวันที่',
+                      tooltip: 'ล้างช่วงวันที่',
                       style: IconButton.styleFrom(backgroundColor: Colors.grey.shade100),
                     ),
                   ],
