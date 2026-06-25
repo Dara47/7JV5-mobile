@@ -417,10 +417,11 @@ class _PackageFormSheetState extends State<_PackageFormSheet> {
                       // ── นักเรียน ──
                       _label('👤 นักเรียน', required: !_isEdit && widget.preselectedStudentId == null),
                       const SizedBox(height: 6),
-                      _UserDropdown(
+                      _SearchableUserField(
                         users: _students,
                         selected: _student,
                         hint: 'เลือกนักเรียน...',
+                        title: 'ค้นหานักเรียน',
                         enabled: !_isEdit && widget.preselectedStudentId == null,
                         color: const Color(0xFFF97316),
                         onChanged: (u) {
@@ -439,10 +440,11 @@ class _PackageFormSheetState extends State<_PackageFormSheet> {
                       // ── ครู ──
                       _label('🎓 ครู', required: !_isEdit),
                       const SizedBox(height: 6),
-                      _UserDropdown(
+                      _SearchableUserField(
                         users: _teachers,
                         selected: _teacher,
                         hint: 'เลือกครู...',
+                        title: 'ค้นหาครู',
                         enabled: !_isEdit,
                         color: const Color(0xFF2E7D32),
                         onChanged: (u) {
@@ -914,40 +916,181 @@ class _DraftSlot {
   bool get isComplete => date != null && start != null && end != null;
 }
 
-class _UserDropdown extends StatelessWidget {
+/// ช่องเลือกผู้ใช้ที่ค้นหาได้ — แตะเพื่อเปิดแผ่นค้นหา (พิมพ์ชื่อ/รหัส)
+class _SearchableUserField extends StatelessWidget {
   final List<UserModel> users;
   final UserModel? selected;
   final String hint;
+  final String title;
   final bool enabled;
   final Color color;
   final void Function(UserModel?) onChanged;
-  const _UserDropdown({required this.users, required this.selected, required this.hint, required this.enabled, required this.color, required this.onChanged});
+  const _SearchableUserField({
+    required this.users, required this.selected, required this.hint,
+    required this.title, required this.enabled, required this.color, required this.onChanged,
+  });
 
   @override
-  Widget build(BuildContext context) => DropdownButtonFormField<UserModel>(
-    value: selected,
-    hint: Text(hint, style: const TextStyle(fontSize: 14)),
-    isExpanded: true,
-    validator: enabled ? (v) => v == null ? 'กรุณาเลือก' : null : null,
-    onChanged: enabled ? onChanged : null,
-    decoration: InputDecoration(
-      filled: true,
-      fillColor: enabled ? Colors.white : Colors.grey.shade100,
-      border: OutlineInputBorder(borderRadius: BorderRadius.circular(10), borderSide: BorderSide(color: Colors.grey.shade300)),
-      enabledBorder: OutlineInputBorder(borderRadius: BorderRadius.circular(10), borderSide: BorderSide(color: Colors.grey.shade300)),
-      contentPadding: const EdgeInsets.symmetric(horizontal: 12, vertical: 10),
-    ),
-    items: users.map((u) => DropdownMenuItem(
-      value: u,
-      child: Row(children: [
-        Container(width: 28, height: 28, decoration: BoxDecoration(color: color.withAlpha(30), shape: BoxShape.circle),
-            child: Center(child: Text(u.code.substring(0, 1), style: TextStyle(fontSize: 11, color: color, fontWeight: FontWeight.bold)))),
-        const SizedBox(width: 8),
-        Expanded(child: Text('${u.name}  ', style: const TextStyle(fontSize: 14), overflow: TextOverflow.ellipsis)),
-        Text(u.code, style: TextStyle(fontSize: 12, color: color)),
-      ]),
-    )).toList(),
-  );
+  Widget build(BuildContext context) {
+    final s = selected;
+    return GestureDetector(
+      onTap: enabled
+          ? () async {
+              final picked = await showModalBottomSheet<UserModel>(
+                context: context,
+                isScrollControlled: true,
+                backgroundColor: Colors.transparent,
+                builder: (_) => _UserPickerSheet(
+                    users: users, title: title, color: color, selected: selected),
+              );
+              if (picked != null) onChanged(picked);
+            }
+          : null,
+      child: Container(
+        padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 10),
+        decoration: BoxDecoration(
+          color: enabled ? Colors.white : Colors.grey.shade100,
+          borderRadius: BorderRadius.circular(10),
+          border: Border.all(color: Colors.grey.shade300),
+        ),
+        child: Row(children: [
+          if (s != null) ...[
+            Container(
+              width: 28, height: 28,
+              decoration: BoxDecoration(color: color.withAlpha(30), shape: BoxShape.circle),
+              child: Center(child: Text(s.code.isNotEmpty ? s.code.substring(0, 1) : '?',
+                  style: TextStyle(fontSize: 11, color: color, fontWeight: FontWeight.bold))),
+            ),
+            const SizedBox(width: 8),
+            Expanded(child: Text(s.name, style: const TextStyle(fontSize: 14), overflow: TextOverflow.ellipsis)),
+            Text(s.code, style: TextStyle(fontSize: 12, color: color)),
+            const SizedBox(width: 6),
+          ] else
+            Expanded(child: Text(hint, style: const TextStyle(fontSize: 14, color: Colors.grey))),
+          Icon(enabled ? Icons.search : Icons.lock_outline, size: 18, color: Colors.grey.shade500),
+        ]),
+      ),
+    );
+  }
+}
+
+/// แผ่นค้นหา + เลือกผู้ใช้
+class _UserPickerSheet extends StatefulWidget {
+  final List<UserModel> users;
+  final String title;
+  final Color color;
+  final UserModel? selected;
+  const _UserPickerSheet({required this.users, required this.title, required this.color, this.selected});
+  @override
+  State<_UserPickerSheet> createState() => _UserPickerSheetState();
+}
+
+class _UserPickerSheetState extends State<_UserPickerSheet> {
+  final _searchCtrl = TextEditingController();
+  String _q = '';
+
+  @override
+  void dispose() {
+    _searchCtrl.dispose();
+    super.dispose();
+  }
+
+  List<UserModel> get _filtered {
+    final q = _q.trim().toLowerCase();
+    if (q.isEmpty) return widget.users;
+    return widget.users
+        .where((u) => u.name.toLowerCase().contains(q) || u.code.toLowerCase().contains(q))
+        .toList();
+  }
+
+  @override
+  Widget build(BuildContext context) {
+    final bottom = MediaQuery.of(context).viewInsets.bottom;
+    final list = _filtered;
+    return Padding(
+      padding: EdgeInsets.only(bottom: bottom),
+      child: Container(
+        constraints: BoxConstraints(maxHeight: MediaQuery.of(context).size.height * 0.8),
+        decoration: const BoxDecoration(
+          color: Colors.white,
+          borderRadius: BorderRadius.vertical(top: Radius.circular(20)),
+        ),
+        child: Column(mainAxisSize: MainAxisSize.min, children: [
+          Container(margin: const EdgeInsets.only(top: 10), width: 40, height: 4,
+              decoration: BoxDecoration(color: Colors.grey.shade300, borderRadius: BorderRadius.circular(2))),
+          Padding(
+            padding: const EdgeInsets.fromLTRB(20, 12, 12, 8),
+            child: Row(children: [
+              Icon(Icons.search, color: widget.color),
+              const SizedBox(width: 10),
+              Text(widget.title, style: const TextStyle(fontSize: 17, fontWeight: FontWeight.bold)),
+              const Spacer(),
+              IconButton(icon: const Icon(Icons.close), onPressed: () => Navigator.pop(context)),
+            ]),
+          ),
+          Padding(
+            padding: const EdgeInsets.symmetric(horizontal: 20),
+            child: TextField(
+              controller: _searchCtrl,
+              autofocus: true,
+              onChanged: (v) => setState(() => _q = v),
+              decoration: InputDecoration(
+                hintText: 'พิมพ์ชื่อ หรือ รหัส...',
+                prefixIcon: const Icon(Icons.search, size: 20),
+                suffixIcon: _q.isNotEmpty
+                    ? IconButton(
+                        icon: const Icon(Icons.clear, size: 18),
+                        onPressed: () => setState(() { _searchCtrl.clear(); _q = ''; }),
+                      )
+                    : null,
+                filled: true, fillColor: Colors.grey.shade50,
+                contentPadding: const EdgeInsets.symmetric(vertical: 4),
+                border: OutlineInputBorder(borderRadius: BorderRadius.circular(10), borderSide: BorderSide(color: Colors.grey.shade300)),
+                enabledBorder: OutlineInputBorder(borderRadius: BorderRadius.circular(10), borderSide: BorderSide(color: Colors.grey.shade300)),
+              ),
+            ),
+          ),
+          const SizedBox(height: 4),
+          Padding(
+            padding: const EdgeInsets.symmetric(horizontal: 20, vertical: 6),
+            child: Align(
+              alignment: Alignment.centerLeft,
+              child: Text('พบ ${list.length} คน', style: const TextStyle(fontSize: 12, color: Colors.grey)),
+            ),
+          ),
+          Flexible(
+            child: list.isEmpty
+                ? const Padding(
+                    padding: EdgeInsets.all(30),
+                    child: Text('ไม่พบรายชื่อที่ค้นหา', style: TextStyle(color: Colors.grey)),
+                  )
+                : ListView.separated(
+                    shrinkWrap: true,
+                    padding: const EdgeInsets.fromLTRB(12, 0, 12, 12),
+                    itemCount: list.length,
+                    separatorBuilder: (_, __) => Divider(height: 1, color: Colors.grey.shade200),
+                    itemBuilder: (_, i) {
+                      final u = list[i];
+                      final isSel = widget.selected?.id == u.id;
+                      return ListTile(
+                        leading: Container(
+                          width: 36, height: 36,
+                          decoration: BoxDecoration(color: widget.color.withAlpha(30), shape: BoxShape.circle),
+                          child: Center(child: Text(u.code.isNotEmpty ? u.code.substring(0, 1) : '?',
+                              style: TextStyle(fontSize: 13, color: widget.color, fontWeight: FontWeight.bold))),
+                        ),
+                        title: Text(u.name, style: const TextStyle(fontSize: 14)),
+                        subtitle: Text(u.code, style: TextStyle(fontSize: 12, color: widget.color)),
+                        trailing: isSel ? Icon(Icons.check_circle, color: widget.color, size: 20) : null,
+                        onTap: () => Navigator.pop(context, u),
+                      );
+                    },
+                  ),
+          ),
+        ]),
+      ),
+    );
+  }
 }
 
 class _TimeTile extends StatelessWidget {
