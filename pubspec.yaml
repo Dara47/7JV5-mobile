@@ -37,6 +37,7 @@ dependencies:
   web: ^1.1.0
   file_picker: ^8.1.2
   excel: ^4.0.6
+  image: ^4.2.0
 
 dev_dependencies:
   flutter_test:

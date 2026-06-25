@@ -1,5 +1,8 @@
-﻿import 'package:flutter/material.dart';
+﻿import 'dart:convert';
+import 'package:flutter/material.dart';
 import 'package:firebase_auth/firebase_auth.dart';
+import 'package:file_picker/file_picker.dart';
+import 'package:image/image.dart' as img;
 import '../services/firestore_service.dart';
 import 'payroll_screen.dart';
 import 'import_users_screen.dart';
@@ -15,6 +18,8 @@ class _SettingsScreenState extends State<SettingsScreen> {
   final _lineCtrl = TextEditingController();
   final _qrCtrl = TextEditingController();
   final _notesCtrl = TextEditingController();
+  String _qrUpload = ''; // รูป QR ที่อัปโหลด (เก็บเป็น data URI base64)
+  bool _qrProcessing = false;
   bool _saving = false;
   bool _loaded = false;
 
@@ -30,16 +35,96 @@ class _SettingsScreenState extends State<SettingsScreen> {
     if (_loaded) return;
     _loaded = true;
     _lineCtrl.text = data['lineLink'] ?? '';
-    _qrCtrl.text = data['qrImageUrl'] ?? '';
     _notesCtrl.text = data['notes'] ?? '';
+    final qr = (data['qrImageUrl'] ?? '') as String;
+    // รูปที่อัปโหลด (ฝัง base64) แยกจาก URL ปกติ
+    if (qr.startsWith('data:')) {
+      _qrUpload = qr;
+    } else {
+      _qrCtrl.text = qr;
+    }
+  }
+
+  /// เลือกรูปจากเครื่อง → ย่อ ≤700px → เก็บเป็น base64 (ไม่ต้องใช้ Firebase Storage)
+  Future<void> _pickQrImage() async {
+    setState(() => _qrProcessing = true);
+    try {
+      final result = await FilePicker.platform.pickFiles(type: FileType.image, withData: true);
+      if (result == null || result.files.isEmpty || result.files.first.bytes == null) {
+        setState(() => _qrProcessing = false);
+        return;
+      }
+      final decoded = img.decodeImage(result.files.first.bytes!);
+      if (decoded == null) {
+        _snack('อ่านไฟล์รูปไม่ได้ — ลองไฟล์อื่น', error: true);
+        setState(() => _qrProcessing = false);
+        return;
+      }
+      // ย่อด้านยาวสุดไม่เกิน 700px (พอสำหรับสแกน QR และเก็บใน Firestore ได้)
+      final resized = (decoded.width > 700 || decoded.height > 700)
+          ? img.copyResize(decoded,
+              width: decoded.width >= decoded.height ? 700 : null,
+              height: decoded.height > decoded.width ? 700 : null)
+          : decoded;
+      final jpg = img.encodeJpg(resized, quality: 88);
+      setState(() {
+        _qrUpload = 'data:image/jpeg;base64,${base64Encode(jpg)}';
+        _qrProcessing = false;
+      });
+    } catch (e) {
+      _snack('ประมวลผลรูปไม่สำเร็จ: $e', error: true);
+      setState(() => _qrProcessing = false);
+    }
+  }
+
+  void _snack(String msg, {bool error = false}) {
+    if (!mounted) return;
+    ScaffoldMessenger.of(context).showSnackBar(
+        SnackBar(content: Text(msg), backgroundColor: error ? Colors.red : null));
+  }
+
+  /// พรีวิวรูป QR — รองรับทั้ง data URI (อัปโหลด) และ URL ปกติ
+  Widget _qrImagePreview(String value) {
+    if (value.isEmpty) {
+      return Container(
+        height: 160,
+        decoration: BoxDecoration(
+          color: Colors.grey.shade100,
+          borderRadius: BorderRadius.circular(12),
+          border: Border.all(color: Colors.grey.shade300),
+        ),
+        child: Column(mainAxisAlignment: MainAxisAlignment.center, children: [
+          Icon(Icons.qr_code_2, size: 48, color: Colors.grey.shade400),
+          const SizedBox(height: 8),
+          Text('อัปโหลดรูป หรือวาง URL', style: TextStyle(fontSize: 12, color: Colors.grey.shade500)),
+        ]),
+      );
+    }
+    Widget errorBox() => Container(
+          height: 100,
+          decoration: BoxDecoration(color: Colors.red.shade50, borderRadius: BorderRadius.circular(12)),
+          child: Row(mainAxisAlignment: MainAxisAlignment.center, children: [
+            Icon(Icons.broken_image_outlined, color: Colors.red.shade300),
+            const SizedBox(width: 8),
+            Text('โหลดภาพไม่ได้', style: TextStyle(fontSize: 12, color: Colors.red.shade400)),
+          ]),
+        );
+    final image = value.startsWith('data:')
+        ? Image.memory(base64Decode(value.substring(value.indexOf(',') + 1)),
+            height: 200, fit: BoxFit.contain, errorBuilder: (_, __, ___) => errorBox())
+        : Image.network(value,
+            height: 200, fit: BoxFit.contain, errorBuilder: (_, __, ___) => errorBox());
+    return ClipRRect(borderRadius: BorderRadius.circular(12), child: image);
   }
 
   Future<void> _save() async {
     setState(() => _saving = true);
     try {
+      // อัปโหลดรูปมาก่อน (base64) ถ้าไม่มีค่อยใช้ URL ที่พิมพ์
+      final qrValue = _qrUpload.isNotEmpty ? _qrUpload : _qrCtrl.text.trim();
       await FirestoreService.saveSettings({
         'lineLink': _lineCtrl.text.trim(),
-        'qrImageUrl': _qrCtrl.text.trim(),
+        'qrImageUrl': qrValue,
         'notes': _notesCtrl.text.trim(),
       });
       if (mounted) {
@@ -110,16 +195,65 @@ class _SettingsScreenState extends State<SettingsScreen> {
               const SizedBox(height: 24),
 
               // ── QR ธนาคาร ───────────────────────────────────────────
-              _SectionHeader(icon: Icons.qr_code_2, label: 'ภาพ QR ธนาคาร (URL)', color: const Color(0xFFF97316)),
+              _SectionHeader(icon: Icons.qr_code_2, label: 'ภาพ QR ธนาคาร', color: const Color(0xFFF97316)),
               const SizedBox(height: 8),
-              _Field(
-                controller: _qrCtrl,
-                hint: 'https://example.com/qr.png',
-                icon: Icons.image_outlined,
-                keyboardType: TextInputType.url,
-              ),
-              const SizedBox(height: 12),
-              _QrPreview(ctrl: _qrCtrl),
+              if (_qrUpload.isNotEmpty) ...[
+                // โหมดรูปที่อัปโหลด (ฝังในระบบ)
+                _qrImagePreview(_qrUpload),
+                const SizedBox(height: 8),
+                Row(children: [
+                  Expanded(child: OutlinedButton.icon(
+                    onPressed: _qrProcessing ? null : _pickQrImage,
+                    icon: const Icon(Icons.image_outlined, size: 18, color: Color(0xFFF97316)),
+                    label: const Text('เปลี่ยนรูป', style: TextStyle(color: Color(0xFFF97316))),
+                    style: OutlinedButton.styleFrom(side: const BorderSide(color: Color(0xFFF97316))),
+                  )),
+                  const SizedBox(width: 8),
+                  Expanded(child: OutlinedButton.icon(
+                    onPressed: () => setState(() => _qrUpload = ''),
+                    icon: const Icon(Icons.delete_outline, size: 18, color: Colors.red),
+                    label: const Text('ลบรูป', style: TextStyle(color: Colors.red)),
+                    style: OutlinedButton.styleFrom(side: const BorderSide(color: Colors.red)),
+                  )),
+                ]),
+                const SizedBox(height: 6),
+                Text('ใช้รูปที่อัปโหลด (ฝังในระบบ) — กดบันทึกเพื่อยืนยัน',
+                    style: TextStyle(fontSize: 12, color: Colors.grey.shade600)),
+              ] else ...[
+                // ปุ่มอัปโหลดรูปจากเครื่อง
+                SizedBox(
+                  height: 48,
+                  child: OutlinedButton.icon(
+                    onPressed: _qrProcessing ? null : _pickQrImage,
+                    icon: _qrProcessing
+                        ? const SizedBox(width: 18, height: 18, child: CircularProgressIndicator(strokeWidth: 2, color: Color(0xFFF97316)))
+                        : const Icon(Icons.upload_file, color: Color(0xFFF97316)),
+                    label: Text(_qrProcessing ? 'กำลังประมวลผล...' : 'อัปโหลดรูป QR จากเครื่อง',
+                        style: const TextStyle(fontSize: 15, fontWeight: FontWeight.bold, color: Color(0xFFF97316))),
+                    style: OutlinedButton.styleFrom(
+                      side: const BorderSide(color: Color(0xFFF97316)),
+                      shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(12)),
+                    ),
+                  ),
+                ),
+                const SizedBox(height: 10),
+                Row(children: [
+                  Expanded(child: Divider(color: Colors.grey.shade300)),
+                  Padding(padding: const EdgeInsets.symmetric(horizontal: 8),
+                      child: Text('หรือวางลิงก์รูป (URL)', style: TextStyle(fontSize: 12, color: Colors.grey.shade500))),
+                  Expanded(child: Divider(color: Colors.grey.shade300)),
+                ]),
+                const SizedBox(height: 10),
+                _Field(
+                  controller: _qrCtrl,
+                  hint: 'https://example.com/qr.png',
+                  icon: Icons.link,
+                  keyboardType: TextInputType.url,
+                  onChanged: (_) => setState(() {}),
+                ),
+                const SizedBox(height: 12),
+                _qrImagePreview(_qrCtrl.text.trim()),
+              ],
               const SizedBox(height: 24),
 
               // ── หมายเหตุ ─────────────────────────────────────────────
@@ -262,13 +396,15 @@ class _Field extends StatelessWidget {
   final String hint;
   final IconData icon;
   final TextInputType? keyboardType;
+  final ValueChanged<String>? onChanged;
 
-  const _Field({required this.controller, required this.hint, required this.icon, this.keyboardType});
+  const _Field({required this.controller, required this.hint, required this.icon, this.keyboardType, this.onChanged});
 
   @override
   Widget build(BuildContext context) => TextField(
     controller: controller,
     keyboardType: keyboardType,
+    onChanged: onChanged,
     decoration: InputDecoration(
       hintText: hint,
       prefixIcon: Icon(icon, size: 20),
@@ -311,54 +447,3 @@ class _PreviewUrlState extends State<_PreviewUrl> {
   }
 }
 
-class _QrPreview extends StatefulWidget {
-  final TextEditingController ctrl;
-  const _QrPreview({required this.ctrl});
-  @override
-  State<_QrPreview> createState() => _QrPreviewState();
-}
-
-class _QrPreviewState extends State<_QrPreview> {
-  @override
-  void initState() {
-    super.initState();
-    widget.ctrl.addListener(() => setState(() {}));
-  }
-
-  @override
-  Widget build(BuildContext context) {
-    final url = widget.ctrl.text.trim();
-    if (url.isEmpty) {
-      return Container(
-        height: 160,
-        decoration: BoxDecoration(
-          color: Colors.grey.shade100,
-          borderRadius: BorderRadius.circular(12),
-          border: Border.all(color: Colors.grey.shade300, style: BorderStyle.solid),
-        ),
-        child: Column(mainAxisAlignment: MainAxisAlignment.center, children: [
-          Icon(Icons.qr_code_2, size: 48, color: Colors.grey.shade400),
-          const SizedBox(height: 8),
-          Text('วาง URL รูป QR แล้วกดบันทึก', style: TextStyle(fontSize: 12, color: Colors.grey.shade500)),
-        ]),
-      );
-    }
-    return ClipRRect(
-      borderRadius: BorderRadius.circular(12),
-      child: Image.network(
-        url,
-        height: 200,
-        fit: BoxFit.contain,
-        errorBuilder: (_, __, ___) => Container(
-          height: 100,
-          decoration: BoxDecoration(color: Colors.red.shade50, borderRadius: BorderRadius.circular(12)),
-          child: Row(mainAxisAlignment: MainAxisAlignment.center, children: [
-            Icon(Icons.broken_image_outlined, color: Colors.red.shade300),
-            const SizedBox(width: 8),
-            Text('โหลดภาพไม่ได้ ตรวจสอบ URL', style: TextStyle(fontSize: 12, color: Colors.red.shade400)),
-          ]),
-        ),
-      ),
-    );
-  }
-}
