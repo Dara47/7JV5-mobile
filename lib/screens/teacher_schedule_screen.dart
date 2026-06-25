@@ -4,6 +4,7 @@ import '../services/firestore_service.dart';
 import '../utils/date_format.dart';
 import 'teacher_slot_form_dialog.dart';
 import 'schedule_calendar_screen.dart';
+import '../widgets/load_more_footer.dart';
 
 class TeacherScheduleScreen extends StatefulWidget {
   final String? filterTeacherId;
@@ -15,11 +16,16 @@ class TeacherScheduleScreen extends StatefulWidget {
 class _TeacherScheduleScreenState extends State<TeacherScheduleScreen> {
   final _searchCtrl = TextEditingController();
   String _search = '';
+  static const _pageSize = 20;
+  int _visible = _pageSize;
 
   @override
   void initState() {
     super.initState();
-    _searchCtrl.addListener(() => setState(() => _search = _searchCtrl.text.toLowerCase()));
+    _searchCtrl.addListener(() => setState(() {
+      _search = _searchCtrl.text.toLowerCase();
+      _visible = _pageSize; // ค้นหาใหม่ → เริ่มนับ 20 ใหม่
+    }));
   }
 
   @override
@@ -117,11 +123,26 @@ class _TeacherScheduleScreenState extends State<TeacherScheduleScreen> {
                 ]));
               }
 
+              // แสดงทีละ 20 (กดโหลดเพิ่ม) — มีช่องค้นหาแล้ว
+              final visible = _visible.clamp(0, teachers.length);
+              final shown = teachers.take(visible).toList();
+              final hasMore = teachers.length > visible;
               return ListView.separated(
                 padding: const EdgeInsets.fromLTRB(12, 8, 12, 80),
-                itemCount: teachers.length,
+                itemCount: shown.length + 1,
                 separatorBuilder: (_, __) => const SizedBox(height: 10),
-                itemBuilder: (_, i) => _TeacherCard(teacher: teachers[i]),
+                itemBuilder: (_, i) {
+                  if (i == shown.length) {
+                    return LoadMoreFooter(
+                      hasMore: hasMore,
+                      remaining: teachers.length - visible,
+                      total: teachers.length,
+                      color: const Color(0xFF2E7D32),
+                      onMore: () => setState(() => _visible += _pageSize),
+                    );
+                  }
+                  return _TeacherCard(teacher: shown[i]);
+                },
               );
             },
           ),

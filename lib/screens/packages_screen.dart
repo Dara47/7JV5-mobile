@@ -4,6 +4,7 @@ import 'package:cloud_firestore/cloud_firestore.dart';
 import '../models/models.dart';
 import '../services/firestore_service.dart';
 import '../utils/date_format.dart';
+import '../widgets/load_more_footer.dart';
 import 'package_form_dialog.dart';
 
 class PackagesScreen extends StatefulWidget {
@@ -669,9 +670,23 @@ class _ActionBtn extends StatelessWidget {
 
 // ── Teacher-grouped view ──────────────────────────────────────────────────────
 
-class _TeacherGroupView extends StatelessWidget {
+class _TeacherGroupView extends StatefulWidget {
   final List<PackageModel> packages;
   const _TeacherGroupView({required this.packages});
+  @override
+  State<_TeacherGroupView> createState() => _TeacherGroupViewState();
+}
+
+class _TeacherGroupViewState extends State<_TeacherGroupView> {
+  static const _pageSize = 20;
+  int _visible = _pageSize;
+
+  @override
+  void didUpdateWidget(covariant _TeacherGroupView old) {
+    super.didUpdateWidget(old);
+    // จำนวน package เปลี่ยน (เช่น ค้นหา) → เริ่มนับ 20 ใหม่
+    if (old.packages.length != widget.packages.length) _visible = _pageSize;
+  }
 
   // ใช้ตัวย่อตรงกับที่เก็บใน Firestore (PackageModel.days)
   static const _dayOrder = ['อา', 'จ', 'อ', 'พ', 'พฤ', 'ศ', 'ส'];
@@ -714,7 +729,7 @@ class _TeacherGroupView extends StatelessWidget {
   Widget build(BuildContext context) {
     // Group by teacherId
     final grouped = <String, List<PackageModel>>{};
-    for (final pkg in packages) {
+    for (final pkg in widget.packages) {
       grouped.putIfAbsent(pkg.teacherId, () => []).add(pkg);
     }
 
@@ -722,12 +737,25 @@ class _TeacherGroupView extends StatelessWidget {
     final teachers = grouped.entries.toList()
       ..sort((a, b) => a.value.first.teacherName.compareTo(b.value.first.teacherName));
 
+    // แสดงทีละ 20 ครู (กดโหลดเพิ่ม)
+    final visible = _visible.clamp(0, teachers.length);
+    final shown = teachers.take(visible).toList();
+    final hasMore = teachers.length > visible;
+
     return ListView.separated(
       padding: const EdgeInsets.fromLTRB(12, 8, 12, 80),
-      itemCount: teachers.length,
+      itemCount: shown.length + 1,
       separatorBuilder: (_, __) => const SizedBox(height: 8),
       itemBuilder: (_, i) {
-        final pkgs = teachers[i].value;
+        if (i == shown.length) {
+          return LoadMoreFooter(
+            hasMore: hasMore,
+            remaining: teachers.length - visible,
+            total: teachers.length,
+            onMore: () => setState(() => _visible += _pageSize),
+          );
+        }
+        final pkgs = shown[i].value;
         final teacherName = pkgs.first.teacherName;
         final teacherCode = pkgs.first.teacherCode;
 

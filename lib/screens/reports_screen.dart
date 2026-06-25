@@ -3,6 +3,7 @@ import '../models/models.dart';
 import '../services/firestore_service.dart';
 import '../utils/date_format.dart';
 import '../utils/excel_export.dart';
+import '../widgets/load_more_footer.dart';
 
 const _kOrange = Color(0xFFF97316);
 const _kExportPass = 'ATAL190314'; // รหัสผ่านก่อนดาวน์โหลดไฟล์ Excel (ข้อมูลสำคัญ)
@@ -18,6 +19,8 @@ class _ReportsScreenState extends State<ReportsScreen> {
   String _query = '';
   DateTimeRange? _range; // null = ทุกวัน (เลือกช่วง: จากวันที่ → ถึงวันที่)
   Map<String, String> _idToCode = {}; // userId → code (เติมรหัสให้ session เก่าที่ไม่มีรหัสฝังไว้)
+  static const _pageSize = 20;
+  int _visible = _pageSize; // แสดงทีละ 20 (กดโหลดเพิ่ม)
 
   @override
   void initState() {
@@ -75,10 +78,13 @@ class _ReportsScreenState extends State<ReportsScreen> {
       saveText: 'ตกลง',
     );
     if (picked != null && mounted) {
-      setState(() => _range = DateTimeRange(
-            start: DateTime(picked.start.year, picked.start.month, picked.start.day),
-            end: DateTime(picked.end.year, picked.end.month, picked.end.day),
-          ));
+      setState(() {
+        _range = DateTimeRange(
+          start: DateTime(picked.start.year, picked.start.month, picked.start.day),
+          end: DateTime(picked.end.year, picked.end.month, picked.end.day),
+        );
+        _visible = _pageSize;
+      });
     }
   }
 
@@ -286,6 +292,10 @@ class _ReportsScreenState extends State<ReportsScreen> {
 
           final sessions = _filter(all);
           final isFiltering = _query.trim().isNotEmpty || _range != null;
+          // แสดงทีละ 20 (กดโหลดเพิ่ม)
+          final visible = _visible.clamp(0, sessions.length);
+          final shown = sessions.take(visible).toList();
+          final hasMore = sessions.length > visible;
 
           return Column(children: [
             // ── แถบค้นหา + เลือกวันที่ ──
@@ -295,7 +305,7 @@ class _ReportsScreenState extends State<ReportsScreen> {
               child: Column(children: [
                 TextField(
                   controller: _searchCtrl,
-                  onChanged: (v) => setState(() => _query = v),
+                  onChanged: (v) => setState(() { _query = v; _visible = _pageSize; }),
                   decoration: InputDecoration(
                     hintText: 'ค้นหา ชื่อ หรือ รหัส (ครู/นักเรียน)',
                     prefixIcon: const Icon(Icons.search, size: 20),
@@ -305,6 +315,7 @@ class _ReportsScreenState extends State<ReportsScreen> {
                             onPressed: () => setState(() {
                               _searchCtrl.clear();
                               _query = '';
+                              _visible = _pageSize;
                             }),
                           )
                         : null,
@@ -336,7 +347,7 @@ class _ReportsScreenState extends State<ReportsScreen> {
                   if (_range != null) ...[
                     const SizedBox(width: 6),
                     IconButton(
-                      onPressed: () => setState(() => _range = null),
+                      onPressed: () => setState(() { _range = null; _visible = _pageSize; }),
                       icon: const Icon(Icons.close, size: 18),
                       tooltip: 'ล้างช่วงวันที่',
                       style: IconButton.styleFrom(backgroundColor: Colors.grey.shade100),
@@ -387,10 +398,19 @@ class _ReportsScreenState extends State<ReportsScreen> {
                     )
                   : ListView.separated(
                       padding: const EdgeInsets.fromLTRB(12, 8, 12, 24),
-                      itemCount: sessions.length,
+                      itemCount: shown.length + 1,
                       separatorBuilder: (_, __) => const SizedBox(height: 6),
                       itemBuilder: (_, i) {
-                        final s = sessions[i];
+                        if (i == shown.length) {
+                          return LoadMoreFooter(
+                            hasMore: hasMore,
+                            remaining: sessions.length - visible,
+                            total: sessions.length,
+                            color: const Color(0xFF00897B),
+                            onMore: () => setState(() => _visible += _pageSize),
+                          );
+                        }
+                        final s = shown[i];
                         return Card(
                           margin: EdgeInsets.zero,
                           shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(12)),
