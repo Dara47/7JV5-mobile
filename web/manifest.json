@@ -1,11 +1,11 @@
 {
-    "name": "jv5_mobile",
-    "short_name": "jv5_mobile",
+    "name": "7J English",
+    "short_name": "7J English",
     "start_url": ".",
     "display": "standalone",
-    "background_color": "#0175C2",
-    "theme_color": "#0175C2",
-    "description": "A new Flutter project.",
+    "background_color": "#D4AF37",
+    "theme_color": "#D4AF37",
+    "description": "7J English Center — ระบบจัดการเรียนการสอน",
     "orientation": "portrait-primary",
     "prefer_related_applications": false,
     "icons": [
