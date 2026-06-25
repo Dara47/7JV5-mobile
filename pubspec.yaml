@@ -51,12 +51,12 @@ flutter_launcher_icons:
   android: true
   ios: true
   remove_alpha_ios: true            # iOS ห้ามมี alpha channel
-  background_color_ios: "#D4AF37"   # พื้นทองเวลา flatten alpha
+  background_color_ios: "#E8590C"   # พื้นส้มเวลา flatten alpha
   web:
     generate: true
     image_path: "assets/icon/app_icon.png"
-    background_color: "#D4AF37"
-    theme_color: "#D4AF37"
+    background_color: "#E8590C"
+    theme_color: "#E8590C"
 
 # For information on the generic Dart part of this file, see the
 # following page: https://dart.dev/tools/pub/pubspec

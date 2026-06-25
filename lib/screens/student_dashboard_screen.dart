@@ -1,4 +1,5 @@
 import 'dart:async';
+import 'dart:convert';
 import 'package:web/web.dart' as web;
 import 'package:flutter/material.dart';
 import '../models/models.dart';
@@ -83,8 +84,119 @@ class _StudentDashboardScreenState extends State<StudentDashboardScreen> {
               child: _CourseCard(pkg: pkg),
             )),
           _leaveShortcut(context),
+          const SizedBox(height: 12),
+          _contactCard(),
           const SizedBox(height: 20),
         ],
+      ),
+    );
+  }
+
+  /// การ์ดติดต่อ/ชำระเงิน — LINE + QR ธนาคาร + หมายเหตุ (จากหน้าตั้งค่า)
+  Widget _contactCard() => StreamBuilder<Map<String, dynamic>>(
+    stream: FirestoreService.watchSettings(),
+    builder: (context, snap) {
+      final data = snap.data ?? const {};
+      final line = (data['lineLink'] ?? '') as String;
+      final qr = (data['qrImageUrl'] ?? '') as String;
+      final notes = (data['notes'] ?? '') as String;
+      if (line.isEmpty && qr.isEmpty && notes.isEmpty) return const SizedBox.shrink();
+
+      return Card(
+        elevation: 1,
+        shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(14)),
+        child: Padding(
+          padding: const EdgeInsets.all(16),
+          child: Column(crossAxisAlignment: CrossAxisAlignment.start, children: [
+            const Row(children: [
+              Icon(Icons.payments_outlined, size: 18, color: Color(0xFFF97316)),
+              SizedBox(width: 8),
+              Text('ติดต่อ / ชำระเงิน',
+                  style: TextStyle(fontWeight: FontWeight.bold, fontSize: 15)),
+            ]),
+            const SizedBox(height: 12),
+
+            if (line.isNotEmpty) ...[
+              SizedBox(
+                width: double.infinity,
+                child: OutlinedButton.icon(
+                  onPressed: () => web.window.open(line.trim(), '_blank'),
+                  icon: const Icon(Icons.chat_bubble_outline, color: Color(0xFF00C300)),
+                  label: const Text('เพิ่มเพื่อน / แชต LINE',
+                      style: TextStyle(color: Color(0xFF00B900), fontWeight: FontWeight.bold)),
+                  style: OutlinedButton.styleFrom(
+                    side: const BorderSide(color: Color(0xFF00C300)),
+                    padding: const EdgeInsets.symmetric(vertical: 12),
+                    shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(10)),
+                  ),
+                ),
+              ),
+              const SizedBox(height: 12),
+            ],
+
+            if (qr.isNotEmpty) ...[
+              Center(child: Text('สแกน QR เพื่อชำระเงิน',
+                  style: TextStyle(fontSize: 12, color: Colors.grey.shade600))),
+              const SizedBox(height: 8),
+              Center(
+                child: GestureDetector(
+                  onTap: () => _showQrFull(context, qr),
+                  child: ClipRRect(
+                    borderRadius: BorderRadius.circular(12),
+                    child: _qrImage(qr, height: 240),
+                  ),
+                ),
+              ),
+              const SizedBox(height: 12),
+            ],
+
+            if (notes.isNotEmpty)
+              Container(
+                width: double.infinity,
+                padding: const EdgeInsets.all(12),
+                decoration: BoxDecoration(
+                  color: Colors.grey.shade50,
+                  borderRadius: BorderRadius.circular(10),
+                  border: Border.all(color: Colors.grey.shade200),
+                ),
+                child: Text(notes, style: const TextStyle(fontSize: 13, color: Colors.black87)),
+              ),
+          ]),
+        ),
+      );
+    },
+  );
+
+  /// แสดงรูป QR — รองรับทั้ง data URI (อัปโหลด) และ URL ปกติ
+  Widget _qrImage(String value, {double height = 200}) {
+    Widget errorBox() => Container(
+          height: 100, alignment: Alignment.center,
+          color: Colors.grey.shade100,
+          child: const Text('โหลดภาพ QR ไม่ได้', style: TextStyle(fontSize: 12, color: Colors.grey)),
+        );
+    if (value.startsWith('data:')) {
+      return Image.memory(base64Decode(value.substring(value.indexOf(',') + 1)),
+          height: height, fit: BoxFit.contain, errorBuilder: (_, __, ___) => errorBox());
+    }
+    return Image.network(value, height: height, fit: BoxFit.contain,
+        errorBuilder: (_, __, ___) => errorBox());
+  }
+
+  void _showQrFull(BuildContext context, String value) {
+    showDialog(
+      context: context,
+      builder: (_) => Dialog(
+        backgroundColor: Colors.white,
+        child: Padding(
+          padding: const EdgeInsets.all(16),
+          child: Column(mainAxisSize: MainAxisSize.min, children: [
+            const Text('QR ชำระเงิน', style: TextStyle(fontWeight: FontWeight.bold, fontSize: 16)),
+            const SizedBox(height: 12),
+            _qrImage(value, height: 360),
+            const SizedBox(height: 12),
+            TextButton(onPressed: () => Navigator.pop(context), child: const Text('ปิด')),
+          ]),
+        ),
       ),
     );
   }
