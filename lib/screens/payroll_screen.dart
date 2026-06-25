@@ -2,6 +2,7 @@ import 'package:flutter/material.dart';
 import '../models/models.dart';
 import '../services/firestore_service.dart';
 import '../utils/date_format.dart';
+import '../utils/excel_export.dart';
 import '../widgets/user_search_field.dart';
 
 const _kPass = 'ATAL190314';
@@ -279,6 +280,71 @@ class _TabContent extends StatelessWidget {
       s + (type == 'teacher' ? (e as TeacherPayrollModel).totalAmount : (e as AdminPayrollModel).totalAmount));
   double get _pending => _totalAmount - _paid;
 
+  static String _num(double n) => n % 1 == 0 ? n.toInt().toString() : n.toString();
+
+  /// ส่งออกรายการที่กำลังแสดง (ตามตัวกรองค้นหา) เป็นไฟล์ Excel
+  void _export(BuildContext context) {
+    if (entries.isEmpty) {
+      ScaffoldMessenger.of(context).showSnackBar(
+          const SnackBar(content: Text('ไม่มีรายการให้ส่งออก')));
+      return;
+    }
+    final isTeacher = type == 'teacher';
+    final headers = <String>[
+      'ลำดับ', isTeacher ? 'ชื่อครู' : 'ชื่อแอดมิน',
+      'ตั้งแต่วันที่', 'ถึงวันที่', 'สัปดาห์/ช่วง', 'รายการค่าจ้าง',
+      if (isTeacher) 'จำนวนคาบ',
+      'รวมค่าจ้าง', 'รายการหักเงิน', 'หักเงิน', 'จ่ายสุทธิ', 'สถานะ', 'หมายเหตุ',
+    ];
+
+    final rows = <List<dynamic>>[];
+    double sumGross = 0, sumDeduct = 0, sumNet = 0, sumSessions = 0;
+    for (var i = 0; i < entries.length; i++) {
+      final e = entries[i];
+      final name = isTeacher ? (e as TeacherPayrollModel).teacherName : (e as AdminPayrollModel).adminName;
+      final roles = isTeacher ? (e as TeacherPayrollModel).roles : (e as AdminPayrollModel).roles;
+      final deds = isTeacher ? (e as TeacherPayrollModel).deductions : (e as AdminPayrollModel).deductions;
+      final dateFrom = isTeacher ? (e as TeacherPayrollModel).dateFrom : (e as AdminPayrollModel).dateFrom;
+      final dateTo = isTeacher ? (e as TeacherPayrollModel).dateTo : (e as AdminPayrollModel).dateTo;
+      final week = isTeacher ? (e as TeacherPayrollModel).weekLabel : (e as AdminPayrollModel).weekLabel;
+      final note = isTeacher ? (e as TeacherPayrollModel).note : (e as AdminPayrollModel).note;
+      final net = isTeacher ? (e as TeacherPayrollModel).totalAmount : (e as AdminPayrollModel).totalAmount;
+      final totalDed = isTeacher ? (e as TeacherPayrollModel).totalDeductions : (e as AdminPayrollModel).totalDeductions;
+      final isPaid = isTeacher ? (e as TeacherPayrollModel).isPaid : (e as AdminPayrollModel).isPaid;
+      final sessions = isTeacher ? (e as TeacherPayrollModel).totalSessions : 0.0;
+      final gross = net + totalDed;
+      final rolesStr = roles.map((r) => '${r.role} ${_num(r.count)}×${_num(r.rate)}=${_num(r.total)}').join(' | ');
+      final dedsStr = deds.map((d) => '${d.label}=${_num(d.amount)}').join(' | ');
+
+      rows.add([
+        i + 1, name,
+        dateFrom ?? '', dateTo ?? '', week ?? '', rolesStr,
+        if (isTeacher) sessions,
+        gross, dedsStr, totalDed, net,
+        isPaid ? 'จ่ายแล้ว' : 'รอจ่าย',
+        note ?? '',
+      ]);
+      sumGross += gross; sumDeduct += totalDed; sumNet += net; sumSessions += sessions;
+    }
+    // แถวรวมยอด
+    rows.add([
+      '', 'รวม', '', '', '', '',
+      if (isTeacher) sumSessions,
+      sumGross, '', sumDeduct, sumNet, '', '',
+    ]);
+
+    exportXlsx(
+      filename: '${isTeacher ? 'payroll_teacher' : 'payroll_admin'}_${todayThaiStr()}.xlsx',
+      sheetName: isTeacher ? 'ค่าจ้างครู' : 'ค่าจ้างแอดมิน',
+      headers: headers,
+      rows: rows,
+    );
+    ScaffoldMessenger.of(context).showSnackBar(SnackBar(
+      content: Text('ส่งออก ${entries.length} รายการเป็น Excel แล้ว'),
+      backgroundColor: Colors.green,
+    ));
+  }
+
   @override
   Widget build(BuildContext context) => Column(children: [
     // ── Summary row ────────────────────────────────────────────────────────
@@ -309,6 +375,18 @@ class _TabContent extends StatelessWidget {
                 borderSide: BorderSide(color: Colors.grey.shade300)),
           ),
         )),
+        const SizedBox(width: 8),
+        OutlinedButton.icon(
+          onPressed: () => _export(context),
+          icon: const Icon(Icons.file_download_outlined, size: 18),
+          label: const Text('Excel'),
+          style: OutlinedButton.styleFrom(
+            foregroundColor: Colors.green.shade700,
+            side: BorderSide(color: Colors.green.shade400),
+            shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(10)),
+            padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 12),
+          ),
+        ),
         const SizedBox(width: 8),
         ElevatedButton.icon(
           onPressed: onAdd,
