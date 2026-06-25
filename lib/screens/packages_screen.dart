@@ -798,6 +798,8 @@ class _StudentScheduleRow extends StatelessWidget {
             for (int i = 0; i < slots.length; i++) ...[
               if (i > 0) const SizedBox(height: 6),
               Row(children: [
+                SizedBox(width: 18, child: Text('${i + 1}.',
+                    style: const TextStyle(fontSize: 12, fontWeight: FontWeight.bold, color: Color(0xFFF97316)))),
                 const Icon(Icons.calendar_today, size: 12, color: Color(0xFFF97316)),
                 const SizedBox(width: 4),
                 Expanded(child: Text(slots[i].date,
@@ -805,6 +807,7 @@ class _StudentScheduleRow extends StatelessWidget {
               ]),
               const SizedBox(height: 2),
               Row(children: [
+                const SizedBox(width: 18),
                 const Icon(Icons.access_time, size: 12, color: Colors.blueGrey),
                 const SizedBox(width: 4),
                 Text(slots[i].time,
