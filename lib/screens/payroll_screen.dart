@@ -2,6 +2,7 @@ import 'package:flutter/material.dart';
 import '../models/models.dart';
 import '../services/firestore_service.dart';
 import '../utils/date_format.dart';
+import '../widgets/user_search_field.dart';
 
 const _kPass = 'ATAL190314';
 
@@ -561,11 +562,16 @@ class _PayrollFormSheetState extends State<_PayrollFormSheet> {
   List<_DeductRow> _deducts = [];
   bool _saving = false;
 
+  // รายชื่อครู (สำหรับช่องค้นหาในโหมดครู)
+  List<UserModel> _teacherUsers = [];
+  String? _teacherCode; // รหัสครูที่เลือก (ไว้แสดงในช่อง)
+
   bool get _isEdit => widget.teacher != null || widget.admin != null;
 
   @override
   void initState() {
     super.initState();
+    if (widget.mode == 'teacher') _loadTeachers();
     if (widget.teacher != null) {
       final t = widget.teacher!;
       _nameCtrl.text = t.teacherName;
@@ -585,6 +591,22 @@ class _PayrollFormSheetState extends State<_PayrollFormSheet> {
       _roles   = a.roles.map((r) => _RoleRow(role: r.role, rate: r.rate.toString(), count: r.count.toString())).toList();
       _deducts = a.deductions.map((d) => _DeductRow(label: d.label, amount: d.amount.toString())).toList();
     }
+  }
+
+  Future<void> _loadTeachers() async {
+    try {
+      final users = await FirestoreService.watchUsers(role: 'teacher').first;
+      if (!mounted) return;
+      setState(() {
+        _teacherUsers = users;
+        // เติมรหัสครูให้ช่องที่เลือกอยู่ (โหมดแก้ไข) จากชื่อที่ตรงกัน
+        if (_nameCtrl.text.isNotEmpty) {
+          for (final u in users) {
+            if (u.name == _nameCtrl.text) { _teacherCode = u.code; break; }
+          }
+        }
+      });
+    } catch (_) {/* โหลดไม่ได้ → ยังพิมพ์เองได้ */}
   }
 
   @override
@@ -697,15 +719,31 @@ class _PayrollFormSheetState extends State<_PayrollFormSheet> {
         Expanded(child: SingleChildScrollView(
           padding: const EdgeInsets.fromLTRB(20, 16, 20, 20),
           child: Column(crossAxisAlignment: CrossAxisAlignment.start, children: [
-            // Name
-            TextField(
-              controller: _nameCtrl,
-              decoration: InputDecoration(
-                labelText: widget.mode == 'teacher' ? 'ชื่อครู' : 'ชื่อแอดมิน',
-                prefixIcon: const Icon(Icons.person_outlined),
-                border: OutlineInputBorder(borderRadius: BorderRadius.circular(12)),
+            // Name — โหมดครูใช้ช่องค้นหารายชื่อ (ชื่อ/รหัส), โหมดแอดมินพิมพ์เอง
+            if (widget.mode == 'teacher') ...[
+              const Text('ชื่อครู', style: TextStyle(fontSize: 13, fontWeight: FontWeight.w600)),
+              const SizedBox(height: 6),
+              UserSearchField(
+                users: _teacherUsers,
+                currentName: _nameCtrl.text.isEmpty ? null : _nameCtrl.text,
+                currentCode: _teacherCode,
+                hint: 'ค้นหา/เลือกครู...',
+                title: 'ค้นหาครู',
+                color: const Color(0xFFF97316),
+                onSelected: (u) => setState(() {
+                  _nameCtrl.text = u.name;
+                  _teacherCode = u.code;
+                }),
               ),
-            ),
+            ] else
+              TextField(
+                controller: _nameCtrl,
+                decoration: InputDecoration(
+                  labelText: 'ชื่อแอดมิน',
+                  prefixIcon: const Icon(Icons.person_outlined),
+                  border: OutlineInputBorder(borderRadius: BorderRadius.circular(12)),
+                ),
+              ),
             const SizedBox(height: 16),
 
             // Role rows
