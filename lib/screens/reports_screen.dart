@@ -5,6 +5,7 @@ import '../utils/date_format.dart';
 import '../utils/excel_export.dart';
 
 const _kOrange = Color(0xFFF97316);
+const _kExportPass = 'ATAL190314'; // รหัสผ่านก่อนดาวน์โหลดไฟล์ Excel (ข้อมูลสำคัญ)
 
 class ReportsScreen extends StatefulWidget {
   const ReportsScreen({super.key});
@@ -120,6 +121,64 @@ class _ReportsScreenState extends State<ReportsScreen> {
         ],
       ),
     );
+  }
+
+  /// ขอรหัสผ่านก่อน แล้วค่อยส่งออก (ไฟล์เป็นข้อมูลสำคัญ)
+  Future<void> _promptExportPassword(List<SessionModel> all) async {
+    final ctrl = TextEditingController();
+    bool obscure = true;
+    bool error = false;
+    final ok = await showDialog<bool>(
+      context: context,
+      builder: (ctx) => StatefulBuilder(
+        builder: (ctx, setS) {
+          void submit() {
+            if (ctrl.text.trim() == _kExportPass) {
+              Navigator.pop(ctx, true);
+            } else {
+              setS(() => error = true);
+            }
+          }
+          return AlertDialog(
+            title: const Row(children: [
+              Icon(Icons.lock_outline, color: _kOrange),
+              SizedBox(width: 8),
+              Text('ใส่รหัสผ่าน'),
+            ]),
+            content: Column(mainAxisSize: MainAxisSize.min, children: [
+              const Text('ไฟล์นี้เป็นข้อมูลสำคัญ — กรุณาใส่รหัสผ่านเพื่อดาวน์โหลด',
+                  style: TextStyle(fontSize: 13, color: Colors.grey)),
+              const SizedBox(height: 12),
+              TextField(
+                controller: ctrl,
+                obscureText: obscure,
+                autofocus: true,
+                onSubmitted: (_) => submit(),
+                decoration: InputDecoration(
+                  labelText: 'รหัสผ่าน',
+                  prefixIcon: const Icon(Icons.key_outlined),
+                  suffixIcon: IconButton(
+                    icon: Icon(obscure ? Icons.visibility_off : Icons.visibility),
+                    onPressed: () => setS(() => obscure = !obscure),
+                  ),
+                  errorText: error ? 'รหัสผ่านไม่ถูกต้อง' : null,
+                  border: OutlineInputBorder(borderRadius: BorderRadius.circular(10)),
+                ),
+              ),
+            ]),
+            actions: [
+              TextButton(onPressed: () => Navigator.pop(ctx, false), child: const Text('ยกเลิก')),
+              ElevatedButton(
+                onPressed: submit,
+                style: ElevatedButton.styleFrom(backgroundColor: _kOrange, foregroundColor: Colors.white),
+                child: const Text('ดาวน์โหลด'),
+              ),
+            ],
+          );
+        },
+      ),
+    );
+    if (ok == true) _exportWeek(all);
   }
 
   /// ส่งออก Excel "คาบที่สอนแล้ว" ของสัปดาห์ปัจจุบัน (อา.–ส.)
@@ -302,8 +361,8 @@ class _ReportsScreenState extends State<ReportsScreen> {
                 ),
                 const Spacer(),
                 TextButton.icon(
-                  onPressed: () => _exportWeek(all),
-                  icon: const Icon(Icons.file_download_outlined, size: 18),
+                  onPressed: () => _promptExportPassword(all),
+                  icon: const Icon(Icons.lock_outline, size: 18),
                   label: const Text('Excel สัปดาห์นี้', style: TextStyle(fontSize: 13)),
                   style: TextButton.styleFrom(foregroundColor: Colors.green.shade800),
                 ),
