@@ -2,6 +2,7 @@ import 'package:flutter/material.dart';
 import '../models/models.dart';
 import '../services/firestore_service.dart';
 import '../utils/date_format.dart';
+import '../utils/excel_export.dart';
 
 const _kOrange = Color(0xFFF97316);
 
@@ -121,6 +122,83 @@ class _ReportsScreenState extends State<ReportsScreen> {
     );
   }
 
+  /// ส่งออก Excel "คาบที่สอนแล้ว" ของสัปดาห์ปัจจุบัน (อา.–ส.)
+  /// 2 ชีต: สรุปรายครู + รายคาบละเอียด พร้อมยอดรวม
+  void _exportWeek(List<SessionModel> all) {
+    final now = nowThai();
+    // สัปดาห์เริ่มวันอาทิตย์: weekday Mon=1..Sun=7 → Sun%7=0
+    final startSun = DateTime(now.year, now.month, now.day)
+        .subtract(Duration(days: now.weekday % 7));
+    final endSat = startSun.add(const Duration(days: 6));
+    final fromStr = toStorageDateStr(startSun);
+    final toStr = toStorageDateStr(endSat);
+
+    final week = all
+        .where((s) => s.date.compareTo(fromStr) >= 0 && s.date.compareTo(toStr) <= 0)
+        .toList()
+      ..sort((a, b) {
+        final d = a.date.compareTo(b.date);
+        return d != 0 ? d : a.startTime.compareTo(b.startTime);
+      });
+
+    if (week.isEmpty) {
+      ScaffoldMessenger.of(context).showSnackBar(SnackBar(
+        content: Text('สัปดาห์นี้ (${_fullDate(fromStr)} – ${_fullDate(toStr)}) ยังไม่มีคาบที่สอนเสร็จ')));
+      return;
+    }
+
+    // ── ชีต 1: สรุปรายครู ──
+    final byTeacher = <String, ({String name, String code, int count})>{};
+    for (final s in week) {
+      final code = _tCode(s) ?? '';
+      final key = '${s.teacherName}|$code';
+      final cur = byTeacher[key];
+      byTeacher[key] = (name: s.teacherName, code: code, count: (cur?.count ?? 0) + 1);
+    }
+    final sortedTeachers = byTeacher.values.toList()
+      ..sort((a, b) => b.count != a.count ? b.count.compareTo(a.count) : a.name.compareTo(b.name));
+    final teacherRows = <List<dynamic>>[];
+    for (var i = 0; i < sortedTeachers.length; i++) {
+      final t = sortedTeachers[i];
+      teacherRows.add([i + 1, t.name, t.code, t.count]);
+    }
+    teacherRows.add(['', 'รวม', '', week.length]);
+
+    // ── ชีต 2: รายคาบละเอียด ──
+    final detailRows = <List<dynamic>>[];
+    for (var i = 0; i < week.length; i++) {
+      final s = week[i];
+      final status = s.isAbsent ? 'ขาด' : (s.isLate ? 'สาย' : 'ปกติ');
+      detailRows.add([
+        i + 1, _fullDate(s.date), s.startTime, s.endTime,
+        s.teacherName, _tCode(s) ?? '',
+        s.studentName, _sCode(s) ?? '',
+        s.language ?? '', status,
+      ]);
+    }
+
+    exportXlsxSheets(
+      filename: '7J_คาบที่สอนแล้ว_${fromStr}_ถึง_$toStr.xlsx',
+      sheets: [
+        (
+          name: 'สรุปรายครู',
+          headers: ['ลำดับ', 'ครู', 'รหัสครู', 'จำนวนคาบที่สอน'],
+          rows: teacherRows,
+        ),
+        (
+          name: 'รายคาบละเอียด',
+          headers: ['ลำดับ', 'วันที่', 'เริ่ม', 'สิ้นสุด', 'ครู', 'รหัสครู',
+            'นักเรียน', 'รหัสนักเรียน', 'ภาษา', 'สถานะ'],
+          rows: detailRows,
+        ),
+      ],
+    );
+    ScaffoldMessenger.of(context).showSnackBar(SnackBar(
+      content: Text('ส่งออก ${week.length} คาบ (${_fullDate(fromStr)} – ${_fullDate(toStr)}) เป็น Excel แล้ว'),
+      backgroundColor: Colors.green,
+    ));
+  }
+
   @override
   Widget build(BuildContext context) {
     return Scaffold(
@@ -223,6 +301,12 @@ class _ReportsScreenState extends State<ReportsScreen> {
                   style: TextStyle(fontWeight: FontWeight.w600, color: Colors.green.shade700),
                 ),
                 const Spacer(),
+                TextButton.icon(
+                  onPressed: () => _exportWeek(all),
+                  icon: const Icon(Icons.file_download_outlined, size: 18),
+                  label: const Text('Excel สัปดาห์นี้', style: TextStyle(fontSize: 13)),
+                  style: TextButton.styleFrom(foregroundColor: Colors.green.shade800),
+                ),
                 TextButton.icon(
                   onPressed: () => _confirmDeleteAll(context, all.length),
                   icon: const Icon(Icons.delete_sweep, size: 18),
