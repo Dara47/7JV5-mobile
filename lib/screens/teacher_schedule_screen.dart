@@ -154,107 +154,10 @@ class _TeacherScheduleScreenState extends State<TeacherScheduleScreen> {
 
 // ── Teacher Card ─────────────────────────────────────────────────────────────
 
-const _thaiDayFull = {
-  'อา': 'อาทิตย์', 'จ': 'จันทร์', 'อ': 'อังคาร', 'พ': 'พุธ',
-  'พฤ': 'พฤหัสบดี', 'ศ': 'ศุกร์', 'ส': 'เสาร์',
-};
-
 class _TeacherCard extends StatelessWidget {
   final UserModel teacher;
   final bool readOnly; // true = มุมมองครู (รายงานอ่านอย่างเดียว ไม่กระทบข้อมูล admin)
   const _TeacherCard({required this.teacher, this.readOnly = false});
-
-  /// รวมคาบสอนจากนักเรียนทุกคน → "วันที่มีสอน" เรียงตามวันที่ (ข้ามที่ผ่านแล้ว)
-  /// แยกคาบประจำสัปดาห์ (ไม่ระบุวันที่) ออกมาด้านบน
-  Widget _teachingDates(List<PackageModel> packages) {
-    final todayStr = todayThaiStr();
-    final dated = <({String dateStr, String start, String end, String student})>[];
-    final recurring = <({String day, String start, String end, String student})>[];
-    for (final p in packages) {
-      for (final s in p.effectiveSlots) {
-        if (s.startTime.isEmpty) continue;
-        if (s.date != null && s.date!.isNotEmpty) {
-          if (s.date!.compareTo(todayStr) < 0) continue; // ผ่านแล้ว
-          dated.add((dateStr: s.date!, start: s.startTime, end: s.endTime, student: p.studentName));
-        } else {
-          recurring.add((day: s.day, start: s.startTime, end: s.endTime, student: p.studentName));
-        }
-      }
-    }
-    if (dated.isEmpty && recurring.isEmpty) return const SizedBox.shrink();
-
-    dated.sort((a, b) {
-      final c = a.dateStr.compareTo(b.dateStr);
-      return c != 0 ? c : a.start.compareTo(b.start);
-    });
-    const order = ['อา', 'จ', 'อ', 'พ', 'พฤ', 'ศ', 'ส'];
-    final seen = <String>{};
-    final rec = recurring.where((r) => seen.add('${r.day}|${r.start}|${r.end}|${r.student}')).toList()
-      ..sort((a, b) {
-        final c = order.indexOf(a.day).compareTo(order.indexOf(b.day));
-        return c != 0 ? c : a.start.compareTo(b.start);
-      });
-
-    const cap = 60;
-    final shownDated = dated.take(cap).toList();
-    final more = dated.length - shownDated.length;
-
-    final rows = <Widget>[];
-    String? lastDate;
-    for (final e in shownDated) {
-      if (e.dateStr != lastDate) {
-        lastDate = e.dateStr;
-        rows.add(Padding(
-          padding: const EdgeInsets.only(top: 6, bottom: 2),
-          child: Row(children: [
-            const Icon(Icons.event, size: 13, color: Color(0xFF2E7D32)),
-            const SizedBox(width: 4),
-            Text('${thaiDayAbbrFromStr(e.dateStr)} ${thaiShortDateFromStr(e.dateStr)}',
-                style: const TextStyle(fontSize: 12.5, fontWeight: FontWeight.bold, color: Color(0xFF2E7D32))),
-          ]),
-        ));
-      }
-      rows.add(Padding(
-        padding: const EdgeInsets.only(left: 18, bottom: 1),
-        child: Text('• ${e.start}–${e.end} น.  ${e.student}',
-            style: const TextStyle(fontSize: 12, color: Colors.black87)),
-      ));
-    }
-
-    return Container(
-      width: double.infinity,
-      margin: const EdgeInsets.only(bottom: 10),
-      padding: const EdgeInsets.all(10),
-      decoration: BoxDecoration(
-        color: const Color(0xFFF1F8E9),
-        borderRadius: BorderRadius.circular(8),
-        border: Border.all(color: Colors.green.shade200),
-      ),
-      child: Column(crossAxisAlignment: CrossAxisAlignment.start, children: [
-        Row(children: [
-          const Icon(Icons.calendar_month, size: 15, color: Color(0xFF2E7D32)),
-          const SizedBox(width: 6),
-          Text('วันที่มีสอน${dated.isNotEmpty ? ' (${dated.length} คาบข้างหน้า)' : ''}',
-              style: const TextStyle(fontSize: 13, fontWeight: FontWeight.bold, color: Color(0xFF2E7D32))),
-        ]),
-        if (rec.isNotEmpty) ...[
-          const SizedBox(height: 6),
-          Text('ประจำสัปดาห์', style: TextStyle(fontSize: 11, color: Colors.grey.shade600, fontWeight: FontWeight.w600)),
-          ...rec.map((r) => Padding(
-                padding: const EdgeInsets.only(left: 4, top: 1),
-                child: Text('• ทุก${_thaiDayFull[r.day] ?? r.day} ${r.start}–${r.end} น.  ${r.student}',
-                    style: const TextStyle(fontSize: 12, color: Colors.black87)),
-              )),
-        ],
-        ...rows,
-        if (more > 0)
-          Padding(
-            padding: const EdgeInsets.only(top: 4),
-            child: Text('… และอีก $more คาบ', style: TextStyle(fontSize: 11, color: Colors.grey.shade600)),
-          ),
-      ]),
-    );
-  }
 
   @override
   Widget build(BuildContext context) {
@@ -417,8 +320,29 @@ class _TeacherCard extends StatelessWidget {
                     ],
                     const SizedBox(height: 10),
 
-                    // วันที่มีสอน (รวมจากนักเรียนทุกคน) — เฉพาะมุมมองครู
-                    if (readOnly) _teachingDates(packages),
+                    // ปฏิทินวันที่มีสอน (รวมจากนักเรียนทุกคน) — เฉพาะมุมมองครู
+                    if (readOnly) ...[
+                      SizedBox(
+                        width: double.infinity,
+                        child: OutlinedButton.icon(
+                          onPressed: () => Navigator.push(context, MaterialPageRoute(
+                            builder: (_) => ScheduleCalendarScreen(
+                              filterTeacherId: teacher.id,
+                              title: 'ปฏิทินสอนของฉัน',
+                            ),
+                          )),
+                          icon: const Icon(Icons.calendar_month, size: 18, color: Color(0xFF2E7D32)),
+                          label: const Text('ดูปฏิทินวันที่มีสอน',
+                              style: TextStyle(color: Color(0xFF2E7D32), fontWeight: FontWeight.bold)),
+                          style: OutlinedButton.styleFrom(
+                            side: const BorderSide(color: Color(0xFF2E7D32)),
+                            padding: const EdgeInsets.symmetric(vertical: 12),
+                            shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(10)),
+                          ),
+                        ),
+                      ),
+                      const SizedBox(height: 10),
+                    ],
 
                     // Students
                     if (students.isNotEmpty) ...[
