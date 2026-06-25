@@ -44,9 +44,13 @@ dev_dependencies:
   flutter_lints: ^3.0.0
   flutter_launcher_icons: ^0.14.4
 
-# ไอคอนแอป/PWA — โลโก้ 7J English (gold) สร้างด้วย: dart run flutter_launcher_icons
+# ไอคอนแอป/PWA + Android/iOS — โลโก้ 7J English (gold) สร้างด้วย: dart run flutter_launcher_icons
 flutter_launcher_icons:
   image_path: "assets/icon/app_icon.png"
+  android: true
+  ios: true
+  remove_alpha_ios: true            # iOS ห้ามมี alpha channel
+  background_color_ios: "#D4AF37"   # พื้นทองเวลา flatten alpha
   web:
     generate: true
     image_path: "assets/icon/app_icon.png"
