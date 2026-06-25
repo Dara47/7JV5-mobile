@@ -1,4 +1,4 @@
-﻿import 'package:flutter/material.dart';
+import 'package:flutter/material.dart';
 import 'package:cloud_firestore/cloud_firestore.dart';
 import '../models/models.dart';
 import '../services/firestore_service.dart';
@@ -32,10 +32,11 @@ class _PackageFormSheetState extends State<_PackageFormSheet> {
   UserModel? _student;
   UserModel? _teacher;
 
-  String? _scheduledDay;
-  DateTime? _scheduledDate;
-  TimeOfDay? _startTime;
-  TimeOfDay? _endTime;
+  // รายการช่วงเวลาที่เลือกแล้ว (หลายช่วงได้)
+  List<SlotItem> _slots = [];
+  // แถวร่างสำหรับเพิ่มหลายช่วง — แต่ละแถวเลือกวันที่(ปฏิทิน)+เวลาเริ่ม/สิ้นสุดได้เอง
+  final List<_DraftSlot> _drafts = [_DraftSlot()];
+
   TeacherSlotModel? _teacherSlot;
   List<PackageModel> _takenSlotPackages = [];
   PackageModel? _existingPkg; // แพ็กเกจเดิมของนักเรียน+ครูคู่นี้ (โควตาร่วม)
@@ -54,10 +55,7 @@ class _PackageFormSheetState extends State<_PackageFormSheet> {
       _totalCtrl.text = p.totalSessions.toString();
       _usedCtrl.text = p.usedSessions.toString();
       _notesCtrl.text = p.notes ?? '';
-      _scheduledDay = p.scheduledDay;
-      if (p.scheduledDate != null) _scheduledDate = parseDateStr(p.scheduledDate!);
-      if (p.scheduledTime != null) _startTime = _parseTime(p.scheduledTime!);
-      if (p.scheduledEndTime != null) _endTime = _parseTime(p.scheduledEndTime!);
+      _slots = List.from(p.effectiveSlots);
     }
   }
 
@@ -179,26 +177,99 @@ class _PackageFormSheetState extends State<_PackageFormSheet> {
     if (_isEdit && _teacher != null) _loadTeacherSlot(_teacher!.id);
   }
 
-  TimeOfDay _parseTime(String t) {
-    final p = t.split(':');
-    return TimeOfDay(hour: int.parse(p[0]), minute: int.parse(p[1]));
-  }
-
   String _fmtTime(TimeOfDay t) => '${t.hour.toString().padLeft(2,'0')}:${t.minute.toString().padLeft(2,'0')}';
 
-  Future<void> _pickScheduledDate() async {
+  Future<TimeOfDay?> _pickTime(TimeOfDay initial) => showTimePicker(
+        context: context,
+        initialTime: initial,
+        builder: (c, child) => MediaQuery(
+          data: MediaQuery.of(c).copyWith(alwaysUse24HourFormat: true),
+          child: child!,
+        ),
+      );
+
+  Future<void> _pickDraftDate(_DraftSlot draft) async {
+    final now = nowThai();
     final d = await showDatePicker(
       context: context,
-      initialDate: _scheduledDate ?? nowThai(),
-      firstDate: DateTime(2020),
+      initialDate: draft.date ?? now,
+      firstDate: DateTime(now.year, now.month, now.day), // ห้ามเลือกวันในอดีต
       lastDate: DateTime(2030),
     );
-    if (d != null) {
-      setState(() {
-        _scheduledDate = d;
-        _scheduledDay = thaiDayAbbr(d); // วันคำนวณอัตโนมัติจากวันที่
-      });
+    if (d != null) setState(() => draft.date = d);
+  }
+
+  /// เพิ่มทุกแถวร่างที่กรอกครบ เข้ารายการ "คาบเรียนที่เลือก"
+  void _commitDrafts() {
+    final now = nowThai();
+    int added = 0, skipped = 0;
+    String? error;
+
+    // ตรวจก่อน: ทุกแถวที่ "เริ่มกรอกแล้ว" ต้องครบ (วันที่ + เริ่ม + สิ้นสุด)
+    for (final d in _drafts) {
+      if (d.isEmpty) continue;
+      if (!d.isComplete) {
+        error = 'มีแถวที่กรอกไม่ครบ — ต้องเลือกวันที่ เวลาเริ่ม และเวลาสิ้นสุด';
+        break;
+      }
     }
+    if (error != null) {
+      ScaffoldMessenger.of(context).showSnackBar(SnackBar(
+        content: Text(error), backgroundColor: Colors.redAccent));
+      return;
+    }
+
+    setState(() {
+      for (final d in _drafts) {
+        if (!d.isComplete) continue;
+        final dt = d.date!;
+        final start = _fmtTime(d.start!);
+        final startDt = DateTime(dt.year, dt.month, dt.day, d.start!.hour, d.start!.minute);
+        // ข้ามวัน/เวลาที่ผ่านไปแล้ว
+        if (now.isAfter(startDt)) { skipped++; continue; }
+        final dateStr = toStorageDateStr(dt);
+        // กันซ้ำกับช่วงที่มีอยู่แล้ว (วันที่ + เวลาเริ่ม เหมือนกัน)
+        if (_slots.any((s) => s.date == dateStr && s.startTime == start)) {
+          skipped++; continue;
+        }
+        _slots.add(SlotItem(
+          day: thaiDayAbbr(dt),
+          startTime: start,
+          endTime: _fmtTime(d.end!),
+          date: dateStr,
+        ));
+        added++;
+      }
+      // รีเซ็ตเหลือแถวว่าง 1 แถว
+      _drafts
+        ..clear()
+        ..add(_DraftSlot());
+    });
+
+    if (added == 0 && skipped == 0) {
+      ScaffoldMessenger.of(context).showSnackBar(const SnackBar(
+        content: Text('ยังไม่มีแถวที่กรอก — เลือกวันที่และเวลาก่อน')));
+      return;
+    }
+    ScaffoldMessenger.of(context).showSnackBar(SnackBar(
+      content: Text(skipped > 0
+          ? 'เพิ่ม $added ช่วง (ข้ามที่ซ้ำ/ผ่านแล้ว $skipped ช่วง)'
+          : 'เพิ่ม $added ช่วง'),
+      backgroundColor: const Color(0xFF2E7D32),
+      duration: const Duration(seconds: 2),
+    ));
+  }
+
+  /// แตะชิป "เวลาว่างของครู" → เพิ่มเข้ารายการทันที
+  void _addSlotFromTeacher(SlotItem s) {
+    final dateStr = (s.date != null && s.date!.isNotEmpty) ? s.date : null;
+    if (_slots.any((x) => x.date == dateStr && x.startTime == s.startTime && x.day == s.day)) {
+      ScaffoldMessenger.of(context).showSnackBar(const SnackBar(
+        content: Text('ช่วงเวลานี้อยู่ในรายการแล้ว')));
+      return;
+    }
+    setState(() => _slots.add(SlotItem(
+      day: s.day, startTime: s.startTime, endTime: s.endTime, date: dateStr)));
   }
 
   // Auto-calculate remaining = total - used
@@ -215,47 +286,37 @@ class _PackageFormSheetState extends State<_PackageFormSheet> {
 
     setState(() => _saving = true);
 
-    // ── กันจองเวลาชนกัน (double-booking) ──
-    if (_scheduledDay != null && _startTime != null) {
-      final startStr = _fmtTime(_startTime!);
-      final endStr = _endTime != null ? _fmtTime(_endTime!) : startStr;
-      final dateStr = _scheduledDate != null ? toStorageDateStr(_scheduledDate!) : null;
+    // ── กันจองเวลาชนกัน (double-booking) — เช็คทุกช่วงในรายการ ──
+    if (_slots.isNotEmpty) {
       try {
         final teacherPkgs = await FirestoreService.getPackagesForUser(_teacher!.id, 'teacher');
-        PackageModel? conflict;
-        for (final p in teacherPkgs) {
-          if (_isEdit && p.id == widget.existing!.id) continue; // ข้ามตัวเอง
-          if (_conflicts(p, _scheduledDay!, dateStr, startStr, endStr)) { conflict = p; break; }
-        }
-        if (conflict != null) {
-          if (mounted) {
-            setState(() => _saving = false);
-            _snack('เวลานี้ครู ${_teacher!.name} ถูกจองโดย ${conflict.studentName} แล้ว');
+        for (final slot in _slots) {
+          PackageModel? conflict;
+          for (final p in teacherPkgs) {
+            if (_isEdit && p.id == widget.existing!.id) continue; // ข้ามตัวเอง
+            if (_existingPkg != null && p.id == _existingPkg!.id) continue; // ข้ามแพ็กเกจที่กำลังเพิ่มเข้าไป
+            if (_conflicts(p, slot.day, slot.date, slot.startTime, slot.endTime)) { conflict = p; break; }
           }
-          return;
+          if (conflict != null) {
+            if (mounted) {
+              setState(() => _saving = false);
+              final dp = (slot.date != null && slot.date!.isNotEmpty) ? '${thaiShortDateFromStr(slot.date!)} ' : '';
+              _snack('ช่วง $dp${slot.day} ${slot.startTime} ถูกจองโดย ${conflict.studentName} แล้ว');
+            }
+            return;
+          }
         }
       } catch (_) {/* ถ้าเช็คไม่ได้ ปล่อยให้บันทึกต่อ */}
     }
 
-    // slot ใหม่จากที่เลือก
-    final hasSlot = _scheduledDay != null && _startTime != null;
-    final newSlot = hasSlot
-        ? SlotItem(
-            day: _scheduledDay!,
-            startTime: _fmtTime(_startTime!),
-            endTime: _endTime != null ? _fmtTime(_endTime!) : _fmtTime(_startTime!),
-            date: _scheduledDate != null ? toStorageDateStr(_scheduledDate!) : null,
-          )
-        : null;
-
     // ── โหมดเพิ่มช่วงเวลาในแพ็กเกจเดิม (ใช้โควตาคาบร่วมกัน ไม่สร้างโควตาใหม่) ──
     if (_existingPkg != null) {
-      if (newSlot == null) {
+      if (_slots.isEmpty) {
         setState(() => _saving = false);
         _snack('กรุณาเลือกวันและเวลาที่จะเพิ่ม');
         return;
       }
-      final merged = [..._existingPkg!.effectiveSlots, newSlot];
+      final merged = [..._existingPkg!.effectiveSlots, ..._slots];
       try {
         await FirestoreService.updatePackageFields(_existingPkg!.id, {
           'slots': merged.map((s) => s.toMap()).toList(),
@@ -270,13 +331,8 @@ class _PackageFormSheetState extends State<_PackageFormSheet> {
     }
 
     final total = int.tryParse(_totalCtrl.text) ?? 0;
-    // slots สำหรับสร้างใหม่/แก้ไข (slot แรก + slot เดิมที่เกินมา)
-    List<Map<String, dynamic>>? slotsData;
-    if (newSlot != null) {
-      final extra = (_isEdit && widget.existing!.slots.length > 1)
-          ? widget.existing!.slots.sublist(1) : <SlotItem>[];
-      slotsData = [newSlot, ...extra].map((s) => s.toMap()).toList();
-    }
+    // ช่วงแรกใช้เป็น scheduled* เพื่อความเข้ากันได้กับการแสดงผลเดิม
+    final first = _slots.isNotEmpty ? _slots.first : null;
 
     final data = {
       'studentId': _student!.id, 'teacherId': _teacher!.id,
@@ -285,14 +341,14 @@ class _PackageFormSheetState extends State<_PackageFormSheet> {
       'totalSessions': total,
       'remainingSessions': _calcRemaining,
       'status': 'active',
-      if (_scheduledDay != null) 'scheduledDay': _scheduledDay,
-      if (_scheduledDate != null)
-        'scheduledDate': toStorageDateStr(_scheduledDate!)
+      if (first != null) 'scheduledDay': first.day,
+      if (first != null && first.date != null && first.date!.isNotEmpty)
+        'scheduledDate': first.date
       else if (_isEdit && widget.existing!.scheduledDate != null)
-        'scheduledDate': FieldValue.delete(), // แก้ไขแล้วล้างวันที่ → ลบค่าเดิม
-      if (_startTime != null) 'scheduledTime': _fmtTime(_startTime!),
-      if (_endTime != null) 'scheduledEndTime': _fmtTime(_endTime!),
-      if (slotsData != null) 'slots': slotsData,
+        'scheduledDate': FieldValue.delete(), // ช่วงแรกไม่มีวันที่เจาะจง → ลบค่าเดิม
+      if (first != null) 'scheduledTime': first.startTime,
+      if (first != null) 'scheduledEndTime': first.endTime,
+      if (_slots.isNotEmpty) 'slots': _slots.map((s) => s.toMap()).toList(),
       if (_notesCtrl.text.isNotEmpty) 'notes': _notesCtrl.text.trim(),
     };
 
@@ -411,7 +467,7 @@ class _PackageFormSheetState extends State<_PackageFormSheet> {
                               const Row(children: [
                                 Icon(Icons.schedule, size: 14, color: Color(0xFF2E7D32)),
                                 SizedBox(width: 6),
-                                Text('เวลาว่างของครู — กดเลือกช่วงเวลา',
+                                Text('เวลาว่างของครู — กดเพื่อเพิ่มเข้ารายการ',
                                     style: TextStyle(fontSize: 11, color: Color(0xFF2E7D32), fontWeight: FontWeight.w600)),
                               ]),
                               const SizedBox(height: 8),
@@ -422,13 +478,7 @@ class _PackageFormSheetState extends State<_PackageFormSheet> {
                                   final past = _isSlotPast(s);
                                   final disabled = taken || past;
                                   return GestureDetector(
-                                    onTap: disabled ? null : () => setState(() {
-                                      _scheduledDay = s.day;
-                                      _scheduledDate = (s.date != null && s.date!.isNotEmpty)
-                                          ? parseDateStr(s.date!) : null;
-                                      _startTime = _parseTime(s.startTime);
-                                      _endTime = _parseTime(s.endTime);
-                                    }),
+                                    onTap: disabled ? null : () => _addSlotFromTeacher(s),
                                     child: Container(
                                       padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 6),
                                       decoration: BoxDecoration(
@@ -452,6 +502,11 @@ class _PackageFormSheetState extends State<_PackageFormSheet> {
                                           const Padding(
                                             padding: EdgeInsets.only(right: 4),
                                             child: Icon(Icons.history, size: 12, color: Colors.orange),
+                                          )
+                                        else
+                                          const Padding(
+                                            padding: EdgeInsets.only(right: 4),
+                                            child: Icon(Icons.add, size: 12, color: Colors.white),
                                           ),
                                         Text(
                                             '${(s.date != null && s.date!.isNotEmpty) ? '${thaiShortDateFromStr(s.date!)} ' : ''}${s.day}  ${s.startTime}–${s.endTime}',
@@ -490,107 +545,85 @@ class _PackageFormSheetState extends State<_PackageFormSheet> {
                       ],
                       const SizedBox(height: 14),
 
-                      // ── วันที่ (ไม่บังคับ — ถ้าระบุ วันจะคำนวณให้) ──
-                      _label('🗓️ วันที่ (ถ้าระบุ วันจะคำนวณให้อัตโนมัติ)'),
-                      const SizedBox(height: 8),
-                      GestureDetector(
-                        onTap: _pickScheduledDate,
-                        child: Container(
-                          width: double.infinity,
-                          padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 12),
-                          decoration: BoxDecoration(
-                            color: _scheduledDate != null ? const Color(0xFFE3F2FD) : Colors.grey.shade50,
-                            borderRadius: BorderRadius.circular(10),
-                            border: Border.all(
-                                color: _scheduledDate != null
-                                    ? const Color(0xFFF97316).withAlpha(100)
-                                    : Colors.grey.shade300),
-                          ),
-                          child: Row(children: [
-                            Icon(Icons.calendar_month,
-                                size: 18,
-                                color: _scheduledDate != null ? const Color(0xFFF97316) : Colors.grey),
-                            const SizedBox(width: 10),
-                            Expanded(
-                              child: Text(
-                                _scheduledDate != null
-                                    ? thaiDateFull(_scheduledDate!)
-                                    : 'แตะเพื่อเลือกวันที่ (ไม่บังคับ)',
-                                style: TextStyle(
-                                  fontSize: 14,
-                                  fontWeight: _scheduledDate != null ? FontWeight.w600 : FontWeight.normal,
-                                  color: _scheduledDate != null ? const Color(0xFFF97316) : Colors.grey,
-                                ),
-                              ),
-                            ),
-                            if (_scheduledDate != null)
-                              GestureDetector(
-                                onTap: () => setState(() => _scheduledDate = null),
-                                child: const Icon(Icons.clear, size: 18, color: Colors.grey),
-                              ),
-                          ]),
-                        ),
-                      ),
-                      const SizedBox(height: 14),
-
-                      // ── วัน ──
-                      _label('📅 วันเรียนประจำ'),
-                      const SizedBox(height: 8),
-                      Wrap(
-                        spacing: 8, runSpacing: 6,
-                        children: PackageModel.days.map((d) => GestureDetector(
-                          onTap: () => setState(() {
-                            _scheduledDay = _scheduledDay == d ? null : d;
-                            _scheduledDate = null; // เลือกวันเองแบบประจำ → ล้างวันที่เจาะจง
-                          }),
-                          child: AnimatedContainer(
-                            duration: const Duration(milliseconds: 150),
-                            width: 44, height: 44,
-                            decoration: BoxDecoration(
-                              color: _scheduledDay == d ? const Color(0xFFF97316) : Colors.grey.shade100,
-                              shape: BoxShape.circle,
-                              border: Border.all(color: _scheduledDay == d ? const Color(0xFFF97316) : Colors.grey.shade300),
-                            ),
-                            child: Center(child: Text(d, style: TextStyle(
-                              fontWeight: FontWeight.bold, fontSize: 13,
-                              color: _scheduledDay == d ? Colors.white : Colors.black87,
-                            ))),
-                          ),
-                        )).toList(),
-                      ),
-                      const SizedBox(height: 14),
-
-                      // ── เวลา ──
-                      _label('⏰ เวลาเรียน'),
-                      const SizedBox(height: 8),
+                      // ── ช่วงเวลาที่เลือกแล้ว ──
                       Row(children: [
-                        Expanded(child: _TimePicker(
-                          label: 'เริ่ม', time: _startTime,
-                          onTap: () async {
-                            final t = await showTimePicker(
-                              context: context,
-                              initialTime: _startTime ?? const TimeOfDay(hour: 9, minute: 0),
-                              builder: (c, child) => MediaQuery(data: MediaQuery.of(c).copyWith(alwaysUse24HourFormat: true), child: child!),
-                            );
-                            if (t != null) setState(() {
-                              _startTime = t;
-                              if (_endTime == null) _endTime = TimeOfDay(hour: t.hour + 1, minute: t.minute);
-                            });
-                          },
-                        )),
-                        const Padding(padding: EdgeInsets.symmetric(horizontal: 8), child: Text('–', style: TextStyle(fontSize: 18, color: Colors.grey))),
-                        Expanded(child: _TimePicker(
-                          label: 'สิ้นสุด', time: _endTime,
-                          onTap: () async {
-                            final t = await showTimePicker(
-                              context: context,
-                              initialTime: _endTime ?? const TimeOfDay(hour: 10, minute: 0),
-                              builder: (c, child) => MediaQuery(data: MediaQuery.of(c).copyWith(alwaysUse24HourFormat: true), child: child!),
-                            );
-                            if (t != null) setState(() => _endTime = t);
-                          },
-                        )),
+                        const Icon(Icons.calendar_month, size: 16, color: Color(0xFFF97316)),
+                        const SizedBox(width: 6),
+                        Text('คาบเรียนที่เลือก (${_slots.length} ช่วง)',
+                            style: const TextStyle(fontSize: 13, fontWeight: FontWeight.w600)),
                       ]),
+                      const SizedBox(height: 8),
+                      if (_slots.isEmpty)
+                        Container(
+                          width: double.infinity,
+                          padding: const EdgeInsets.symmetric(vertical: 14),
+                          decoration: BoxDecoration(
+                            color: Colors.grey.shade50,
+                            borderRadius: BorderRadius.circular(10),
+                            border: Border.all(color: Colors.grey.shade200),
+                          ),
+                          child: const Center(
+                            child: Text('ยังไม่มีช่วงเวลา — เพิ่มด้านล่าง',
+                                style: TextStyle(color: Colors.grey, fontSize: 13)),
+                          ),
+                        )
+                      else
+                        ...List.generate(_slots.length, _buildSlotRow),
+                      const SizedBox(height: 12),
+
+                      // ── เพิ่มช่วงเวลา (หลายแถว) ──
+                      Container(
+                        padding: const EdgeInsets.all(14),
+                        decoration: BoxDecoration(
+                          color: Colors.blue.shade50,
+                          borderRadius: BorderRadius.circular(12),
+                          border: Border.all(color: Colors.blue.shade200),
+                        ),
+                        child: Column(crossAxisAlignment: CrossAxisAlignment.start, children: [
+                          const Row(children: [
+                            Icon(Icons.add_circle_outline, size: 16, color: Color(0xFFF97316)),
+                            SizedBox(width: 6),
+                            Expanded(
+                              child: Text('เพิ่มช่วงเวลา (เลือกวันที่ + เวลา ได้หลายแถว)',
+                                  style: TextStyle(fontSize: 13, fontWeight: FontWeight.w600, color: Color(0xFFF97316))),
+                            ),
+                          ]),
+                          const SizedBox(height: 12),
+
+                          // แถวร่าง — แต่ละแถว = วันที่(ปฏิทิน) + เวลาเริ่ม/สิ้นสุด
+                          ...List.generate(_drafts.length, _buildDraftRow),
+
+                          // ปุ่มเพิ่มแถว
+                          Align(
+                            alignment: Alignment.centerLeft,
+                            child: TextButton.icon(
+                              onPressed: () => setState(() => _drafts.add(_DraftSlot())),
+                              icon: const Icon(Icons.add, size: 18, color: Color(0xFFF97316)),
+                              label: const Text('เพิ่มวัน/เวลา',
+                                  style: TextStyle(color: Color(0xFFF97316), fontWeight: FontWeight.w600)),
+                              style: TextButton.styleFrom(
+                                  padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 4)),
+                            ),
+                          ),
+                          const SizedBox(height: 8),
+
+                          // ปุ่มยืนยันเข้ารายการ
+                          SizedBox(
+                            width: double.infinity,
+                            child: ElevatedButton.icon(
+                              onPressed: _commitDrafts,
+                              icon: const Icon(Icons.playlist_add_check, size: 18),
+                              label: const Text('เพิ่มเข้ารายการ'),
+                              style: ElevatedButton.styleFrom(
+                                backgroundColor: const Color(0xFFF97316),
+                                foregroundColor: Colors.white,
+                                padding: const EdgeInsets.symmetric(vertical: 10),
+                                shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(10)),
+                              ),
+                            ),
+                          ),
+                        ]),
+                      ),
                       const SizedBox(height: 14),
 
                       // ── จำนวนคาบ ──
@@ -668,7 +701,10 @@ class _PackageFormSheetState extends State<_PackageFormSheet> {
                           icon: _saving
                               ? const SizedBox(width: 18, height: 18, child: CircularProgressIndicator(color: Colors.white, strokeWidth: 2))
                               : const Icon(Icons.check_circle_outline),
-                          label: Text(_isEdit ? 'อัปเดต' : 'บันทึกคาบเรียน', style: const TextStyle(fontSize: 16, fontWeight: FontWeight.bold)),
+                          label: Text(
+                            '${_isEdit ? 'อัปเดต' : 'บันทึกคาบเรียน'} (${_slots.length} ช่วงเวลา)',
+                            style: const TextStyle(fontSize: 16, fontWeight: FontWeight.bold),
+                          ),
                           style: ElevatedButton.styleFrom(
                             backgroundColor: const Color(0xFFF97316), foregroundColor: Colors.white,
                             shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(12)),
@@ -679,6 +715,170 @@ class _PackageFormSheetState extends State<_PackageFormSheet> {
                   ),
                 ),
         ),
+      ]),
+    );
+  }
+
+  /// แถวของช่วงเวลาที่เลือกแล้ว (ลบได้)
+  Widget _buildSlotRow(int i) {
+    final s = _slots[i];
+    final past = _isSlotPast(s);
+    final taken = !past && _isSlotTaken(s);
+    final dim = past || taken;
+    return Container(
+      margin: const EdgeInsets.only(bottom: 6),
+      padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 8),
+      decoration: BoxDecoration(
+        color: dim ? Colors.grey.shade100 : const Color(0xFFFFF3E0),
+        borderRadius: BorderRadius.circular(10),
+        border: Border.all(color: dim ? Colors.grey.shade300 : Colors.orange.shade200),
+      ),
+      child: Row(children: [
+        Container(
+          width: 36, height: 36,
+          decoration: BoxDecoration(
+              color: dim ? Colors.grey.shade400 : const Color(0xFFF97316), shape: BoxShape.circle),
+          child: Center(
+            child: Text(s.day,
+                style: const TextStyle(color: Colors.white, fontWeight: FontWeight.bold, fontSize: 13)),
+          ),
+        ),
+        const SizedBox(width: 10),
+        Expanded(child: Column(
+          crossAxisAlignment: CrossAxisAlignment.start,
+          mainAxisSize: MainAxisSize.min,
+          children: [
+            Row(children: [
+              Text('${s.startTime} – ${s.endTime}',
+                  style: TextStyle(
+                    fontSize: 15, fontWeight: FontWeight.w600,
+                    color: dim ? Colors.grey.shade500 : const Color(0xFFE65100),
+                    decoration: dim ? TextDecoration.lineThrough : null,
+                  )),
+              if (past) ...[
+                const SizedBox(width: 8),
+                _badge(Icons.history, 'ผ่านไปแล้ว'),
+              ] else if (taken) ...[
+                const SizedBox(width: 8),
+                _badge(Icons.block, 'จองแล้ว'),
+              ],
+            ]),
+            if (s.date != null && s.date!.isNotEmpty)
+              Text(thaiDateFromStr(s.date!),
+                  style: TextStyle(
+                      fontSize: 11,
+                      color: dim ? Colors.grey.shade500 : const Color(0xFF558B2F))),
+          ],
+        )),
+        IconButton(
+          onPressed: () => setState(() => _slots.removeAt(i)),
+          icon: const Icon(Icons.delete_outline, color: Colors.red, size: 20),
+          padding: EdgeInsets.zero,
+          constraints: const BoxConstraints(),
+        ),
+      ]),
+    );
+  }
+
+  Widget _badge(IconData icon, String text) => Container(
+        padding: const EdgeInsets.symmetric(horizontal: 6, vertical: 1),
+        decoration: BoxDecoration(
+          color: Colors.grey.shade300,
+          borderRadius: BorderRadius.circular(6),
+        ),
+        child: Row(mainAxisSize: MainAxisSize.min, children: [
+          Icon(icon, size: 11, color: Colors.grey.shade600),
+          const SizedBox(width: 2),
+          Text(text, style: TextStyle(fontSize: 10, color: Colors.grey.shade600, fontWeight: FontWeight.w600)),
+        ]),
+      );
+
+  /// แถวร่าง — วันที่(ปฏิทิน) + เวลาเริ่ม/สิ้นสุด
+  Widget _buildDraftRow(int i) {
+    final d = _drafts[i];
+    final hasDate = d.date != null;
+    return Container(
+      margin: const EdgeInsets.only(bottom: 10),
+      padding: const EdgeInsets.all(10),
+      decoration: BoxDecoration(
+        color: Colors.white,
+        borderRadius: BorderRadius.circular(10),
+        border: Border.all(color: Colors.grey.shade300),
+      ),
+      child: Column(crossAxisAlignment: CrossAxisAlignment.start, children: [
+        Row(children: [
+          Container(
+            width: 22, height: 22,
+            decoration: const BoxDecoration(color: Color(0xFFF97316), shape: BoxShape.circle),
+            child: Center(
+              child: Text('${i + 1}',
+                  style: const TextStyle(color: Colors.white, fontSize: 12, fontWeight: FontWeight.bold)),
+            ),
+          ),
+          const SizedBox(width: 8),
+          Expanded(
+            child: GestureDetector(
+              onTap: () => _pickDraftDate(d),
+              child: Container(
+                padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 10),
+                decoration: BoxDecoration(
+                  color: hasDate ? const Color(0xFFE3F2FD) : Colors.white,
+                  borderRadius: BorderRadius.circular(8),
+                  border: Border.all(
+                      color: hasDate ? const Color(0xFFF97316).withAlpha(100) : Colors.grey.shade300),
+                ),
+                child: Row(children: [
+                  Icon(Icons.calendar_month, size: 16,
+                      color: hasDate ? const Color(0xFFF97316) : Colors.grey),
+                  const SizedBox(width: 8),
+                  Expanded(
+                    child: Text(
+                      hasDate ? thaiDateFull(d.date!) : 'แตะเลือกวันที่',
+                      style: TextStyle(
+                        fontSize: 13,
+                        fontWeight: hasDate ? FontWeight.w600 : FontWeight.normal,
+                        color: hasDate ? const Color(0xFFF97316) : Colors.grey,
+                      ),
+                    ),
+                  ),
+                ]),
+              ),
+            ),
+          ),
+          if (_drafts.length > 1)
+            IconButton(
+              onPressed: () => setState(() => _drafts.removeAt(i)),
+              icon: const Icon(Icons.close, color: Colors.red, size: 18),
+              padding: const EdgeInsets.only(left: 4),
+              constraints: const BoxConstraints(),
+            ),
+        ]),
+        const SizedBox(height: 8),
+        Row(children: [
+          Expanded(child: _TimeTile(
+            label: 'เริ่ม',
+            time: d.start,
+            onTap: () async {
+              final t = await _pickTime(d.start ?? const TimeOfDay(hour: 9, minute: 0));
+              if (t != null) setState(() {
+                d.start = t;
+                d.end ??= TimeOfDay(hour: (t.hour + 1) % 24, minute: t.minute);
+              });
+            },
+          )),
+          const Padding(
+            padding: EdgeInsets.symmetric(horizontal: 8),
+            child: Text('–', style: TextStyle(fontSize: 18, color: Colors.grey)),
+          ),
+          Expanded(child: _TimeTile(
+            label: 'สิ้นสุด',
+            time: d.end,
+            onTap: () async {
+              final t = await _pickTime(d.end ?? const TimeOfDay(hour: 10, minute: 0));
+              if (t != null) setState(() => d.end = t);
+            },
+          )),
+        ]),
       ]),
     );
   }
@@ -704,6 +904,15 @@ class _PackageFormSheetState extends State<_PackageFormSheet> {
 }
 
 // ── Sub-widgets ───────────────────────────────────────────────────────────────
+
+/// แถวร่างสำหรับกรอกช่วงเวลาใหม่ (วันที่ + เวลาเริ่ม/สิ้นสุด)
+class _DraftSlot {
+  DateTime? date;
+  TimeOfDay? start;
+  TimeOfDay? end;
+  bool get isEmpty => date == null && start == null && end == null;
+  bool get isComplete => date != null && start != null && end != null;
+}
 
 class _UserDropdown extends StatelessWidget {
   final List<UserModel> users;
@@ -741,27 +950,35 @@ class _UserDropdown extends StatelessWidget {
   );
 }
 
-class _TimePicker extends StatelessWidget {
+class _TimeTile extends StatelessWidget {
   final String label;
   final TimeOfDay? time;
   final VoidCallback onTap;
-  const _TimePicker({required this.label, required this.time, required this.onTap});
+  const _TimeTile({required this.label, required this.time, required this.onTap});
 
   @override
   Widget build(BuildContext context) => GestureDetector(
     onTap: onTap,
     child: Container(
-      height: 56,
+      height: 60,
       decoration: BoxDecoration(
         color: time != null ? const Color(0xFFE3F2FD) : Colors.grey.shade100,
         borderRadius: BorderRadius.circular(10),
-        border: Border.all(color: time != null ? const Color(0xFFF97316).withAlpha(100) : Colors.grey.shade300),
+        border: Border.all(
+            color: time != null ? const Color(0xFFF97316).withAlpha(100) : Colors.grey.shade300),
       ),
       child: Column(mainAxisAlignment: MainAxisAlignment.center, children: [
-        Text(label, style: const TextStyle(fontSize: 10, color: Colors.grey)),
+        Text(label, style: const TextStyle(fontSize: 11, color: Colors.grey)),
+        const SizedBox(height: 2),
         Text(
-          time != null ? '${time!.hour.toString().padLeft(2,'0')}:${time!.minute.toString().padLeft(2,'0')}' : 'แตะเพื่อเลือก',
-          style: TextStyle(fontSize: 16, fontWeight: FontWeight.bold, color: time != null ? const Color(0xFFF97316) : Colors.grey),
+          time != null
+              ? '${time!.hour.toString().padLeft(2, '0')}:${time!.minute.toString().padLeft(2, '0')}'
+              : 'แตะเลือก',
+          style: TextStyle(
+            fontSize: 17,
+            fontWeight: FontWeight.bold,
+            color: time != null ? const Color(0xFFF97316) : Colors.grey,
+          ),
         ),
       ]),
     ),
