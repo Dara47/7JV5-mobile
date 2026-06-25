@@ -136,11 +136,28 @@ class _UsersListScreenState extends State<UsersListScreen> with SingleTickerProv
   }
 }
 
-class _UserList extends StatelessWidget {
+class _UserList extends StatefulWidget {
   final String role;
   final String search;
   final void Function({UserModel? user}) onEdit;
   const _UserList({required this.role, required this.search, required this.onEdit});
+
+  @override
+  State<_UserList> createState() => _UserListState();
+}
+
+class _UserListState extends State<_UserList> {
+  static const _pageSize = 20;
+  int _visible = _pageSize;
+
+  @override
+  void didUpdateWidget(covariant _UserList old) {
+    super.didUpdateWidget(old);
+    // เปลี่ยนคำค้น → เริ่มนับใหม่ที่ 20
+    if (old.search != widget.search) {
+      _visible = _pageSize;
+    }
+  }
 
   void _confirmDelete(BuildContext context, UserModel u) {
     showDialog(
@@ -181,6 +198,8 @@ class _UserList extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
+    final role = widget.role;
+    final search = widget.search;
     return StreamBuilder<List<UserModel>>(
       stream: FirestoreService.watchUsers(role: role),
       builder: (context, snap) {
@@ -208,16 +227,48 @@ class _UserList extends StatelessWidget {
           );
         }
 
+        // แสดงทีละ 20 รายการ (กดโหลดเพิ่มได้) — มีช่องค้นหาแล้วไม่ต้องโหลดทั้งหมด
+        final visible = _visible.clamp(0, filtered.length);
+        final shown = filtered.take(visible).toList();
+        final hasMore = filtered.length > visible;
+
         return StreamBuilder<List<SessionModel>>(
           stream: role == 'student' ? FirestoreService.watchTodaySessions() : null,
           builder: (context, sessSnap) {
             final todaySessions = sessSnap.data ?? const <SessionModel>[];
             return ListView.separated(
           padding: const EdgeInsets.fromLTRB(12, 8, 12, 80),
-          itemCount: filtered.length,
+          itemCount: shown.length + 1, // +1 = แถวท้าย (ปุ่มโหลดเพิ่ม / สรุปจำนวน)
           separatorBuilder: (_, __) => const SizedBox(height: 6),
           itemBuilder: (context, i) {
-            final u = filtered[i];
+            // แถวท้ายสุด
+            if (i == shown.length) {
+              if (hasMore) {
+                final remaining = filtered.length - visible;
+                return Padding(
+                  padding: const EdgeInsets.symmetric(vertical: 10),
+                  child: Center(
+                    child: OutlinedButton.icon(
+                      onPressed: () => setState(() => _visible += _pageSize),
+                      icon: const Icon(Icons.expand_more, size: 18),
+                      label: Text('โหลดเพิ่ม (เหลืออีก $remaining)'),
+                      style: OutlinedButton.styleFrom(
+                        foregroundColor: const Color(0xFFF97316),
+                        side: const BorderSide(color: Color(0xFFF97316)),
+                        padding: const EdgeInsets.symmetric(horizontal: 20, vertical: 12),
+                        shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(10)),
+                      ),
+                    ),
+                  ),
+                );
+              }
+              return Padding(
+                padding: const EdgeInsets.symmetric(vertical: 8),
+                child: Center(child: Text('แสดงครบ ${filtered.length} รายการ',
+                    style: TextStyle(fontSize: 12, color: Colors.grey.shade500))),
+              );
+            }
+            final u = shown[i];
             final color = role == 'student' ? const Color(0xFFF97316) : const Color(0xFF2E7D32);
             return Card(
               margin: EdgeInsets.zero,
@@ -267,7 +318,7 @@ class _UserList extends StatelessWidget {
                     PopupMenuButton<String>(
                       icon: const Icon(Icons.more_vert, size: 20, color: Colors.grey),
                       onSelected: (v) {
-                        if (v == 'edit') onEdit(user: u);
+                        if (v == 'edit') widget.onEdit(user: u);
                         if (v == 'detail') Navigator.push(context, MaterialPageRoute(
                             builder: (_) => role == 'student'
                                 ? PackagesScreen(filterStudentId: u.id, filterStudentName: u.name)
