@@ -682,8 +682,9 @@ class _PayrollFormSheetState extends State<_PayrollFormSheet> {
     final List<PayrollDeduction> deds = last.deductions;
     final String? note = last.note;
     setState(() {
+      // เก็บรายการ/อัตราเดิม แต่ล้าง "จำนวน" ให้กรอกใหม่ทุกงวด
       _roles = roles
-          .map((r) => _RoleRow(role: r.role, rate: _numStr(r.rate), count: _numStr(r.count)))
+          .map((r) => _RoleRow(role: r.role, rate: _numStr(r.rate), count: ''))
           .toList();
       if (_roles.isEmpty) _roles = [_RoleRow()];
       _deducts = deds.map((d) => _DeductRow(label: d.label, amount: _numStr(d.amount))).toList();
@@ -912,7 +913,7 @@ class _PayrollFormSheetState extends State<_PayrollFormSheet> {
                 child: Row(children: [
                   Icon(Icons.info_outline, size: 18, color: Colors.amber.shade800),
                   const SizedBox(width: 8),
-                  Expanded(child: Text('ดึงอัตรา/หมายเหตุจากงวดก่อนมาให้แล้ว — แก้ "จำนวน" และวันที่ได้เลย',
+                  Expanded(child: Text('ดึงอัตรา/หมายเหตุจากงวดก่อนมาให้แล้ว — กรอก "จำนวน" และวันที่ของงวดนี้',
                       style: TextStyle(fontSize: 12, color: Colors.amber.shade900))),
                 ]),
               ),
