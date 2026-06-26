@@ -4,6 +4,7 @@ import 'package:flutter/material.dart';
 import 'package:firebase_auth/firebase_auth.dart';
 import '../models/models.dart';
 import '../services/firestore_service.dart';
+import '../utils/date_format.dart';
 import 'users_list_screen.dart';
 import 'packages_screen.dart';
 import 'teacher_schedule_screen.dart';
@@ -265,6 +266,29 @@ class _MenuSheetState extends State<_MenuSheet> with SingleTickerProviderStateMi
     super.dispose();
   }
 
+  /// สีประจำวันไทย (จ.เหลือง อ.ชมพู พ.เขียว พฤ.ส้ม ศ.ฟ้า ส.ม่วง อา.แดง)
+  Color _dayColor() {
+    const colors = {
+      1: Color(0xFFF9A825), // จันทร์ — เหลือง
+      2: Color(0xFFEC407A), // อังคาร — ชมพู
+      3: Color(0xFF43A047), // พุธ — เขียว
+      4: Color(0xFFFB8C00), // พฤหัสบดี — ส้ม
+      5: Color(0xFF039BE5), // ศุกร์ — ฟ้า
+      6: Color(0xFF8E24AA), // เสาร์ — ม่วง
+      7: Color(0xFFE53935), // อาทิตย์ — แดง
+    };
+    return colors[nowThai().weekday] ?? _kOrange;
+  }
+
+  /// คำทักทายตามช่วงเวลา (เวลาไทย)
+  ({String text, String emoji}) _greeting() {
+    final h = nowThai().hour;
+    if (h < 12) return (text: 'สวัสดีตอนเช้า', emoji: '☀️');
+    if (h < 17) return (text: 'สวัสดีตอนบ่าย', emoji: '🌤️');
+    if (h < 20) return (text: 'สวัสดีตอนเย็น', emoji: '🌆');
+    return (text: 'สวัสดีตอนค่ำ', emoji: '🌙');
+  }
+
   /// pop-in แบบ staggered (scale + fade) ทีละไอคอนแบบ iOS
   Widget _staggered(int i, int count, Widget child) {
     final start = ((i / (count < 1 ? 1 : count)) * 0.55).clamp(0.0, 1.0);
@@ -289,6 +313,8 @@ class _MenuSheetState extends State<_MenuSheet> with SingleTickerProviderStateMi
     final width = MediaQuery.of(context).size.width;
     final cols = width >= 700 ? 5 : 4;
 
+    final dayColor = _dayColor();
+
     return ClipRRect(
       borderRadius: const BorderRadius.vertical(top: Radius.circular(24)),
       child: BackdropFilter(
@@ -307,26 +333,47 @@ class _MenuSheetState extends State<_MenuSheet> with SingleTickerProviderStateMi
                 width: 40, height: 4,
                 decoration: BoxDecoration(color: Colors.grey.shade300, borderRadius: BorderRadius.circular(2)),
               ),
-              // Header
-              Padding(
-                padding: const EdgeInsets.fromLTRB(20, 8, 12, 8),
+              // Header (พื้นหลังไล่สี "ตามวัน" + คำทักทายตามเวลา + วันที่ไทย)
+              Container(
+                decoration: BoxDecoration(
+                  gradient: LinearGradient(
+                    begin: Alignment.topLeft, end: Alignment.bottomRight,
+                    colors: [dayColor.withValues(alpha: 0.14), dayColor.withValues(alpha: 0.02)],
+                  ),
+                ),
+                padding: const EdgeInsets.fromLTRB(20, 10, 12, 10),
                 child: Row(children: [
                   Container(
-                    width: 36, height: 36,
+                    width: 42, height: 42,
                     decoration: BoxDecoration(
                       gradient: const LinearGradient(
                         colors: [_kOrange, Color(0xFFFF8F00)],
                         begin: Alignment.topLeft, end: Alignment.bottomRight,
                       ),
-                      borderRadius: BorderRadius.circular(10),
+                      borderRadius: BorderRadius.circular(12),
+                      boxShadow: [
+                        BoxShadow(color: _kOrange.withAlpha(80), blurRadius: 8, offset: const Offset(0, 3)),
+                      ],
                     ),
                     child: const Center(child: Text('7J',
-                        style: TextStyle(color: Colors.white, fontWeight: FontWeight.bold, fontSize: 13))),
+                        style: TextStyle(color: Colors.white, fontWeight: FontWeight.bold, fontSize: 15))),
                   ),
-                  const SizedBox(width: 10),
+                  const SizedBox(width: 12),
                   Expanded(child: Column(crossAxisAlignment: CrossAxisAlignment.start, children: [
+                    Text('${_greeting().text} ${_greeting().emoji}',
+                        style: const TextStyle(fontSize: 12, fontWeight: FontWeight.w600, color: Color(0xFFE65100))),
+                    const SizedBox(height: 1),
                     Text(widget.roleLabel, style: const TextStyle(fontWeight: FontWeight.bold, fontSize: 15)),
                     Text(widget.userName, style: TextStyle(fontSize: 11, color: Colors.grey.shade600)),
+                    const SizedBox(height: 3),
+                    // แถววันที่ไทย ใช้ "สีประจำวัน"
+                    Row(children: [
+                      Icon(Icons.event_rounded, size: 13, color: dayColor),
+                      const SizedBox(width: 4),
+                      Flexible(child: Text(thaiDateFull(nowThai()),
+                          overflow: TextOverflow.ellipsis,
+                          style: TextStyle(fontSize: 11.5, fontWeight: FontWeight.w700, color: dayColor))),
+                    ]),
                   ])),
                   IconButton(
                     onPressed: () => Navigator.pop(context),
@@ -367,7 +414,7 @@ class _MenuSheetState extends State<_MenuSheet> with SingleTickerProviderStateMi
                     label: const Text('รีเฟรช', style: TextStyle(fontSize: 13, color: Colors.grey)),
                     style: TextButton.styleFrom(alignment: Alignment.centerLeft),
                   )),
-                  Text('Version 5.1.0', style: TextStyle(fontSize: 11, color: Colors.grey.shade400)),
+                  Text('Version 5.1.1', style: TextStyle(fontSize: 11, color: Colors.grey.shade400)),
                   const SizedBox(width: 8),
                   TextButton.icon(
                     onPressed: widget.onLogout,
