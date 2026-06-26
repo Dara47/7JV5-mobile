@@ -150,6 +150,10 @@ class _UserListState extends State<_UserList> {
   static const _pageSize = 20;
   int _visible = _pageSize;
 
+  // ── โหมดเลือกหลายคนเพื่อลบ ──
+  bool _selectMode = false;
+  final Set<String> _selected = {};
+
   @override
   void didUpdateWidget(covariant _UserList old) {
     super.didUpdateWidget(old);
@@ -157,6 +161,177 @@ class _UserListState extends State<_UserList> {
     if (old.search != widget.search) {
       _visible = _pageSize;
     }
+  }
+
+  void _toggleSelect(String id) {
+    setState(() {
+      if (_selected.contains(id)) {
+        _selected.remove(id);
+      } else {
+        _selected.add(id);
+      }
+    });
+  }
+
+  void _exitSelect() => setState(() {
+    _selectMode = false;
+    _selected.clear();
+  });
+
+  /// แถบเครื่องมือด้านบน — สลับระหว่างปุ่ม "เลือกเพื่อลบ" กับแถบเลือก/ลบ
+  Widget _selectionBar(List<UserModel> filtered) {
+    final label = widget.role == 'student' ? 'นักเรียน' : 'ครู';
+    if (!_selectMode) {
+      return Align(
+        alignment: Alignment.centerRight,
+        child: Padding(
+          padding: const EdgeInsets.fromLTRB(12, 2, 12, 0),
+          child: TextButton.icon(
+            onPressed: () => setState(() { _selectMode = true; _selected.clear(); }),
+            icon: const Icon(Icons.checklist_rtl, size: 18),
+            label: const Text('เลือกเพื่อลบ'),
+            style: TextButton.styleFrom(foregroundColor: Colors.red.shade700),
+          ),
+        ),
+      );
+    }
+    final allIds = filtered.map((u) => u.id).toSet();
+    final allSelected = allIds.isNotEmpty && _selected.containsAll(allIds);
+    return Container(
+      color: Colors.red.shade50,
+      padding: const EdgeInsets.fromLTRB(4, 2, 8, 2),
+      child: Row(children: [
+        Checkbox(
+          value: allSelected,
+          onChanged: (v) => setState(() {
+            if (v == true) { _selected..clear()..addAll(allIds); }
+            else { _selected.clear(); }
+          }),
+        ),
+        Text('เลือก ${_selected.length}/${filtered.length} $label',
+            style: const TextStyle(fontSize: 13, fontWeight: FontWeight.w600)),
+        const Spacer(),
+        TextButton(onPressed: _exitSelect, child: const Text('ยกเลิก')),
+        const SizedBox(width: 4),
+        ElevatedButton.icon(
+          onPressed: _selected.isEmpty ? null : () => _confirmDeleteSelected(),
+          icon: const Icon(Icons.delete_outline, size: 18),
+          label: Text('ลบ (${_selected.length})'),
+          style: ElevatedButton.styleFrom(
+            backgroundColor: Colors.red, foregroundColor: Colors.white,
+            disabledBackgroundColor: Colors.grey.shade300,
+            padding: const EdgeInsets.symmetric(horizontal: 14, vertical: 10),
+          ),
+        ),
+      ]),
+    );
+  }
+
+  /// ยืนยันลบรายการที่เลือก แล้วลบพร้อมความคืบหน้า + ปุ่มหยุด
+  Future<void> _confirmDeleteSelected() async {
+    final role = widget.role;
+    final label = role == 'student' ? 'นักเรียน' : 'ครู';
+    final ids = _selected.toList();
+    final count = ids.length;
+    if (count == 0) return;
+
+    final ok = await showDialog<bool>(
+      context: context,
+      builder: (dctx) => AlertDialog(
+        title: Row(children: [
+          const Icon(Icons.warning_amber_rounded, color: Colors.red),
+          const SizedBox(width: 8),
+          Expanded(child: Text('ลบ$label ที่เลือก')),
+        ]),
+        content: Column(mainAxisSize: MainAxisSize.min, crossAxisAlignment: CrossAxisAlignment.start, children: [
+          Text('จะลบ$label ที่เลือกไว้ $count คน', style: const TextStyle(fontWeight: FontWeight.w600)),
+          const SizedBox(height: 10),
+          Container(
+            padding: const EdgeInsets.all(10),
+            decoration: BoxDecoration(color: Colors.red.shade50, borderRadius: BorderRadius.circular(8)),
+            child: const Column(crossAxisAlignment: CrossAxisAlignment.start, children: [
+              Text('ข้อมูลที่จะถูกลบ (ของแต่ละคน):', style: TextStyle(fontSize: 12, fontWeight: FontWeight.bold, color: Colors.red)),
+              SizedBox(height: 4),
+              Text('• ข้อมูลผู้ใช้', style: TextStyle(fontSize: 12, color: Colors.black87)),
+              Text('• แพ็กเกจทั้งหมด', style: TextStyle(fontSize: 12, color: Colors.black87)),
+              Text('• คาบเรียนที่ยังไม่เสร็จ', style: TextStyle(fontSize: 12, color: Colors.black87)),
+              SizedBox(height: 4),
+              Text('* ประวัติรายงานยังคงอยู่', style: TextStyle(fontSize: 11, color: Colors.green, fontStyle: FontStyle.italic)),
+              Text('* ลบแล้วกู้คืนไม่ได้', style: TextStyle(fontSize: 11, color: Colors.red, fontWeight: FontWeight.bold)),
+            ]),
+          ),
+        ]),
+        actions: [
+          TextButton(onPressed: () => Navigator.pop(dctx, false), child: const Text('ยกเลิก')),
+          ElevatedButton.icon(
+            onPressed: () => Navigator.pop(dctx, true),
+            icon: const Icon(Icons.delete_forever, size: 18),
+            label: Text('ลบ ($count)'),
+            style: ElevatedButton.styleFrom(backgroundColor: Colors.red, foregroundColor: Colors.white),
+          ),
+        ],
+      ),
+    );
+    if (ok != true || !mounted) return;
+
+    // กล่องความคืบหน้า + ปุ่มหยุด
+    final doneVN = ValueNotifier<int>(0);
+    final cancelVN = ValueNotifier<bool>(false);
+    showDialog(
+      context: context,
+      barrierDismissible: false,
+      builder: (_) => PopScope(
+        canPop: false,
+        child: AlertDialog(
+          content: Column(mainAxisSize: MainAxisSize.min, children: [
+            const SizedBox(height: 4),
+            const CircularProgressIndicator(),
+            const SizedBox(height: 16),
+            ValueListenableBuilder<int>(
+              valueListenable: doneVN,
+              builder: (_, d, __) => Text('กำลังลบ $d / $count คน…',
+                  style: const TextStyle(fontWeight: FontWeight.w600)),
+            ),
+          ]),
+          actions: [
+            ValueListenableBuilder<bool>(
+              valueListenable: cancelVN,
+              builder: (_, c, __) => TextButton(
+                onPressed: c ? null : () => cancelVN.value = true,
+                child: Text(c ? 'กำลังหยุด…' : 'หยุด',
+                    style: TextStyle(color: c ? Colors.grey : Colors.red, fontWeight: FontWeight.bold)),
+              ),
+            ),
+          ],
+        ),
+      ),
+    );
+
+    int deleted = 0;
+    String? error;
+    try {
+      deleted = await FirestoreService.cascadeDeleteUsers(
+        ids, role,
+        onProgress: (d, t) => doneVN.value = d,
+        isCancelled: () => cancelVN.value,
+      );
+    } catch (e) {
+      error = e.toString();
+    }
+    doneVN.dispose();
+    cancelVN.dispose();
+    if (!mounted) return;
+    Navigator.pop(context); // ปิดกล่องความคืบหน้า
+    _exitSelect();
+    final stopped = error == null && deleted < count;
+    ScaffoldMessenger.of(context).showSnackBar(SnackBar(
+      content: Text(error != null
+          ? 'ลบล้มเหลว: $error'
+          : stopped
+              ? 'หยุดแล้ว — ลบไป $deleted จาก $count คน'
+              : 'ลบ$label $deleted คนแล้ว'),
+      backgroundColor: error != null ? Colors.red : (stopped ? Colors.orange : Colors.green),
+    ));
   }
 
   void _confirmDelete(BuildContext context, UserModel u) {
@@ -232,7 +407,9 @@ class _UserListState extends State<_UserList> {
         final shown = filtered.take(visible).toList();
         final hasMore = filtered.length > visible;
 
-        return StreamBuilder<List<SessionModel>>(
+        return Column(children: [
+          _selectionBar(filtered),
+          Expanded(child: StreamBuilder<List<SessionModel>>(
           stream: role == 'student' ? FirestoreService.watchTodaySessions() : null,
           builder: (context, sessSnap) {
             final todaySessions = sessSnap.data ?? const <SessionModel>[];
@@ -270,22 +447,37 @@ class _UserListState extends State<_UserList> {
             }
             final u = shown[i];
             final color = role == 'student' ? const Color(0xFFF97316) : const Color(0xFF2E7D32);
+            final isSel = _selected.contains(u.id);
             return Card(
               margin: EdgeInsets.zero,
-              shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(12)),
+              shape: RoundedRectangleBorder(
+                borderRadius: BorderRadius.circular(12),
+                side: isSel ? const BorderSide(color: Colors.red, width: 1.5) : BorderSide.none,
+              ),
+              color: isSel ? Colors.red.shade50 : null,
               elevation: 1,
               child: Column(crossAxisAlignment: CrossAxisAlignment.stretch, children: [
                 ListTile(
                   contentPadding: const EdgeInsets.symmetric(horizontal: 12, vertical: 4),
                   leading: Row(mainAxisSize: MainAxisSize.min, children: [
-                    // เลขลำดับ (เรียงตามผลค้นหา)
-                    SizedBox(
-                      width: 24,
-                      child: Text('${i + 1}',
-                          textAlign: TextAlign.center,
-                          style: TextStyle(fontSize: 14, fontWeight: FontWeight.bold, color: Colors.grey.shade500)),
-                    ),
-                    const SizedBox(width: 6),
+                    if (_selectMode)
+                      Checkbox(
+                        value: isSel,
+                        onChanged: (_) => _toggleSelect(u.id),
+                        activeColor: Colors.red,
+                        materialTapTargetSize: MaterialTapTargetSize.shrinkWrap,
+                        visualDensity: VisualDensity.compact,
+                      )
+                    else ...[
+                      // เลขลำดับ (เรียงตามผลค้นหา)
+                      SizedBox(
+                        width: 24,
+                        child: Text('${i + 1}',
+                            textAlign: TextAlign.center,
+                            style: TextStyle(fontSize: 14, fontWeight: FontWeight.bold, color: Colors.grey.shade500)),
+                      ),
+                      const SizedBox(width: 6),
+                    ],
                     CircleAvatar(
                       backgroundColor: color,
                       radius: 22,
@@ -332,10 +524,12 @@ class _UserListState extends State<_UserList> {
                       ],
                     ),
                   ]),
-                  onTap: () => Navigator.push(context, MaterialPageRoute(
-                      builder: (_) => role == 'student'
-                          ? PackagesScreen(filterStudentId: u.id, filterStudentName: u.name)
-                          : PackagesScreen(filterTeacherId: u.id, filterTeacherName: u.name))),
+                  onTap: _selectMode
+                      ? () => _toggleSelect(u.id)
+                      : () => Navigator.push(context, MaterialPageRoute(
+                          builder: (_) => role == 'student'
+                              ? PackagesScreen(filterStudentId: u.id, filterStudentName: u.name)
+                              : PackagesScreen(filterTeacherId: u.id, filterTeacherName: u.name))),
                 ),
                 if (role == 'student')
                   StreamBuilder<List<PackageModel>>(
@@ -480,7 +674,8 @@ class _UserListState extends State<_UserList> {
           },
         );
           },
-        );
+        )),
+        ]);
       },
     );
   }

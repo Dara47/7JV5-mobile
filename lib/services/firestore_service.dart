@@ -676,6 +676,29 @@ class FirestoreService {
     await logAudit('ลบผู้ใช้', detail: '$role · id $userId · ลบแพ็กเกจ ${pkgs.docs.length}');
   }
 
+  /// ลบผู้ใช้ที่เลือกหลายคน (cascade ทีละคน — เก็บประวัติรายงานไว้)
+  /// - [onProgress] รายงานความคืบหน้า (ลบไปแล้ว/ทั้งหมด)
+  /// - [isCancelled] ถ้าคืน true จะหยุดก่อนลบคนถัดไป
+  /// คืนจำนวนที่ลบจริง (น้อยกว่าทั้งหมด = ถูกสั่งหยุดกลางคัน)
+  static Future<int> cascadeDeleteUsers(
+    List<String> userIds,
+    String role, {
+    void Function(int done, int total)? onProgress,
+    bool Function()? isCancelled,
+  }) async {
+    final total = userIds.length;
+    var done = 0;
+    for (final id in userIds) {
+      if (isCancelled?.call() ?? false) break;
+      await cascadeDeleteUser(id, role);
+      done++;
+      onProgress?.call(done, total);
+    }
+    await logAudit('ลบผู้ใช้ที่เลือก',
+        detail: '$role · $done/$total คน${done < total ? ' (หยุดกลางคัน)' : ''}');
+    return done;
+  }
+
   // ── Leave Requests ───────────────────────────────────────────────────────
 
   static Stream<List<LeaveRequestModel>> watchLeaveRequests() {
