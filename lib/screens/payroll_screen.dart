@@ -119,6 +119,8 @@ class _PayrollScreenState extends State<PayrollScreen>
         mode: mode,
         teacher: teacher,
         admin: admin,
+        existingTeachers: _teachers,
+        existingAdmins: _admins,
         onSaved: _load,
       ),
     );
@@ -623,8 +625,12 @@ class _PayrollFormSheet extends StatefulWidget {
   final String mode;
   final TeacherPayrollModel? teacher;
   final AdminPayrollModel? admin;
+  final List<TeacherPayrollModel> existingTeachers;
+  final List<AdminPayrollModel> existingAdmins;
   final VoidCallback onSaved;
-  const _PayrollFormSheet({required this.mode, this.teacher, this.admin, required this.onSaved});
+  const _PayrollFormSheet({required this.mode, this.teacher, this.admin,
+      this.existingTeachers = const [], this.existingAdmins = const [],
+      required this.onSaved});
   @override
   State<_PayrollFormSheet> createState() => _PayrollFormSheetState();
 }
@@ -645,6 +651,60 @@ class _PayrollFormSheetState extends State<_PayrollFormSheet> {
   String? _teacherCode; // รหัสครูที่เลือก (ไว้แสดงในช่อง)
 
   bool get _isEdit => widget.teacher != null || widget.admin != null;
+
+  // แสดงแบนเนอร์เมื่อเพิ่งดึงข้อมูลครั้งก่อนมาเติม
+  bool _prefilled = false;
+
+  /// งวดล่าสุดก่อนหน้าของชื่อที่ระบุ (ใช้เป็นต้นแบบอัตรา/หมายเหตุ) — null ถ้าไม่มี
+  dynamic _lastEntryFor(String name) {
+    if (name.trim().isEmpty) return null;
+    if (widget.mode == 'teacher') {
+      final m = widget.existingTeachers
+          .where((t) => t.teacherName.trim() == name.trim() &&
+              (!_isEdit || t.id != widget.teacher!.id))
+          .toList()
+        ..sort((a, b) => b.createdAt.compareTo(a.createdAt));
+      return m.isEmpty ? null : m.first;
+    }
+    final m = widget.existingAdmins
+        .where((a) => a.adminName.trim() == name.trim() &&
+            (!_isEdit || a.id != widget.admin!.id))
+        .toList()
+      ..sort((a, b) => b.createdAt.compareTo(a.createdAt));
+    return m.isEmpty ? null : m.first;
+  }
+
+  /// ดึงรายการ/อัตรา/หักเงิน/หมายเหตุ จากงวดล่าสุดมาเติมในฟอร์ม (ไม่แตะวันที่/ชื่อ)
+  void _applyPreviousData() {
+    final last = _lastEntryFor(_nameCtrl.text);
+    if (last == null) return;
+    final List<PayrollRole> roles = last.roles;
+    final List<PayrollDeduction> deds = last.deductions;
+    final String? note = last.note;
+    setState(() {
+      _roles = roles
+          .map((r) => _RoleRow(role: r.role, rate: _numStr(r.rate), count: _numStr(r.count)))
+          .toList();
+      if (_roles.isEmpty) _roles = [_RoleRow()];
+      _deducts = deds.map((d) => _DeductRow(label: d.label, amount: _numStr(d.amount))).toList();
+      if (note != null && note.isNotEmpty) _noteCtrl.text = note;
+      _prefilled = true;
+    });
+  }
+
+  static String _numStr(double n) => n % 1 == 0 ? n.toInt().toString() : n.toString();
+
+  /// เปิดปฏิทินเลือกวันที่ให้ช่อง from/to
+  Future<void> _pickDate(TextEditingController ctrl) async {
+    final initial = parseDateStr(ctrl.text) ?? nowThai();
+    final picked = await showDatePicker(
+      context: context,
+      initialDate: initial,
+      firstDate: DateTime(2020),
+      lastDate: DateTime(2100),
+    );
+    if (picked != null) setState(() => ctrl.text = toStorageDateStr(picked));
+  }
 
   @override
   void initState() {
@@ -808,10 +868,13 @@ class _PayrollFormSheetState extends State<_PayrollFormSheet> {
                 hint: 'ค้นหา/เลือกครู...',
                 title: 'ค้นหาครู',
                 color: const Color(0xFFF97316),
-                onSelected: (u) => setState(() {
-                  _nameCtrl.text = u.name;
-                  _teacherCode = u.code;
-                }),
+                onSelected: (u) {
+                  setState(() {
+                    _nameCtrl.text = u.name;
+                    _teacherCode = u.code;
+                  });
+                  if (!_isEdit) _applyPreviousData();
+                },
               ),
             ] else
               TextField(
@@ -822,7 +885,39 @@ class _PayrollFormSheetState extends State<_PayrollFormSheet> {
                   border: OutlineInputBorder(borderRadius: BorderRadius.circular(12)),
                 ),
               ),
-            const SizedBox(height: 16),
+            const SizedBox(height: 12),
+
+            // ── ใช้ข้อมูลครั้งก่อน (จำอัตรา/หมายเหตุ) ──────────────────────
+            if (!_isEdit && _lastEntryFor(_nameCtrl.text) != null) ...[
+              OutlinedButton.icon(
+                onPressed: _applyPreviousData,
+                icon: const Icon(Icons.history, size: 18),
+                label: const Text('ใช้อัตรา/หมายเหตุครั้งก่อน'),
+                style: OutlinedButton.styleFrom(
+                  foregroundColor: const Color(0xFFF97316),
+                  side: const BorderSide(color: Color(0xFFF97316)),
+                  shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(10)),
+                ),
+              ),
+              const SizedBox(height: 8),
+            ],
+            if (_prefilled) ...[
+              Container(
+                padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 8),
+                decoration: BoxDecoration(
+                  color: Colors.amber.shade50,
+                  borderRadius: BorderRadius.circular(10),
+                  border: Border.all(color: Colors.amber.shade200),
+                ),
+                child: Row(children: [
+                  Icon(Icons.info_outline, size: 18, color: Colors.amber.shade800),
+                  const SizedBox(width: 8),
+                  Expanded(child: Text('ดึงอัตรา/หมายเหตุจากงวดก่อนมาให้แล้ว — แก้ "จำนวน" และวันที่ได้เลย',
+                      style: TextStyle(fontSize: 12, color: Colors.amber.shade900))),
+                ]),
+              ),
+              const SizedBox(height: 12),
+            ],
 
             // Role rows
             const Text('รายการค่าจ้าง', style: TextStyle(fontWeight: FontWeight.bold)),
@@ -853,27 +948,11 @@ class _PayrollFormSheetState extends State<_PayrollFormSheet> {
             ),
             const SizedBox(height: 16),
 
-            // Date range
+            // Date range — แตะเพื่อเลือกจากปฏิทิน
             Row(children: [
-              Expanded(child: TextField(
-                controller: _fromCtrl,
-                decoration: InputDecoration(
-                  labelText: 'ตั้งแต่วันที่',
-                  hintText: 'YYYY-MM-DD',
-                  prefixIcon: const Icon(Icons.calendar_today, size: 18),
-                  border: OutlineInputBorder(borderRadius: BorderRadius.circular(12)),
-                ),
-              )),
+              Expanded(child: _dateField(_fromCtrl, 'ตั้งแต่วันที่')),
               const SizedBox(width: 8),
-              Expanded(child: TextField(
-                controller: _toCtrl,
-                decoration: InputDecoration(
-                  labelText: 'ถึงวันที่',
-                  hintText: 'YYYY-MM-DD',
-                  prefixIcon: const Icon(Icons.calendar_today, size: 18),
-                  border: OutlineInputBorder(borderRadius: BorderRadius.circular(12)),
-                ),
-              )),
+              Expanded(child: _dateField(_toCtrl, 'ถึงวันที่')),
             ]),
             const SizedBox(height: 10),
 
@@ -937,10 +1016,10 @@ class _PayrollFormSheetState extends State<_PayrollFormSheet> {
             onChange: (v) { _roles[e.key].role = v; })),
         const SizedBox(width: 6),
         SizedBox(width: 80, child: _miniField(hint: '0', init: e.value.rate, numpad: true,
-            onChange: (v) { _roles[e.key].rate = v; })),
+            onChange: (v) => setState(() => _roles[e.key].rate = v))),
         const SizedBox(width: 6),
         SizedBox(width: 70, child: _miniField(hint: '0', init: e.value.count, numpad: true,
-            onChange: (v) { _roles[e.key].count = v; })),
+            onChange: (v) => setState(() => _roles[e.key].count = v))),
         SizedBox(width: 36, child: IconButton(
           padding: EdgeInsets.zero, iconSize: 18,
           icon: const Icon(Icons.close, color: Colors.red),
@@ -970,7 +1049,7 @@ class _PayrollFormSheetState extends State<_PayrollFormSheet> {
             onChange: (v) { _deducts[e.key].label = v; })),
         const SizedBox(width: 6),
         SizedBox(width: 100, child: _miniField(hint: '0.00', init: e.value.amount, numpad: true,
-            onChange: (v) { _deducts[e.key].amount = v; })),
+            onChange: (v) => setState(() => _deducts[e.key].amount = v))),
         SizedBox(width: 36, child: IconButton(
           padding: EdgeInsets.zero, iconSize: 18,
           icon: const Icon(Icons.close, color: Colors.red),
@@ -988,6 +1067,22 @@ class _PayrollFormSheetState extends State<_PayrollFormSheet> {
       ),
     ),
   ]);
+
+  Widget _dateField(TextEditingController ctrl, String label) => TextField(
+    controller: ctrl,
+    readOnly: true,
+    onTap: () => _pickDate(ctrl),
+    decoration: InputDecoration(
+      labelText: label,
+      hintText: 'แตะเพื่อเลือก',
+      prefixIcon: const Icon(Icons.calendar_today, size: 18),
+      suffixIcon: ctrl.text.isEmpty ? null : IconButton(
+        icon: const Icon(Icons.clear, size: 18),
+        onPressed: () => setState(() => ctrl.clear()),
+      ),
+      border: OutlineInputBorder(borderRadius: BorderRadius.circular(12)),
+    ),
+  );
 
   Widget _miniField({required String hint, required String init,
       required ValueChanged<String> onChange, bool numpad = false}) {
