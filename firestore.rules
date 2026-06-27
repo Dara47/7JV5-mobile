@@ -1,0 +1,56 @@
+rules_version = '2';
+
+// ============================================================================
+// Firestore Rules — 7J Eng Mobile V5.1  (PROD: jenglishcenter-v4)
+// เฟส 1 — cutover คืนเสาร์ 2026-06-27
+//
+// โมเดล auth ของแอป:
+//   - แอดมิน  = ล็อกอิน Firebase Auth (email+password)  → request.auth != null
+//   - ครู/นักเรียน = ล็อกอินด้วย "รหัส" เท่านั้น ไม่มี Firebase Auth → request.auth == null
+//
+// ดังนั้นเฟส 1:
+//   - collection ที่ครู/นักเรียนต้องอ่าน/เขียน (users/packages/sessions/
+//     teacherSlots/leaveRequests/settings) ยัง "เปิด" ไว้ — ถ้าล็อก auth จะพังทันที
+//   - collection ที่เฉพาะแอดมินใช้ (payroll/auditLogs) → require auth
+//     (มีแต่แอดมินเท่านั้นที่มี Firebase Auth จึงเข้าได้)
+//
+// เฟส 2 (ทีหลัง): เพิ่ม Anonymous Auth ตอนเข้าด้วยรหัส แล้วค่อยล็อก
+//   users/packages/sessions/... ให้ต้อง login
+// ============================================================================
+
+service cloud.firestore {
+  match /databases/{database}/documents {
+
+    // ── แอดมินเท่านั้น (มี Firebase Auth) ──────────────────────────────────
+    function isAdmin() {
+      return request.auth != null;
+    }
+
+    // บัญชีค่าจ้าง + audit log = เฉพาะแอดมิน
+    match /sevenj_teacher_payroll/{doc} {
+      allow read, write: if isAdmin();
+    }
+    match /sevenj_admin_payroll/{doc} {
+      allow read, write: if isAdmin();
+    }
+    match /auditLogs/{doc} {
+      allow read, write: if isAdmin();
+    }
+
+    // ── เปิดไว้ (ครู/นักเรียนยังไม่มี auth) — จะล็อกในเฟส 2 ─────────────────
+    match /users/{doc}        { allow read, write: if true; }
+    match /packages/{doc}     { allow read, write: if true; }
+    match /sessions/{doc}     { allow read, write: if true; }
+    match /teacherSlots/{doc} { allow read, write: if true; }
+    match /leaveRequests/{doc}{ allow read, write: if true; }
+    match /settings/{doc}     { allow read, write: if true; }
+
+    // ── default สำหรับ collection อื่นที่ไม่ได้ระบุข้างบน ───────────────────
+    // เฟส 1 เปิดไว้ (= สถานะปัจจุบัน) เพื่อ "ไม่ให้ cutover พัง" ถ้ามี collection
+    // ตกหล่น. เฟส 2 ค่อยเปลี่ยนเป็น `if false` หลังยืนยันรายชื่อ collection ครบ
+    // และครู/นักเรียนมี (anonymous) auth แล้ว
+    match /{document=**} {
+      allow read, write: if true;
+    }
+  }
+}
