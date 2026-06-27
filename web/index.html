@@ -32,6 +32,21 @@
 
   <title>7J English</title>
   <link rel="manifest" href="manifest.json">
+
+  <!-- ปิด/ถอน Service Worker เก่า + ล้าง cache เก่าที่เคยแคชแอปไว้
+       (แอปนี้ออนไลน์ตลอด ไม่ใช้ offline) → deploy แล้วผู้ใช้เห็นของใหม่ทันทีที่รีโหลด -->
+  <script>
+    if ('serviceWorker' in navigator) {
+      navigator.serviceWorker.getRegistrations().then(function (regs) {
+        regs.forEach(function (r) { r.unregister(); });
+      }).catch(function () {});
+    }
+    if (window.caches && caches.keys) {
+      caches.keys().then(function (keys) {
+        keys.forEach(function (k) { caches.delete(k); });
+      }).catch(function () {});
+    }
+  </script>
 </head>
 <body>
   <!--
