@@ -47,6 +47,13 @@ class _UserFormScreenState extends State<UserFormScreen> {
     if (mounted) setState(() { _codeCtrl.text = code; _loadingCode = false; });
   }
 
+  /// เติมรหัสชุด "เพิ่มเอง" ไล่เลขเริ่มที่ 261000 (แยกจากชุดอัตโนมัติ 270000)
+  Future<void> _fetchManualCode(String role) async {
+    setState(() { _loadingCode = true; _codeError = null; });
+    final code = await FirestoreService.generateManualCode(role);
+    if (mounted) setState(() { _codeCtrl.text = code; _loadingCode = false; });
+  }
+
   Future<void> _save() async {
     if (!_formKey.currentState!.validate()) return;
 
@@ -193,6 +200,25 @@ class _UserFormScreenState extends State<UserFormScreen> {
                 ),
               ),
               const SizedBox(width: 8),
+              // ปุ่มชุด "เพิ่มเอง" — เติมรหัสไล่เลขเริ่ม 261000
+              SizedBox(
+                height: 52, width: 52,
+                child: OutlinedButton(
+                  onPressed: _loadingCode ? null : () => _fetchManualCode(_role),
+                  style: OutlinedButton.styleFrom(
+                    padding: EdgeInsets.zero,
+                    shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(12)),
+                    side: BorderSide(color: Colors.grey.shade300),
+                  ),
+                  child: Text(
+                    '${_role == 'student' ? 'S' : 'T'}26',
+                    style: const TextStyle(
+                        fontSize: 13, fontWeight: FontWeight.bold, color: Color(0xFF2E7D32)),
+                  ),
+                ),
+              ),
+              const SizedBox(width: 8),
+              // ปุ่มชุด "อัตโนมัติ" — เติมรหัสไล่เลขเริ่ม 270000 (เหมือนเดิม)
               SizedBox(
                 height: 52, width: 52,
                 child: OutlinedButton(
@@ -217,7 +243,7 @@ class _UserFormScreenState extends State<UserFormScreen> {
               ]),
             ],
             const SizedBox(height: 6),
-            Text('กรอกเองได้สำหรับโอนย้ายข้อมูลเดิม (S26xxxx / T26xxxx) หรือกด ↻ เพื่อสร้างอัตโนมัติ',
+            Text('พิมพ์เองได้ · ปุ่ม "${_role == 'student' ? 'S' : 'T'}26" = สร้างรหัสมือไล่เลขเริ่ม ${_role == 'student' ? 'S' : 'T'}261000 · ปุ่ม ↻ = อัตโนมัติเริ่ม ${_role == 'student' ? 'S' : 'T'}270000',
                 style: TextStyle(fontSize: 11, color: Colors.grey.shade500)),
           ],
           const SizedBox(height: 20),

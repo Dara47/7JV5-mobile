@@ -572,6 +572,24 @@ class FirestoreService {
     return '$prefix${max + 1}';
   }
 
+  /// สร้างรหัสชุด "เพิ่มเอง" ไล่เลขอัตโนมัติเริ่มที่ 261000 (S261000 / T261000)
+  /// แยกพูลชัดเจน: 26xxxx (<261000)=ข้อมูลเก่า import, 261000–269999=เพิ่มเอง, 270000+=อัตโนมัติ
+  static Future<String> generateManualCode(String role) async {
+    final prefix = role == 'student' ? 'S' : 'T';
+    const base = 261000;
+    final snap = await _db.collection('users').where('role', isEqualTo: role).get();
+    int max = base - 1;
+    for (final doc in snap.docs) {
+      final code = (doc.data()['code'] ?? '') as String;
+      if (code.startsWith(prefix)) {
+        final num = int.tryParse(code.substring(1));
+        // เฉพาะชุดเพิ่มเอง 261000–269999 (ไม่ชน import เก่า/อัตโนมัติ)
+        if (num != null && num >= base && num < 270000 && num > max) max = num;
+      }
+    }
+    return '$prefix${max + 1}';
+  }
+
   /// รหัสนี้ถูกใช้แล้วหรือยัง (กันซ้ำตอนสร้าง/โอนย้ายข้อมูล) — ข้ามเอกสารของตัวเองได้
   static Future<bool> isCodeTaken(String code, {String? excludeId}) async {
     final snap = await _db.collection('users')

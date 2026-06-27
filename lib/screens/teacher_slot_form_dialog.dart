@@ -76,7 +76,7 @@ class _TeacherSlotSheetState extends State<_TeacherSlotSheet> {
     for (final d in _drafts) {
       if (d.isEmpty) continue;
       if (!d.isComplete) {
-        error = 'มีแถวที่กรอกไม่ครบ — ต้องเลือกวันที่ เวลาเริ่ม และเวลาสิ้นสุด';
+        error = 'มีแถวที่กรอกไม่ครบ — ต้องเลือกวันที่หรือวัน + เวลาเริ่ม + เวลาสิ้นสุด';
         break;
       }
     }
@@ -89,23 +89,43 @@ class _TeacherSlotSheetState extends State<_TeacherSlotSheet> {
     setState(() {
       for (final d in _drafts) {
         if (!d.isComplete) continue;
-        final dt = d.date!;
         final start = _fmt(d.start!);
-        final startDt = DateTime(dt.year, dt.month, dt.day, d.start!.hour, d.start!.minute);
-        // ข้ามวัน/เวลาที่ผ่านไปแล้ว
-        if (now.isAfter(startDt)) { skipped++; continue; }
-        final dateStr = toStorageDateStr(dt);
-        // กันซ้ำกับช่วงที่มีอยู่แล้ว (วันที่ + เวลาเริ่ม เหมือนกัน)
-        if (_slots.any((s) => s.date == dateStr && s.startTime == start)) {
-          skipped++; continue;
+        final end = _fmt(d.end!);
+
+        if (d.date != null) {
+          // ── วันที่เจาะจง ──
+          final dt = d.date!;
+          final startDt = DateTime(dt.year, dt.month, dt.day, d.start!.hour, d.start!.minute);
+          // ข้ามวัน/เวลาที่ผ่านไปแล้ว
+          if (now.isAfter(startDt)) { skipped++; continue; }
+          final dateStr = toStorageDateStr(dt);
+          // กันซ้ำกับช่วงที่มีอยู่แล้ว (วันที่ + เวลาเริ่ม เหมือนกัน)
+          if (_slots.any((s) => s.date == dateStr && s.startTime == start)) {
+            skipped++; continue;
+          }
+          _slots.add(SlotItem(
+            day: thaiDayAbbr(dt),
+            startTime: start,
+            endTime: end,
+            date: dateStr,
+          ));
+          added++;
+        } else {
+          // ── วันประจำทุกสัปดาห์ (ไม่มีวันที่) ──
+          // กันซ้ำกับช่วงประจำที่มีอยู่ (วัน + เวลาเริ่ม เหมือนกัน)
+          if (_slots.any((s) =>
+              (s.date == null || s.date!.isEmpty) &&
+              s.day == d.day &&
+              s.startTime == start)) {
+            skipped++; continue;
+          }
+          _slots.add(SlotItem(
+            day: d.day!,
+            startTime: start,
+            endTime: end,
+          ));
+          added++;
         }
-        _slots.add(SlotItem(
-          day: thaiDayAbbr(dt),
-          startTime: start,
-          endTime: _fmt(d.end!),
-          date: dateStr,
-        ));
-        added++;
       }
       // รีเซ็ตเหลือแถวว่าง 1 แถว
       _drafts
@@ -135,7 +155,10 @@ class _TeacherSlotSheetState extends State<_TeacherSlotSheet> {
       firstDate: DateTime(now.year, now.month, now.day), // ห้ามเลือกวันในอดีต
       lastDate: DateTime(2030),
     );
-    if (d != null) setState(() => draft.date = d);
+    if (d != null) setState(() {
+      draft.date = d;
+      draft.day = thaiDayAbbr(d); // เลือกวันที่ → วันคำนวณอัตโนมัติ
+    });
   }
 
   Widget _buildDraftRow(int i) {
@@ -197,7 +220,40 @@ class _TeacherSlotSheetState extends State<_TeacherSlotSheet> {
               constraints: const BoxConstraints(),
             ),
         ]),
-        const SizedBox(height: 8),
+        const SizedBox(height: 10),
+        // เลือกวัน (ประจำทุกสัปดาห์) — ถ้าเลือกวันที่ไว้ วันจะถูกคำนวณให้
+        const Text('วัน', style: TextStyle(fontSize: 11, color: Colors.grey)),
+        const SizedBox(height: 6),
+        Wrap(
+          spacing: 6,
+          runSpacing: 6,
+          children: const ['อา', 'จ', 'อ', 'พ', 'พฤ', 'ศ', 'ส'].map((day) {
+            final selected = d.day == day;
+            return GestureDetector(
+              onTap: () => setState(() {
+                d.day = day;
+                d.date = null; // เลือกวันประจำ → ล้างวันที่เจาะจง
+              }),
+              child: Container(
+                width: 40, height: 40,
+                alignment: Alignment.center,
+                decoration: BoxDecoration(
+                  color: selected ? const Color(0xFFF97316) : Colors.white,
+                  shape: BoxShape.circle,
+                  border: Border.all(
+                      color: selected ? const Color(0xFFF97316) : Colors.grey.shade300),
+                ),
+                child: Text(day,
+                    style: TextStyle(
+                      fontSize: 13,
+                      fontWeight: selected ? FontWeight.bold : FontWeight.w500,
+                      color: selected ? Colors.white : Colors.black87,
+                    )),
+              ),
+            );
+          }).toList(),
+        ),
+        const SizedBox(height: 10),
         Row(children: [
           Expanded(child: _TimeTile(
             label: 'เริ่ม',
@@ -530,13 +586,16 @@ class _TeacherSlotSheetState extends State<_TeacherSlotSheet> {
   }
 }
 
-/// แถวร่างสำหรับกรอกช่วงเวลาใหม่ (วันที่ + เวลาเริ่ม/สิ้นสุด)
+/// แถวร่างสำหรับกรอกช่วงเวลาใหม่
+/// เลือกได้ 2 แบบ: วันที่เจาะจง (date) หรือ วันประจำทุกสัปดาห์ (day เช่น 'จ')
 class _DraftSlot {
-  DateTime? date;
+  DateTime? date; // วันที่เจาะจง — ถ้าระบุ day จะถูกคำนวณอัตโนมัติ
+  String? day;    // วันประจำ ('อา','จ','อ','พ','พฤ','ศ','ส') — ใช้เมื่อไม่ระบุวันที่
   TimeOfDay? start;
   TimeOfDay? end;
-  bool get isEmpty => date == null && start == null && end == null;
-  bool get isComplete => date != null && start != null && end != null;
+  bool get isEmpty => date == null && day == null && start == null && end == null;
+  bool get isComplete =>
+      (date != null || day != null) && start != null && end != null;
 }
 
 class _TimeTile extends StatelessWidget {
