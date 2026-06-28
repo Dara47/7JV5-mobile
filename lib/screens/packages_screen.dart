@@ -242,7 +242,8 @@ class PackageCard extends StatelessWidget {
         child: slots.isEmpty
             ? const Padding(padding: EdgeInsets.symmetric(vertical: 12),
                 child: Text('ยังไม่มีช่วงเวลา', style: TextStyle(color: Colors.grey)))
-            : Column(mainAxisSize: MainAxisSize.min, children: List.generate(slots.length, (i) {
+            : SingleChildScrollView(
+                child: Column(mainAxisSize: MainAxisSize.min, children: List.generate(slots.length, (i) {
                 final s = slots[i];
                 final past = _slotStarted(s);
                 return Container(
@@ -290,7 +291,7 @@ class PackageCard extends StatelessWidget {
                     ),
                   ]),
                 );
-              })),
+              }))),
       ),
       actions: [
         TextButton(onPressed: () => Navigator.pop(ctx), child: const Text('ยกเลิก')),
