@@ -19,7 +19,10 @@ class _AdminProfileScreenState extends State<AdminProfileScreen> {
   @override
   void initState() {
     super.initState();
-    _nameCtrl.text = FirestoreService.currentUser?.name ?? '';
+    // ชื่อผู้ดูแลควรเป็น "ชื่อคน" ไม่ใช่อีเมลเต็ม — ถ้าค่าที่เก็บไว้เผลอเป็นอีเมล
+    // (เช่น Frame@7J.com) ให้ตัดเหลือแค่ส่วนหน้า @ อัตโนมัติ (→ Frame)
+    final name = FirestoreService.currentUser?.name ?? '';
+    _nameCtrl.text = name.contains('@') ? name.split('@').first : name;
   }
 
   @override
