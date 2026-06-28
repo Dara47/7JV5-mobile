@@ -72,9 +72,46 @@ class _StudentDashboardScreenState extends State<StudentDashboardScreen> {
             )),
           _leaveShortcut(context),
           const SizedBox(height: 12),
+          _youtubeCard(),
+          const SizedBox(height: 12),
           _contactCard(),
           const SizedBox(height: 20),
         ],
+      ),
+    );
+  }
+
+  /// การ์ดช่อง YouTube 7J — เพลงภาษาอังกฤษ (เปิดแท็บใหม่)
+  Widget _youtubeCard() {
+    const url = 'https://www.youtube.com/@7%E0%B9%8BJENGLISHCENTER';
+    return Card(
+      elevation: 1,
+      shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(14)),
+      child: InkWell(
+        onTap: () => web.window.open(url, '_blank'),
+        borderRadius: BorderRadius.circular(14),
+        child: Padding(
+          padding: const EdgeInsets.all(16),
+          child: Row(children: [
+            Container(
+              width: 44, height: 44,
+              decoration: BoxDecoration(
+                color: const Color(0xFFFF0000).withAlpha(20),
+                borderRadius: BorderRadius.circular(12),
+              ),
+              child: const Icon(Icons.play_circle_fill, color: Color(0xFFFF0000), size: 30),
+            ),
+            const SizedBox(width: 12),
+            const Expanded(child: Column(crossAxisAlignment: CrossAxisAlignment.start, children: [
+              Text('เพลงภาษาอังกฤษ 7J',
+                  style: TextStyle(fontWeight: FontWeight.bold, fontSize: 15)),
+              SizedBox(height: 2),
+              Text('ดูช่อง YouTube — เรียนรู้ผ่านเพลงสนุกๆ',
+                  style: TextStyle(fontSize: 12, color: Colors.grey)),
+            ])),
+            const Icon(Icons.open_in_new, size: 18, color: Colors.grey),
+          ]),
+        ),
       ),
     );
   }
