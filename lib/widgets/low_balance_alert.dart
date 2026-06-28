@@ -103,6 +103,7 @@ class _LowBalanceRow extends StatelessWidget {
 
   static const _green = Color(0xFF2E7D32);
   static const _grey = Color(0xFF757575);
+  static const _teal = Color(0xFF00897B);
 
   Future<void> _setStatus(BuildContext context, String? value) async {
     final messenger = ScaffoldMessenger.of(context);
@@ -115,6 +116,15 @@ class _LowBalanceRow extends StatelessWidget {
             ? 'ทำเครื่องหมาย "ไม่เรียนต่อ"'
             : 'ล้างสถานะแล้ว';
     messenger.showSnackBar(SnackBar(content: Text(msg), duration: const Duration(seconds: 1)));
+  }
+
+  Future<void> _toggleFollowed(BuildContext context) async {
+    final messenger = ScaffoldMessenger.of(context);
+    final next = !p.followedUp;
+    await FirestoreService.updatePackageFields(p.id, {'followedUp': next});
+    messenger.showSnackBar(SnackBar(
+        content: Text(next ? 'ทำเครื่องหมาย "ติดตามแล้ว"' : 'ยกเลิก "ติดตามแล้ว"'),
+        duration: const Duration(seconds: 1)));
   }
 
   @override
@@ -145,6 +155,7 @@ class _LowBalanceRow extends StatelessWidget {
             ]),
           ),
           const SizedBox(width: 8),
+          if (p.followedUp) ...[_followedChip(), const SizedBox(width: 6)],
           if (st != null) ...[_statusChip(st), const SizedBox(width: 6)],
           Container(
             padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 5),
@@ -179,6 +190,13 @@ class _LowBalanceRow extends StatelessWidget {
               active: st == 'stop',
               onTap: () => _setStatus(context, 'stop'),
             ),
+            _btn(
+              icon: Icons.how_to_reg_outlined,
+              label: 'ติดตามแล้ว',
+              accent: _teal,
+              active: p.followedUp,
+              onTap: () => _toggleFollowed(context),
+            ),
           ],
         ),
       ]),
@@ -203,6 +221,21 @@ class _LowBalanceRow extends StatelessWidget {
       ]),
     );
   }
+
+  Widget _followedChip() => Container(
+        padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 4),
+        decoration: BoxDecoration(
+          color: _teal.withValues(alpha: 0.12),
+          borderRadius: BorderRadius.circular(20),
+          border: Border.all(color: _teal.withValues(alpha: 0.5)),
+        ),
+        child: const Row(mainAxisSize: MainAxisSize.min, children: [
+          Icon(Icons.how_to_reg, size: 13, color: _teal),
+          SizedBox(width: 3),
+          Text('ติดตามแล้ว',
+              style: TextStyle(fontSize: 11, fontWeight: FontWeight.bold, color: _teal)),
+        ]),
+      );
 
   Widget _btn({
     required IconData icon,
