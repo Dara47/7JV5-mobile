@@ -482,28 +482,30 @@ class PackageCard extends StatelessWidget {
         Padding(padding: const EdgeInsets.fromLTRB(14, 10, 14, 0), child: Column(
           crossAxisAlignment: CrossAxisAlignment.start,
           children: [
-            // Student + Teacher
-            // Primary person (student when teacher views, teacher when student/admin views)
-            Row(children: [
-              Icon(viewerRole == 'teacher' ? Icons.school_outlined : Icons.school_outlined,
-                  size: 16, color: const Color(0xFFF97316)),
-              const SizedBox(width: 6),
-              Expanded(child: Text(
-                viewerRole == 'teacher' ? pkg.studentName : pkg.studentName,
-                style: const TextStyle(fontWeight: FontWeight.bold, fontSize: 15))),
-              Text(
-                viewerRole == 'teacher' ? pkg.studentCode : pkg.studentCode,
-                style: const TextStyle(color: Color(0xFFF97316), fontWeight: FontWeight.w600, fontSize: 13)),
-            ]),
-            const SizedBox(height: 4),
-            Row(children: [
-              const Icon(Icons.person_outlined, size: 16, color: Color(0xFF2E7D32)),
-              const SizedBox(width: 6),
-              Expanded(child: Text(
-                viewerRole == 'teacher' ? 'ครู: ${pkg.teacherName}' : pkg.teacherName,
-                style: const TextStyle(fontSize: 14, color: Colors.black87))),
-              Text(pkg.teacherCode, style: const TextStyle(color: Color(0xFF2E7D32), fontSize: 13)),
-            ]),
+            // Student + Teacher — เลือก/คัดลอกชื่อ+รหัสได้ (ครอบด้วย SelectionArea)
+            SelectionArea(
+              child: Column(crossAxisAlignment: CrossAxisAlignment.start, children: [
+                Row(children: [
+                  const Icon(Icons.school_outlined, size: 16, color: Color(0xFFF97316)),
+                  const SizedBox(width: 6),
+                  Expanded(child: Text(
+                    pkg.studentName,
+                    style: const TextStyle(fontWeight: FontWeight.bold, fontSize: 15))),
+                  Text(
+                    pkg.studentCode,
+                    style: const TextStyle(color: Color(0xFFF97316), fontWeight: FontWeight.w600, fontSize: 13)),
+                ]),
+                const SizedBox(height: 4),
+                Row(children: [
+                  const Icon(Icons.person_outlined, size: 16, color: Color(0xFF2E7D32)),
+                  const SizedBox(width: 6),
+                  Expanded(child: Text(
+                    viewerRole == 'teacher' ? 'ครู: ${pkg.teacherName}' : pkg.teacherName,
+                    style: const TextStyle(fontSize: 14, color: Colors.black87))),
+                  Text(pkg.teacherCode, style: const TextStyle(color: Color(0xFF2E7D32), fontSize: 13)),
+                ]),
+              ]),
+            ),
             const SizedBox(height: 8),
 
             // Schedule row
