@@ -164,7 +164,6 @@ class _HomeScreenState extends State<HomeScreen> {
         items: _navItems,
         selectedIndex: _selectedIndex,
         roleLabel: _roleLabel,
-        userName: '${widget.appUser.name} (${widget.appUser.code})',
         onSelect: (i) {
           Navigator.pop(context);
           setState(() => _selectedIndex = i);
@@ -242,7 +241,6 @@ class _MenuSheet extends StatefulWidget {
   final List<_NavItem> items;
   final int selectedIndex;
   final String roleLabel;
-  final String userName;
   final ValueChanged<int> onSelect;
   final VoidCallback onRefresh;
   final VoidCallback onLogout;
@@ -250,7 +248,6 @@ class _MenuSheet extends StatefulWidget {
     required this.items,
     required this.selectedIndex,
     required this.roleLabel,
-    required this.userName,
     required this.onSelect,
     required this.onRefresh,
     required this.onLogout,
@@ -373,7 +370,6 @@ class _MenuSheetState extends State<_MenuSheet> with SingleTickerProviderStateMi
                         style: const TextStyle(fontSize: 12, fontWeight: FontWeight.w600, color: Color(0xFFE65100))),
                     const SizedBox(height: 1),
                     Text(widget.roleLabel, style: const TextStyle(fontWeight: FontWeight.bold, fontSize: 15)),
-                    Text(widget.userName, style: TextStyle(fontSize: 11, color: Colors.grey.shade600)),
                     const SizedBox(height: 3),
                     // แถววันที่ไทย ใช้ "สีประจำวัน"
                     Row(children: [
