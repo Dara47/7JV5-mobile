@@ -245,6 +245,9 @@ class FirestoreService {
     final dec = <String, int>{}; // packageId → จำนวนคาบที่หัก
     int count = 0;
     for (final it in items) {
+      // กันหักเกินโควตาที่เหลือ: ตัดได้ไม่เกิน remainingSessions ต่อแพ็กเกจ
+      // (กรณีวันเดียวมีหลายคาบแต่โควตาเหลือไม่พอ → ข้ามคาบที่เกิน)
+      if ((dec[it.pkg.id] ?? 0) >= it.pkg.remainingSessions) continue;
       final key = '${it.pkg.id}_${it.slot.startTime}';
       final ref = byKey[key];
       if (ref != null) {

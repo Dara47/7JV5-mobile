@@ -45,7 +45,6 @@ class _CutSessionScreenState extends State<CutSessionScreen> {
   }
 
   void _confirmCut(BuildContext context, PendingCut item) {
-    final now = nowThai();
     final pkg = item.pkg;
     showDialog(
       context: context,
@@ -54,7 +53,7 @@ class _CutSessionScreenState extends State<CutSessionScreen> {
         content: Column(mainAxisSize: MainAxisSize.min, crossAxisAlignment: CrossAxisAlignment.start, children: [
           Text('นักเรียน: ${pkg.studentName}'),
           Text('ครู: ${pkg.teacherName}'),
-          Text(thaiDateTimeFull(now, startTime: item.slot.startTime, endTime: item.slot.endTime)),
+          Text(thaiDateTimeFull(_selectedDate, startTime: item.slot.startTime, endTime: item.slot.endTime)),
           const SizedBox(height: 8),
           Text('คงเหลือก่อนตัด ${pkg.remainingSessions} คาบ → จะเหลือ ${pkg.remainingSessions - 1} คาบ',
               style: const TextStyle(fontSize: 13, color: Colors.grey)),
