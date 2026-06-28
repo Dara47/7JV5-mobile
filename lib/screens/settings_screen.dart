@@ -1,9 +1,9 @@
 ﻿import 'dart:convert';
 import 'package:flutter/material.dart';
 import 'package:firebase_auth/firebase_auth.dart';
-import 'package:file_picker/file_picker.dart';
 import 'package:image/image.dart' as img;
 import '../services/firestore_service.dart';
+import '../utils/web_file_picker.dart';
 import 'payroll_screen.dart';
 import 'import_users_screen.dart';
 import 'admin_profile_screen.dart';
@@ -49,12 +49,12 @@ class _SettingsScreenState extends State<SettingsScreen> {
   Future<void> _pickQrImage() async {
     setState(() => _qrProcessing = true);
     try {
-      final result = await FilePicker.platform.pickFiles(type: FileType.image, withData: true);
-      if (result == null || result.files.isEmpty || result.files.first.bytes == null) {
+      final picked = await pickWebFile(accept: 'image/*');
+      if (picked == null) {
         setState(() => _qrProcessing = false);
         return;
       }
-      final decoded = img.decodeImage(result.files.first.bytes!);
+      final decoded = img.decodeImage(picked.bytes);
       if (decoded == null) {
         _snack('อ่านไฟล์รูปไม่ได้ — ลองไฟล์อื่น', error: true);
         setState(() => _qrProcessing = false);

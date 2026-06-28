@@ -905,6 +905,21 @@ class _StudentScheduleRow extends StatelessWidget {
             const SizedBox(width: 4),
             Expanded(child: Text(pkg.studentName,
                 style: const TextStyle(fontWeight: FontWeight.w600, fontSize: 14))),
+            if (pkg.isGroup) ...[
+              Container(
+                padding: const EdgeInsets.symmetric(horizontal: 6, vertical: 1),
+                margin: const EdgeInsets.only(right: 6),
+                decoration: BoxDecoration(
+                  color: const Color(0xFF6A1B9A).withAlpha(30),
+                  borderRadius: BorderRadius.circular(6),
+                ),
+                child: const Row(mainAxisSize: MainAxisSize.min, children: [
+                  Icon(Icons.groups, size: 11, color: Color(0xFF6A1B9A)),
+                  SizedBox(width: 2),
+                  Text('กลุ่ม', style: TextStyle(fontSize: 10, color: Color(0xFF6A1B9A), fontWeight: FontWeight.w700)),
+                ]),
+              ),
+            ],
             Text(pkg.studentCode,
                 style: const TextStyle(color: Color(0xFF1565C0), fontSize: 12, fontWeight: FontWeight.w500)),
           ]),

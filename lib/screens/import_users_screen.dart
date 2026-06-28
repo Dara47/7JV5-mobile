@@ -1,8 +1,8 @@
 import 'dart:convert';
 import 'package:flutter/material.dart';
-import 'package:file_picker/file_picker.dart';
 import '../services/firestore_service.dart';
 import '../utils/date_format.dart';
+import '../utils/web_file_picker.dart';
 
 enum _Mode { users, relations }
 
@@ -52,29 +52,19 @@ class _ImportUsersScreenState extends State<ImportUsersScreen> {
   Future<void> _pickFile() async {
     setState(() { _loading = true; _parseError = null; });
     try {
-      final result = await FilePicker.platform.pickFiles(
-        type: FileType.custom,
-        allowedExtensions: ['csv', 'json', 'txt'],
-        withData: true,
-      );
-      if (result == null || result.files.isEmpty) {
+      final picked = await pickWebFile(accept: '.csv,.json,.txt,text/csv,application/json');
+      if (picked == null) {
         setState(() => _loading = false);
         return;
       }
-      final file = result.files.first;
-      final bytes = file.bytes;
-      if (bytes == null) {
-        setState(() { _parseError = 'อ่านไฟล์ไม่ได้'; _loading = false; });
-        return;
-      }
-      var content = utf8.decode(bytes, allowMalformed: true);
+      var content = utf8.decode(picked.bytes, allowMalformed: true);
       if (content.isNotEmpty && content.codeUnitAt(0) == 0xFEFF) {
         content = content.substring(1); // ตัด BOM
       }
-      final raw = _parseRaw(file.name, content);
+      final raw = _parseRaw(picked.name, content);
       final rows = _mode == _Mode.users ? await _validateUsers(raw) : await _validateRelations(raw);
       if (!mounted) return;
-      setState(() { _fileName = file.name; _rows = rows; _loading = false; });
+      setState(() { _fileName = picked.name; _rows = rows; _loading = false; });
     } catch (e) {
       if (mounted) setState(() { _parseError = 'แปลงไฟล์ไม่สำเร็จ: $e'; _loading = false; });
     }

@@ -550,6 +550,20 @@ class _ScheduleCalendarBodyState extends State<ScheduleCalendarBody> {
             const SizedBox(width: 4),
             Expanded(child: Text('${p.studentName} (${p.studentCode})',
                 style: const TextStyle(fontSize: 13, fontWeight: FontWeight.w600), overflow: TextOverflow.ellipsis)),
+            if (p.isGroup)
+              Container(
+                padding: const EdgeInsets.symmetric(horizontal: 6, vertical: 1),
+                margin: const EdgeInsets.only(left: 4),
+                decoration: BoxDecoration(
+                  color: _kPurple.withAlpha(28),
+                  borderRadius: BorderRadius.circular(6),
+                ),
+                child: const Row(mainAxisSize: MainAxisSize.min, children: [
+                  Icon(Icons.groups, size: 11, color: _kPurple),
+                  SizedBox(width: 2),
+                  Text('กลุ่ม', style: TextStyle(fontSize: 9, color: _kPurple, fontWeight: FontWeight.w700)),
+                ]),
+              ),
           ]),
           const SizedBox(height: 2),
           Row(children: [

@@ -102,6 +102,7 @@ class PackageModel {
   final List<SlotItem> slots;
   final String? notes;
   final String? lastCutDate;       // 'YYYY-MM-DD' of last cut
+  final bool isGroup;              // คลาสกลุ่ม — อนุญาตให้เวลาซ้ำกับนักเรียนคนอื่นของครูคนเดียวกัน
 
   PackageModel({
     required this.id, required this.studentId, required this.teacherId,
@@ -111,6 +112,7 @@ class PackageModel {
     this.scheduledDay, this.scheduledDate, this.scheduledTime, this.scheduledEndTime,
     this.slots = const [], this.notes,
     this.lastCutDate,
+    this.isGroup = false,
   });
 
   /// ช่วงเวลาที่ใช้จริง — ถ้ามี slots ใช้ slots, ไม่งั้น fallback เป็น slot เดี่ยวจาก scheduled*
@@ -175,6 +177,7 @@ class PackageModel {
           .toList() ?? const [],
       notes: d['notes'],
       lastCutDate: d['lastCutDate'],
+      isGroup: d['isGroup'] ?? false,
     );
   }
 
@@ -190,6 +193,7 @@ class PackageModel {
     if (scheduledEndTime != null) 'scheduledEndTime': scheduledEndTime,
     if (slots.isNotEmpty) 'slots': slots.map((s) => s.toMap()).toList(),
     if (notes != null && notes!.isNotEmpty) 'notes': notes,
+    if (isGroup) 'isGroup': true,
   };
 }
 

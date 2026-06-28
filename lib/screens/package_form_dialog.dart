@@ -44,6 +44,7 @@ class _PackageFormSheetState extends State<_PackageFormSheet> {
   bool _loadingUsers = true;
   bool _loadingSlot = false;
   bool _saving = false;
+  bool _isGroup = false; // คลาสกลุ่ม — อนุญาตจองเวลาซ้ำกับนักเรียนคนอื่นของครูคนเดียวกัน
 
   bool get _isEdit => widget.existing != null;
 
@@ -57,6 +58,7 @@ class _PackageFormSheetState extends State<_PackageFormSheet> {
       _usedCtrl.text = p.usedSessions.toString();
       _notesCtrl.text = p.notes ?? '';
       _slots = List.from(p.effectiveSlots);
+      _isGroup = p.isGroup;
     }
   }
 
@@ -288,7 +290,8 @@ class _PackageFormSheetState extends State<_PackageFormSheet> {
     setState(() => _saving = true);
 
     // ── กันจองเวลาชนกัน (double-booking) — เช็คทุกช่วงในรายการ ──
-    if (_slots.isNotEmpty) {
+    // โหมดเรียนกลุ่ม: ข้ามการบล็อก (ตั้งใจให้เวลาซ้ำกับนักเรียนคนอื่นของครูคนเดียวกันได้)
+    if (!_isGroup && _slots.isNotEmpty) {
       try {
         final teacherPkgs = await FirestoreService.getPackagesForUser(_teacher!.id, 'teacher');
         for (final slot in _slots) {
@@ -322,6 +325,7 @@ class _PackageFormSheetState extends State<_PackageFormSheet> {
         await FirestoreService.updatePackageFields(_existingPkg!.id, {
           'slots': merged.map((s) => s.toMap()).toList(),
           if (_notesCtrl.text.isNotEmpty) 'notes': _notesCtrl.text.trim(),
+          'isGroup': _isGroup || _existingPkg!.isGroup,
         });
         await FirestoreService.resyncPackageSchedule(_existingPkg!.id);
         if (mounted) Navigator.pop(context);
@@ -351,6 +355,7 @@ class _PackageFormSheetState extends State<_PackageFormSheet> {
       if (first != null) 'scheduledEndTime': first.endTime,
       if (_slots.isNotEmpty) 'slots': _slots.map((s) => s.toMap()).toList(),
       if (_notesCtrl.text.isNotEmpty) 'notes': _notesCtrl.text.trim(),
+      'isGroup': _isGroup,
     };
 
     try {
@@ -458,6 +463,32 @@ class _PackageFormSheetState extends State<_PackageFormSheet> {
                       // ── เวลาว่างครู ──
                       if (_teacher != null) ...[
                         const SizedBox(height: 8),
+                        // โหมดเรียนกลุ่ม — เปิดเพื่อจองเวลาซ้ำกับนักเรียนคนอื่นของครูคนเดียวกัน
+                        Container(
+                          decoration: BoxDecoration(
+                            color: _isGroup ? const Color(0xFFF3E5F5) : Colors.grey.shade50,
+                            borderRadius: BorderRadius.circular(10),
+                            border: Border.all(color: _isGroup ? const Color(0xFF8E24AA) : Colors.grey.shade300),
+                          ),
+                          child: SwitchListTile(
+                            value: _isGroup,
+                            onChanged: (v) => setState(() => _isGroup = v),
+                            activeThumbColor: const Color(0xFF6A1B9A),
+                            dense: true,
+                            contentPadding: const EdgeInsets.symmetric(horizontal: 12),
+                            secondary: Icon(Icons.groups,
+                                color: _isGroup ? const Color(0xFF6A1B9A) : Colors.grey),
+                            title: const Text('เรียนกลุ่ม',
+                                style: TextStyle(fontSize: 14, fontWeight: FontWeight.w700)),
+                            subtitle: Text(
+                              _isGroup
+                                  ? 'ลงเวลาซ้ำกับนักเรียนคนอื่นของครูคนนี้ได้'
+                                  : 'ปิด = กันเวลาชน (1 ช่วง 1 คน)',
+                              style: const TextStyle(fontSize: 11),
+                            ),
+                          ),
+                        ),
+                        const SizedBox(height: 8),
                         if (_loadingSlot)
                           const Center(child: SizedBox(height: 24, width: 24, child: CircularProgressIndicator(strokeWidth: 2)))
                         else if (_teacherSlot != null && _teacherSlot!.slots.isNotEmpty)
@@ -481,24 +512,34 @@ class _PackageFormSheetState extends State<_PackageFormSheet> {
                                 children: _teacherSlot!.slots.map((s) {
                                   final taken = _isSlotTaken(s);
                                   final past = _isSlotPast(s);
-                                  final disabled = taken || past;
+                                  // โหมดกลุ่ม: ช่วงที่ถูกจองแล้วเลือกได้ (เป็นกลุ่ม) ไม่บล็อก
+                                  final group = taken && _isGroup;
+                                  final disabled = past || (taken && !_isGroup);
+                                  final bg = group
+                                      ? const Color(0xFF6A1B9A)
+                                      : taken
+                                          ? Colors.grey.shade300
+                                          : past
+                                              ? Colors.orange.shade100
+                                              : const Color(0xFF2E7D32);
                                   return GestureDetector(
                                     onTap: disabled ? null : () => _addSlotFromTeacher(s),
                                     child: Container(
                                       padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 6),
                                       decoration: BoxDecoration(
-                                        color: taken
-                                            ? Colors.grey.shade300
-                                            : past
-                                                ? Colors.orange.shade100
-                                                : const Color(0xFF2E7D32),
+                                        color: bg,
                                         borderRadius: BorderRadius.circular(8),
                                         border: past && !taken
                                             ? Border.all(color: Colors.orange.shade300)
                                             : null,
                                       ),
                                       child: Row(mainAxisSize: MainAxisSize.min, children: [
-                                        if (taken)
+                                        if (group)
+                                          const Padding(
+                                            padding: EdgeInsets.only(right: 4),
+                                            child: Icon(Icons.groups, size: 12, color: Colors.white),
+                                          )
+                                        else if (taken)
                                           const Padding(
                                             padding: EdgeInsets.only(right: 4),
                                             child: Icon(Icons.block, size: 12, color: Colors.grey),
@@ -517,13 +558,15 @@ class _PackageFormSheetState extends State<_PackageFormSheet> {
                                             '${(s.date != null && s.date!.isNotEmpty) ? '${thaiShortDateFromStr(s.date!)} ' : ''}${s.day}  ${s.startTime}–${s.endTime}',
                                             style: TextStyle(
                                               fontSize: 12,
-                                              color: taken
-                                                  ? Colors.grey.shade600
-                                                  : past
-                                                      ? Colors.orange.shade700
-                                                      : Colors.white,
+                                              color: group
+                                                  ? Colors.white
+                                                  : taken
+                                                      ? Colors.grey.shade600
+                                                      : past
+                                                          ? Colors.orange.shade700
+                                                          : Colors.white,
                                               fontWeight: FontWeight.w600,
-                                              decoration: taken ? TextDecoration.lineThrough : null,
+                                              decoration: (taken && !group) ? TextDecoration.lineThrough : null,
                                             )),
                                       ]),
                                     ),
@@ -733,7 +776,8 @@ class _PackageFormSheetState extends State<_PackageFormSheet> {
     final s = _slots[i];
     final past = _isSlotPast(s);
     final taken = !past && _isSlotTaken(s);
-    final dim = past || taken;
+    final group = taken && _isGroup; // เวลาซ้ำแบบตั้งใจ (คลาสกลุ่ม)
+    final dim = past || (taken && !_isGroup);
     return Container(
       margin: const EdgeInsets.only(bottom: 6),
       padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 8),
@@ -767,6 +811,9 @@ class _PackageFormSheetState extends State<_PackageFormSheet> {
               if (past) ...[
                 const SizedBox(width: 8),
                 _badge(Icons.history, 'ผ่านไปแล้ว'),
+              ] else if (group) ...[
+                const SizedBox(width: 8),
+                _badge(Icons.groups, 'กลุ่ม', color: const Color(0xFF6A1B9A)),
               ] else if (taken) ...[
                 const SizedBox(width: 8),
                 _badge(Icons.block, 'จองแล้ว'),
@@ -789,18 +836,21 @@ class _PackageFormSheetState extends State<_PackageFormSheet> {
     );
   }
 
-  Widget _badge(IconData icon, String text) => Container(
+  Widget _badge(IconData icon, String text, {Color? color}) {
+    final c = color ?? Colors.grey.shade600;
+    return Container(
         padding: const EdgeInsets.symmetric(horizontal: 6, vertical: 1),
         decoration: BoxDecoration(
-          color: Colors.grey.shade300,
+          color: color != null ? color.withAlpha(30) : Colors.grey.shade300,
           borderRadius: BorderRadius.circular(6),
         ),
         child: Row(mainAxisSize: MainAxisSize.min, children: [
-          Icon(icon, size: 11, color: Colors.grey.shade600),
+          Icon(icon, size: 11, color: c),
           const SizedBox(width: 2),
-          Text(text, style: TextStyle(fontSize: 10, color: Colors.grey.shade600, fontWeight: FontWeight.w600)),
+          Text(text, style: TextStyle(fontSize: 10, color: c, fontWeight: FontWeight.w600)),
         ]),
       );
+  }
 
   /// แถวร่าง — วันที่(ปฏิทิน) + เวลาเริ่ม/สิ้นสุด
   Widget _buildDraftRow(int i) {
