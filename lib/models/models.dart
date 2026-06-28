@@ -433,6 +433,26 @@ class SlotItem {
     } catch (_) { return false; }
   }
 
+  /// คาบนี้ "ผ่านไปแล้ว" หรือยัง — เทียบ "วันที่ + เวลาสิ้นสุด" กับเวลาไทยจริง
+  /// - วันก่อนวันนี้ = ผ่านแล้ว
+  /// - วันนี้ = ผ่านแล้วเมื่อเลยเวลาสิ้นสุด (เช่น 14:00 จบไปแล้วตอน 16:00)
+  /// - คาบประจำ (ไม่มีวันที่เจาะจง) = ไม่นับว่าผ่าน (เกิดซ้ำทุกสัปดาห์)
+  bool get isPast {
+    if (date == null || date!.isEmpty) return false;
+    final now = nowThai();
+    final todayStr = '${now.year}-${now.month.toString().padLeft(2, '0')}-${now.day.toString().padLeft(2, '0')}';
+    final cmp = date!.compareTo(todayStr); // 'YYYY-MM-DD' zero-padded เทียบ string ได้
+    if (cmp < 0) return true;
+    if (cmp > 0) return false;
+    // วันเดียวกับวันนี้ → เช็คเวลาสิ้นสุด
+    try {
+      final ep = (endTime.isNotEmpty ? endTime : startTime).split(':');
+      final endM = int.parse(ep[0]) * 60 + int.parse(ep[1]);
+      final nowM = now.hour * 60 + now.minute;
+      return nowM >= endM;
+    } catch (_) { return false; }
+  }
+
   Map<String, dynamic> toMap() => {
     'day': day, 'startTime': startTime, 'endTime': endTime,
     if (date != null && date!.isNotEmpty) 'date': date,

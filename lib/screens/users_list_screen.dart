@@ -598,8 +598,7 @@ class _UserListState extends State<_UserList> {
                       }
 
                       // ── ตารางเรียน: วัน/วันที่ + เวลา ทุก slot (ดูได้ทันทีไม่ต้องคลิกเข้า) ──
-                      // คาบที่ระบุวันที่และผ่านมาแล้ว → ทำเครื่องหมาย "ผ่านแล้ว" (สีเทา)
-                      final today = DateTime(now.year, now.month, now.day);
+                      // คาบที่ระบุวันที่และเวลา "ผ่านไปแล้ว" → ขีดฆ่า + ป้าย "ผ่านแล้ว" (สีเทา)
                       final scheduleLines = <({String text, bool past})>[];
                       for (final p in pkgs) {
                         for (final s in p.effectiveSlots) {
@@ -609,12 +608,7 @@ class _UserListState extends State<_UserList> {
                           final timePart = s.startTime.isNotEmpty
                               ? '${s.startTime}${s.endTime.isNotEmpty ? '–${s.endTime}' : ''} น.'
                               : '';
-                          bool past = false;
-                          if (s.date != null && s.date!.isNotEmpty) {
-                            final d = parseDateStr(s.date!);
-                            if (d != null && DateTime(d.year, d.month, d.day).isBefore(today)) past = true;
-                          }
-                          scheduleLines.add((text: '$datePart  $timePart'.trim(), past: past));
+                          scheduleLines.add((text: '$datePart  $timePart'.trim(), past: s.isPast));
                         }
                       }
 
