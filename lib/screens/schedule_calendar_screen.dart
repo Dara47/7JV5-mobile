@@ -462,15 +462,22 @@ class _ScheduleCalendarBodyState extends State<ScheduleCalendarBody> {
 
     return Container(
       width: double.infinity,
-      constraints: const BoxConstraints(maxHeight: 260),
+      // ความสูงยืดหยุ่นตามจอ (≈45%) — แสดงได้หลายคาบ ส่วนที่เกินเลื่อนดูในแถบได้
+      constraints: BoxConstraints(maxHeight: MediaQuery.of(context).size.height * 0.45),
       decoration: BoxDecoration(
         color: Colors.white,
         borderRadius: const BorderRadius.vertical(top: Radius.circular(16)),
         boxShadow: [BoxShadow(color: Colors.black.withAlpha(20), blurRadius: 8, offset: const Offset(0, -2))],
       ),
       child: Column(mainAxisSize: MainAxisSize.min, crossAxisAlignment: CrossAxisAlignment.start, children: [
+        // เส้นจับ (บอกใบ้ว่าเลื่อนรายการได้)
+        Center(child: Container(
+          margin: const EdgeInsets.only(top: 8),
+          width: 36, height: 4,
+          decoration: BoxDecoration(color: Colors.grey.shade300, borderRadius: BorderRadius.circular(2)),
+        )),
         Padding(
-          padding: const EdgeInsets.fromLTRB(16, 12, 16, 8),
+          padding: const EdgeInsets.fromLTRB(16, 8, 16, 8),
           child: Row(children: [
             const Icon(Icons.event_note, size: 18, color: _kOrange),
             const SizedBox(width: 8),
