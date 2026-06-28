@@ -89,11 +89,7 @@ class _HomeScreenState extends State<HomeScreen> {
         TeacherScheduleScreen(key: ValueKey('schedule_$k')),
         LeaveRequestScreen(key: ValueKey('leave_$k'), appUser: u),
         ReportsScreen(key: ValueKey('reports_$k')),
-        AdminDashboardScreen(
-          key: ValueKey('dash_$k'),
-          lowBalanceCount: _lowBalance.length,
-          onTapLowBalance: () => showLowBalanceAlert(context, _lowBalance),
-        ),
+        AdminDashboardScreen(key: ValueKey('dash_$k'), lowBalance: _lowBalance),
         SettingsScreen(key: ValueKey('settings_$k')),
       ];
     }
@@ -182,10 +178,6 @@ class _HomeScreenState extends State<HomeScreen> {
         items: _navItems,
         selectedIndex: _selectedIndex,
         roleLabel: _roleLabel,
-        lowBalanceCount: _lowBalance.length,
-        onBell: widget.appUser.isAdmin
-            ? () { Navigator.pop(context); showLowBalanceAlert(context, _lowBalance); }
-            : null,
         onSelect: (i) {
           Navigator.pop(context);
           setState(() => _selectedIndex = i);
@@ -263,8 +255,6 @@ class _MenuSheet extends StatefulWidget {
   final List<_NavItem> items;
   final int selectedIndex;
   final String roleLabel;
-  final int lowBalanceCount;
-  final VoidCallback? onBell;
   final ValueChanged<int> onSelect;
   final VoidCallback onRefresh;
   final VoidCallback onLogout;
@@ -272,8 +262,6 @@ class _MenuSheet extends StatefulWidget {
     required this.items,
     required this.selectedIndex,
     required this.roleLabel,
-    this.lowBalanceCount = 0,
-    this.onBell,
     required this.onSelect,
     required this.onRefresh,
     required this.onLogout,
@@ -406,32 +394,6 @@ class _MenuSheetState extends State<_MenuSheet> with SingleTickerProviderStateMi
                           style: TextStyle(fontSize: 11.5, fontWeight: FontWeight.w700, color: dayColor))),
                     ]),
                   ])),
-                  if (widget.onBell != null)
-                    Stack(clipBehavior: Clip.none, children: [
-                      IconButton(
-                        onPressed: widget.onBell,
-                        icon: Icon(Icons.notifications_rounded,
-                            color: widget.lowBalanceCount > 0
-                                ? const Color(0xFFE53935) : Colors.grey),
-                        tooltip: 'คาบเรียนใกล้หมด',
-                      ),
-                      if (widget.lowBalanceCount > 0)
-                        Positioned(
-                          right: 4, top: 4,
-                          child: Container(
-                            padding: const EdgeInsets.symmetric(horizontal: 5, vertical: 1),
-                            constraints: const BoxConstraints(minWidth: 18),
-                            decoration: BoxDecoration(
-                              color: Colors.red,
-                              borderRadius: BorderRadius.circular(9),
-                              border: Border.all(color: Colors.white, width: 1.5),
-                            ),
-                            child: Text('${widget.lowBalanceCount}',
-                                textAlign: TextAlign.center,
-                                style: const TextStyle(fontSize: 10, color: Colors.white, fontWeight: FontWeight.bold)),
-                          ),
-                        ),
-                    ]),
                   IconButton(
                     onPressed: () => Navigator.pop(context),
                     icon: const Icon(Icons.close, color: Colors.grey),
