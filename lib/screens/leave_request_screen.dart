@@ -370,7 +370,7 @@ class _UserLeaveViewState extends State<_UserLeaveView> {
           child: Column(mainAxisSize: MainAxisSize.min, children: [
             Container(margin: const EdgeInsets.only(top: 10), width: 40, height: 4,
                 decoration: BoxDecoration(color: Colors.grey.shade300, borderRadius: BorderRadius.circular(2))),
-            Padding(
+            Flexible(child: SingleChildScrollView(child: Padding(
               padding: const EdgeInsets.fromLTRB(20, 16, 20, 20),
               child: Column(crossAxisAlignment: CrossAxisAlignment.start, children: [
                 Row(children: [
@@ -615,6 +615,7 @@ class _UserLeaveViewState extends State<_UserLeaveView> {
                 ),
               ]),
             ),
+          )),
           ]),
         ),
       ),
