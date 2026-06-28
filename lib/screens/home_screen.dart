@@ -14,6 +14,7 @@ import 'leave_request_screen.dart';
 import 'settings_screen.dart';
 import 'teacher_dashboard_screen.dart';
 import 'student_dashboard_screen.dart';
+import 'schedule_calendar_screen.dart';
 
 const _kOrange = Color(0xFFF97316);
 
@@ -89,6 +90,11 @@ class _HomeScreenState extends State<HomeScreen> {
     }
     return [
       StudentDashboardScreen(key: ValueKey('sdash_$k'), appUser: u),
+      ScheduleCalendarScreen(
+        key: ValueKey('scal_$k'),
+        filterStudentId: u.uid,
+        title: 'ปฏิทินเรียนของฉัน',
+      ),
       LeaveRequestScreen(key: ValueKey('sleave_$k'), appUser: u),
     ];
   }
@@ -115,6 +121,7 @@ class _HomeScreenState extends State<HomeScreen> {
     }
     return const [
       _NavItem(Icons.home, 'หน้าหลัก', Color(0xFFF97316)),
+      _NavItem(Icons.calendar_month, 'ปฏิทิน', Color(0xFF1976D2)),
       _NavItem(Icons.event_busy, 'ใบลา', Color(0xFFE65100)),
     ];
   }

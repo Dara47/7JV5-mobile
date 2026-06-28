@@ -7,7 +7,6 @@ import '../services/firestore_service.dart';
 import '../services/notification_service.dart';
 import '../widgets/upcoming_class_card.dart';
 import 'leave_request_screen.dart';
-import 'schedule_calendar_screen.dart';
 
 class StudentDashboardScreen extends StatefulWidget {
   final AppUser appUser;
@@ -54,18 +53,6 @@ class _StudentDashboardScreenState extends State<StudentDashboardScreen> {
         title: const Text('หน้าหลัก'),
         backgroundColor: const Color(0xFFF97316),
         foregroundColor: Colors.white,
-        actions: [
-          IconButton(
-            icon: const Icon(Icons.calendar_month),
-            tooltip: 'ปฏิทินคาบเรียน',
-            onPressed: () => Navigator.push(context, MaterialPageRoute(
-              builder: (_) => ScheduleCalendarScreen(
-                filterStudentId: widget.appUser.uid,
-                title: 'ปฏิทินเรียนของฉัน',
-              ),
-            )),
-          ),
-        ],
       ),
       body: ListView(
         padding: const EdgeInsets.all(12),

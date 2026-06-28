@@ -758,6 +758,7 @@ class _TeacherGroupViewState extends State<_TeacherGroupView> {
         final pkgs = shown[i].value;
         final teacherName = pkgs.first.teacherName;
         final teacherCode = pkgs.first.teacherCode;
+        final teacherId = pkgs.first.teacherId;
 
         // Sort students by day order then time
         final sorted = List<PackageModel>.from(pkgs)..sort((a, b) {
@@ -780,12 +781,47 @@ class _TeacherGroupViewState extends State<_TeacherGroupView> {
             ),
             title: Text(teacherName,
                 style: const TextStyle(fontWeight: FontWeight.bold, fontSize: 15)),
-            subtitle: Row(children: [
-              Text(teacherCode,
-                  style: const TextStyle(color: Color(0xFF2E7D32), fontSize: 12, fontWeight: FontWeight.w600)),
-              const SizedBox(width: 8),
-              Text('${sorted.length} นักเรียน',
-                  style: const TextStyle(color: Colors.grey, fontSize: 12)),
+            subtitle: Column(crossAxisAlignment: CrossAxisAlignment.start, children: [
+              Row(children: [
+                Text(teacherCode,
+                    style: const TextStyle(color: Color(0xFF2E7D32), fontSize: 12, fontWeight: FontWeight.w600)),
+                const SizedBox(width: 8),
+                Text('${sorted.length} นักเรียน',
+                    style: const TextStyle(color: Colors.grey, fontSize: 12)),
+              ]),
+              // ── ลิงก์ Google Meet ของครู (แสดง URL เต็มไว้ตรวจสอบ + กดเปิดได้) ──
+              StreamBuilder<UserModel?>(
+                stream: FirestoreService.watchUser(teacherId),
+                builder: (context, snap) {
+                  final link = snap.data?.googleMeetLink?.trim();
+                  if (link == null || link.isEmpty) {
+                    return const Padding(
+                      padding: EdgeInsets.only(top: 4),
+                      child: Row(children: [
+                        Icon(Icons.videocam_off_outlined, size: 13, color: Colors.redAccent),
+                        SizedBox(width: 4),
+                        Text('ยังไม่มีลิงก์ Google Meet',
+                            style: TextStyle(fontSize: 11.5, color: Colors.redAccent)),
+                      ]),
+                    );
+                  }
+                  return Padding(
+                    padding: const EdgeInsets.only(top: 4),
+                    child: InkWell(
+                      onTap: () => web.window.open(link, '_blank'),
+                      child: Row(crossAxisAlignment: CrossAxisAlignment.start, children: [
+                        const Icon(Icons.video_call_rounded, size: 14, color: Color(0xFF1565C0)),
+                        const SizedBox(width: 4),
+                        Expanded(child: SelectableText(link,
+                            style: const TextStyle(
+                                fontSize: 11.5,
+                                color: Color(0xFF1565C0),
+                                decoration: TextDecoration.underline))),
+                      ]),
+                    ),
+                  );
+                },
+              ),
             ]),
             children: sorted.asMap().entries.map((e) {
               final pkg = e.value;

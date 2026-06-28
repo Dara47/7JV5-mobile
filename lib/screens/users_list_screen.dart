@@ -539,6 +539,8 @@ class _UserListState extends State<_UserList> {
                       if (pkgs.isEmpty && u.totalAdded == 0 && u.totalRemoved == 0) return const SizedBox.shrink();
 
                       final total = pkgs.fold(0, (s, p) => s + p.totalSessions);
+                      final used = pkgs.fold(0, (s, p) => s + p.usedSessions);
+                      final remaining = pkgs.fold(0, (s, p) => s + p.remainingSessions);
                       final hasAdj = u.totalAdded > 0 || u.totalRemoved > 0;
 
                       // ── คำนวณสถานะการเรียน (รองรับหลาย slot ต่อแพ็กเกจ) ──
@@ -609,6 +611,13 @@ class _UserListState extends State<_UserList> {
                         }
                       }
 
+                      // ── หมายเหตุ/ชื่อคอร์ส จากแพ็กเกจ (แสดงให้เห็นทันที) ──
+                      final notes = <String>[];
+                      for (final p in pkgs) {
+                        final n = p.notes?.trim();
+                        if (n != null && n.isNotEmpty && !notes.contains(n)) notes.add(n);
+                      }
+
                       return Padding(
                         padding: const EdgeInsets.fromLTRB(54, 0, 12, 10),
                         child: Column(crossAxisAlignment: CrossAxisAlignment.start, children: [
@@ -617,6 +626,12 @@ class _UserListState extends State<_UserList> {
                             Icon(Icons.book_outlined, size: 13, color: Colors.blue.shade300),
                             Text('จำนวนคาบ:', style: TextStyle(fontSize: 12, color: Colors.grey.shade500)),
                             Text('$total คาบ', style: const TextStyle(fontSize: 12, color: Color(0xFFF97316), fontWeight: FontWeight.w600)),
+                            Text('•', style: TextStyle(fontSize: 12, color: Colors.grey.shade400)),
+                            Text('เรียนแล้ว', style: TextStyle(fontSize: 12, color: Colors.grey.shade500)),
+                            Text('$used', style: const TextStyle(fontSize: 12, color: Color(0xFF2E7D32), fontWeight: FontWeight.w600)),
+                            Text('•', style: TextStyle(fontSize: 12, color: Colors.grey.shade400)),
+                            Text('เหลือ', style: TextStyle(fontSize: 12, color: Colors.grey.shade500)),
+                            Text('$remaining', style: TextStyle(fontSize: 12, color: remaining <= 0 ? Colors.red.shade600 : Colors.blue.shade700, fontWeight: FontWeight.w600)),
                             if (hasAdj) ...[
                               if (u.totalAdded > 0)
                                 Container(
@@ -632,6 +647,22 @@ class _UserListState extends State<_UserList> {
                                 ),
                             ],
                           ]),
+                          // แถว หมายเหตุ/ชื่อคอร์ส (จากแพ็กเกจ)
+                          if (notes.isNotEmpty) ...[
+                            const SizedBox(height: 4),
+                            ...notes.map((n) => Padding(
+                              padding: const EdgeInsets.only(top: 2),
+                              child: Row(crossAxisAlignment: CrossAxisAlignment.start, children: [
+                                Icon(Icons.sticky_note_2_outlined, size: 13, color: Colors.amber.shade700),
+                                const SizedBox(width: 4),
+                                Expanded(child: Text(n,
+                                    style: TextStyle(
+                                        fontSize: 12,
+                                        fontWeight: FontWeight.w600,
+                                        color: Colors.brown.shade600))),
+                              ]),
+                            )),
+                          ],
                           const SizedBox(height: 4),
                           // แถว 2: สถานะ dot + text
                           Wrap(spacing: 12, crossAxisAlignment: WrapCrossAlignment.center, children: [

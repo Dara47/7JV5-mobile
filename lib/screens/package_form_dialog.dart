@@ -682,18 +682,22 @@ class _PackageFormSheetState extends State<_PackageFormSheet> {
                       ],
                       const SizedBox(height: 14),
 
-                      // ── หมายเหตุ ──
-                      _label('📝 หมายเหตุ'),
+                      // ── หมายเหตุ (เช่น ชื่อคอร์ส) — แสดงในหน้าจัดการผู้ใช้ด้วย ──
+                      _label('📝 หมายเหตุ / ชื่อคอร์ส'),
                       const SizedBox(height: 6),
                       TextFormField(
                         controller: _notesCtrl,
-                        maxLines: 2,
+                        minLines: 4,
+                        maxLines: 8,
+                        style: const TextStyle(fontSize: 16),
                         decoration: InputDecoration(
-                          hintText: 'บันทึกเพิ่มเติม...',
+                          hintText: 'เช่น คอร์ส9-4 หรือบันทึกเพิ่มเติม...\n(หมายเหตุนี้จะแสดงในหน้าจัดการผู้ใช้)',
+                          hintStyle: TextStyle(fontSize: 13, color: Colors.grey.shade400),
                           filled: true, fillColor: Colors.grey.shade50,
                           border: OutlineInputBorder(borderRadius: BorderRadius.circular(10), borderSide: BorderSide(color: Colors.grey.shade300)),
                           enabledBorder: OutlineInputBorder(borderRadius: BorderRadius.circular(10), borderSide: BorderSide(color: Colors.grey.shade300)),
-                          contentPadding: const EdgeInsets.all(12),
+                          focusedBorder: OutlineInputBorder(borderRadius: BorderRadius.circular(10), borderSide: const BorderSide(color: Color(0xFFF97316), width: 2)),
+                          contentPadding: const EdgeInsets.all(14),
                         ),
                       ),
                       const SizedBox(height: 20),
