@@ -1015,6 +1015,14 @@ class SessionHealthReport {
     required this.issues,
   });
   bool get allHealthy => issues.isEmpty;
+
+  /// นำเข้าเก่า: กำหนดเรียนแล้วไว้ แต่ไม่มี record คาบเลย (completedCount==0) — ปกติ ไม่ต้องแก้
+  List<SessionHealthIssue> get legacyIssues =>
+      issues.where((i) => i.isLegacy).toList();
+
+  /// drift จริง: มี record คาบอยู่บ้างแต่ตัวเลขไม่ตรง / คาบจริงเกินเรียนแล้ว — ควรตรวจ
+  List<SessionHealthIssue> get driftIssues =>
+      issues.where((i) => !i.isLegacy).toList();
 }
 
 /// แพ็ก 1 รายการที่ "เรียนแล้ว" ไม่ตรงกับจำนวน session completed จริง
@@ -1028,4 +1036,8 @@ class SessionHealthIssue {
 
   /// ต่าง = session จริง − เรียนแล้วตามแพ็ก (บวก=session มากกว่า, ลบ=น้อยกว่า)
   int get diff => completedCount - expectedUsed;
+
+  /// นำเข้าเก่า = มีเรียนแล้ว(>0) แต่ไม่มี record คาบจริงเลย (completedCount==0)
+  /// = ข้อมูลโอนย้ายจาก V4.1.2 ที่ใส่ used มาเลย ไม่ใช่ความผิดพลาด
+  bool get isLegacy => completedCount == 0;
 }

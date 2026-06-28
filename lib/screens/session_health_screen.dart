@@ -82,9 +82,10 @@ class _SessionHealthScreenState extends State<SessionHealthScreen> {
             Icon(Icons.info_outline, size: 18, color: Colors.amber.shade800),
             const SizedBox(width: 8),
             Expanded(child: Text(
-              'หน้านี้อ่านอย่างเดียว ไม่แก้ไขข้อมูล — แพ็กที่ "ไม่ตรง" อาจเป็นข้อมูลนำเข้าเก่า '
-              '(กำหนดเรียนแล้วไว้โดยไม่มี record คาบ) หรือมี drift จริง ให้ตรวจเป็นรายกรณี',
-              style: TextStyle(fontSize: 12, color: Colors.amber.shade900, height: 1.4),
+              'หน้านี้อ่านอย่างเดียว ไม่แก้ไขข้อมูล — แยกเป็น 2 กลุ่ม:\n'
+              '🔵 นำเข้าเก่า = กำหนดเรียนแล้วไว้แต่ไม่มี record คาบ (ปกติ ตัวเลขถูกต้อง ไม่ต้องแก้)\n'
+              '🔴 drift จริง = มี record คาบแต่ตัวเลขไม่ตรง — ควรตรวจเป็นรายกรณี',
+              style: TextStyle(fontSize: 12, color: Colors.amber.shade900, height: 1.5),
             )),
           ]),
         ),
@@ -103,29 +104,63 @@ class _SessionHealthScreenState extends State<SessionHealthScreen> {
             ]),
           ))
         else ...[
-          Text('รายการที่ไม่ตรง (${r.issues.length})',
-              style: const TextStyle(fontSize: 15, fontWeight: FontWeight.bold)),
+          // ── drift จริง (ปัญหาที่ควรดู) แสดงก่อนเสมอ ──
+          _sectionTitle('🔴 ต้องตรวจ — drift จริง', r.driftIssues.length, const Color(0xFFE53935)),
           const SizedBox(height: 8),
-          ...r.issues.take(_visible).map(_issueCard),
-          if (r.issues.length > _visible)
-            Padding(
-              padding: const EdgeInsets.only(top: 4, bottom: 8),
-              child: OutlinedButton.icon(
-                onPressed: () => setState(() => _visible += _pageSize),
-                icon: const Icon(Icons.expand_more, color: _teal),
-                label: Text('โหลดเพิ่ม • เหลืออีก ${r.issues.length - _visible} รายการ',
-                    style: const TextStyle(color: _teal, fontWeight: FontWeight.bold)),
-                style: OutlinedButton.styleFrom(
-                  minimumSize: const Size.fromHeight(46),
-                  side: const BorderSide(color: _teal),
-                  shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(12)),
+          if (r.driftIssues.isEmpty)
+            _note('ไม่มี drift จริง — แพ็กที่มี record คาบ ตัวเลขตรงทั้งหมด ✅', Colors.green.shade600)
+          else
+            ...r.driftIssues.map(_issueCard),
+          const SizedBox(height: 20),
+
+          // ── นำเข้าเก่า (ปกติ — แบ่งหน้าโหลดเพิ่ม) ──
+          if (r.legacyIssues.isNotEmpty) ...[
+            _sectionTitle('🔵 นำเข้าเก่า — ไม่มี record คาบ (ปกติ)', r.legacyIssues.length, const Color(0xFF1976D2)),
+            const SizedBox(height: 4),
+            Text('ข้อมูลโอนจาก V4.1.2 ที่ใส่ "เรียนแล้ว" มาเลย ไม่มี record รายคาบ — ตัวเลขถูกต้อง ไม่ต้องแก้',
+                style: TextStyle(fontSize: 12, color: Colors.grey.shade600)),
+            const SizedBox(height: 8),
+            ...r.legacyIssues.take(_visible).map(_issueCard),
+            if (r.legacyIssues.length > _visible)
+              Padding(
+                padding: const EdgeInsets.only(top: 4, bottom: 8),
+                child: OutlinedButton.icon(
+                  onPressed: () => setState(() => _visible += _pageSize),
+                  icon: const Icon(Icons.expand_more, color: _teal),
+                  label: Text('โหลดเพิ่ม • เหลืออีก ${r.legacyIssues.length - _visible} รายการ',
+                      style: const TextStyle(color: _teal, fontWeight: FontWeight.bold)),
+                  style: OutlinedButton.styleFrom(
+                    minimumSize: const Size.fromHeight(46),
+                    side: const BorderSide(color: _teal),
+                    shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(12)),
+                  ),
                 ),
               ),
-            ),
+          ],
         ],
       ],
     );
   }
+
+  Widget _sectionTitle(String text, int count, Color color) => Row(children: [
+        Text(text, style: TextStyle(fontSize: 15, fontWeight: FontWeight.bold, color: color)),
+        const SizedBox(width: 6),
+        Container(
+          padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 2),
+          decoration: BoxDecoration(color: color.withValues(alpha: 0.12), borderRadius: BorderRadius.circular(20)),
+          child: Text('$count', style: TextStyle(fontSize: 13, fontWeight: FontWeight.bold, color: color)),
+        ),
+      ]);
+
+  Widget _note(String text, Color color) => Container(
+        padding: const EdgeInsets.all(12),
+        decoration: BoxDecoration(
+          color: color.withValues(alpha: 0.08),
+          borderRadius: BorderRadius.circular(12),
+          border: Border.all(color: color.withValues(alpha: 0.3)),
+        ),
+        child: Text(text, style: TextStyle(fontSize: 13, color: color, fontWeight: FontWeight.w600)),
+      );
 
   Widget _summaryCard(SessionHealthReport r) {
     return Container(
@@ -135,12 +170,14 @@ class _SessionHealthScreenState extends State<SessionHealthScreen> {
         borderRadius: BorderRadius.circular(16),
       ),
       child: Row(children: [
-        _stat('ตรวจทั้งหมด', '${r.totalPackages}', Colors.white),
+        _stat('ทั้งหมด', '${r.totalPackages}', Colors.white),
         _divider(),
         _stat('ตรงกัน', '${r.okCount}', Colors.white),
         _divider(),
-        _stat('ไม่ตรง', '${r.issues.length}',
-            r.issues.isEmpty ? Colors.white : const Color(0xFFFFE082)),
+        _stat('นำเข้าเก่า', '${r.legacyIssues.length}', Colors.white),
+        _divider(),
+        _stat('ต้องตรวจ', '${r.driftIssues.length}',
+            r.driftIssues.isEmpty ? Colors.white : const Color(0xFFFFCDD2)),
       ]),
     );
   }
@@ -157,15 +194,20 @@ class _SessionHealthScreenState extends State<SessionHealthScreen> {
 
   Widget _issueCard(SessionHealthIssue it) {
     final p = it.pkg;
-    final diff = it.diff;
-    final diffColor = diff > 0 ? const Color(0xFFE53935) : const Color(0xFFFB8C00);
+    final legacy = it.isLegacy;
+    final accent = legacy
+        ? const Color(0xFF1976D2)
+        : (it.diff > 0 ? const Color(0xFFE53935) : const Color(0xFFFB8C00));
+    final badge = legacy
+        ? 'ไม่มี record'
+        : (it.diff > 0 ? 'session เกิน ${it.diff}' : 'session ขาด ${-it.diff}');
     return Container(
       margin: const EdgeInsets.only(bottom: 10),
       padding: const EdgeInsets.all(12),
       decoration: BoxDecoration(
         color: Colors.white,
         borderRadius: BorderRadius.circular(12),
-        border: Border.all(color: diffColor.withValues(alpha: 0.4)),
+        border: Border.all(color: accent.withValues(alpha: 0.4)),
       ),
       child: Column(crossAxisAlignment: CrossAxisAlignment.start, children: [
         Row(children: [
@@ -175,8 +217,8 @@ class _SessionHealthScreenState extends State<SessionHealthScreen> {
           )),
           Container(
             padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 4),
-            decoration: BoxDecoration(color: diffColor, borderRadius: BorderRadius.circular(20)),
-            child: Text(diff > 0 ? 'session เกิน $diff' : 'session ขาด ${-diff}',
+            decoration: BoxDecoration(color: accent, borderRadius: BorderRadius.circular(20)),
+            child: Text(badge,
                 style: const TextStyle(color: Colors.white, fontWeight: FontWeight.bold, fontSize: 12)),
           ),
         ]),
@@ -191,7 +233,7 @@ class _SessionHealthScreenState extends State<SessionHealthScreen> {
           _chip('รวม', '${p.totalSessions}', Colors.blueGrey),
           _chip('เหลือ', '${p.remainingSessions}', const Color(0xFF1976D2)),
           _chip('เรียนแล้ว(แพ็ก)', '${it.expectedUsed}', const Color(0xFF2E7D32)),
-          _chip('คาบจริง', '${it.completedCount}', diffColor),
+          _chip('คาบจริง', '${it.completedCount}', accent),
         ]),
       ]),
     );
