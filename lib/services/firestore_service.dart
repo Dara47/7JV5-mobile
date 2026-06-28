@@ -500,26 +500,75 @@ class FirestoreService {
     await batch.commit();
   }
 
+  /// ปรับคงเหลือของแพ็กเกจแบบ atomic + clamp ให้อยู่ในช่วง [0, total]
+  /// (กันคงเหลือติดลบ/เกินจำนวนรวม — รักษาสมการ เหลือ = รวม − เรียนแล้ว)
+  static Future<void> _bumpRemaining(String packageId, int delta) async {
+    if (delta == 0 || packageId.isEmpty) return;
+    final ref = _db.collection('packages').doc(packageId);
+    await _db.runTransaction((tx) async {
+      final snap = await tx.get(ref);
+      if (!snap.exists) return;
+      final m = snap.data() as Map<String, dynamic>;
+      final total = (m['totalSessions'] ?? 0) as int;
+      final remaining = (m['remainingSessions'] ?? 0) as int;
+      final next = (remaining + delta).clamp(0, total);
+      if (next == remaining) return;
+      tx.update(ref, {'remainingSessions': next, 'updatedAt': FieldValue.serverTimestamp()});
+    });
+  }
+
+  /// session ที่ตัดผ่าน cutSlot/cutAllSlots เขียนตรง (หักคงเหลือเอง) — ไม่ผ่าน addSession
+  /// เพิ่มคาบเรียนรายครั้งเอง: ถ้า status='completed' → หักคงเหลือ −1 ให้ตรงสมการ
   static Future<void> addSession(Map<String, dynamic> data) async {
     await _db.collection('sessions').add({
       ...data, 'createdAt': FieldValue.serverTimestamp(),
     });
+    if (data['status'] == 'completed') {
+      await _bumpRemaining((data['packageId'] ?? '') as String, -1);
+    }
   }
 
+  /// แก้ไขคาบเรียน: ถ้าสถานะ "เรียนแล้ว" เปลี่ยน → ปรับคงเหลือให้ตรง
+  /// (กลายเป็นเรียนแล้ว = −1, เลิกเป็นเรียนแล้ว = +1)
   static Future<void> updateSession(String id, Map<String, dynamic> data) async {
-    await _db.collection('sessions').doc(id).update({
-      ...data, 'updatedAt': FieldValue.serverTimestamp(),
-    });
+    final ref = _db.collection('sessions').doc(id);
+    String? oldStatus, pkgId;
+    if (data.containsKey('status')) {
+      final snap = await ref.get();
+      final m = snap.data();
+      if (m != null) { oldStatus = m['status'] as String?; pkgId = m['packageId'] as String?; }
+    }
+    await ref.update({...data, 'updatedAt': FieldValue.serverTimestamp()});
+    if (data.containsKey('status') && pkgId != null) {
+      final wasCompleted = oldStatus == 'completed';
+      final nowCompleted = data['status'] == 'completed';
+      if (!wasCompleted && nowCompleted) await _bumpRemaining(pkgId, -1);
+      if (wasCompleted && !nowCompleted) await _bumpRemaining(pkgId, 1);
+    }
   }
 
   static Future<void> updateSessionStatus(String sessionId, String status) async {
-    await _db.collection('sessions').doc(sessionId).update({
-      'status': status, 'updatedAt': FieldValue.serverTimestamp(),
-    });
+    final ref = _db.collection('sessions').doc(sessionId);
+    final snap = await ref.get();
+    final m = snap.data();
+    final oldStatus = m?['status'] as String?;
+    final pkgId = m?['packageId'] as String?;
+    await ref.update({'status': status, 'updatedAt': FieldValue.serverTimestamp()});
+    if (pkgId != null) {
+      if (oldStatus != 'completed' && status == 'completed') await _bumpRemaining(pkgId, -1);
+      if (oldStatus == 'completed' && status != 'completed') await _bumpRemaining(pkgId, 1);
+    }
   }
 
+  /// ลบคาบเรียน: ถ้าเป็นคาบที่ "เรียนแล้ว" (เคยหักคงเหลือ) → คืนคงเหลือ +1 ให้ตรงสมการ
   static Future<void> deleteSession(String sessionId) async {
-    await _db.collection('sessions').doc(sessionId).delete();
+    final ref = _db.collection('sessions').doc(sessionId);
+    final snap = await ref.get();
+    final m = snap.data();
+    await ref.delete();
+    if (m != null && m['status'] == 'completed') {
+      await _bumpRemaining((m['packageId'] ?? '') as String, 1);
+    }
   }
 
   // ── Package management ───────────────────────────────────────────────────
