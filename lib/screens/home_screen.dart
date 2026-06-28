@@ -15,6 +15,7 @@ import 'settings_screen.dart';
 import 'teacher_dashboard_screen.dart';
 import 'student_dashboard_screen.dart';
 import 'schedule_calendar_screen.dart';
+import '../widgets/low_balance_alert.dart';
 
 const _kOrange = Color(0xFFF97316);
 
@@ -41,8 +42,11 @@ class _HomeScreenState extends State<HomeScreen> {
   // Badge counts (admin only)
   int _pendingCuts = 0;
   int _pendingLeaves = 0;
+  List<PackageModel> _lowBalance = const [];
+  bool _autoAlertDone = false;
   StreamSubscription? _cutSub;
   StreamSubscription? _leaveSub;
+  StreamSubscription? _pkgSub;
 
   @override
   void initState() {
@@ -55,13 +59,34 @@ class _HomeScreenState extends State<HomeScreen> {
         final count = list.where((r) => r.isPending).length;
         if (mounted) setState(() => _pendingLeaves = count);
       });
+      // คาบใกล้หมด → badge + เด้งป๊อปอัปเตือนอัตโนมัติครั้งแรก
+      _pkgSub = FirestoreService.watchAllPackages().listen((pkgs) {
+        if (!mounted) return;
+        setState(() => _lowBalance = lowBalancePackages(pkgs));
+        _maybeAutoAlert();
+      });
     }
+  }
+
+  /// เด้งป๊อปอัปเตือนคาบใกล้หมดอัตโนมัติ "ครั้งเดียวต่อการเปิดแอป"
+  /// (ข้ามถ้าไม่มีใครใกล้หมด หรือกด "ไม่ต้องเตือนวันนี้" ไปแล้ว)
+  void _maybeAutoAlert() {
+    if (_autoAlertDone) return;
+    if (_lowBalance.isEmpty || lowBalanceDismissedToday()) {
+      _autoAlertDone = true;
+      return;
+    }
+    _autoAlertDone = true;
+    WidgetsBinding.instance.addPostFrameCallback((_) {
+      if (mounted) showLowBalanceAlert(context, _lowBalance);
+    });
   }
 
   @override
   void dispose() {
     _cutSub?.cancel();
     _leaveSub?.cancel();
+    _pkgSub?.cancel();
     super.dispose();
   }
 
@@ -133,7 +158,7 @@ class _HomeScreenState extends State<HomeScreen> {
     return 'นักเรียน';
   }
 
-  int get _totalBadge => _pendingCuts + _pendingLeaves;
+  int get _totalBadge => _pendingCuts + _pendingLeaves + _lowBalance.length;
 
   Future<void> _logout() async {
     final ok = await showDialog<bool>(context: context, builder: (_) => AlertDialog(
@@ -164,6 +189,10 @@ class _HomeScreenState extends State<HomeScreen> {
         items: _navItems,
         selectedIndex: _selectedIndex,
         roleLabel: _roleLabel,
+        lowBalanceCount: _lowBalance.length,
+        onBell: widget.appUser.isAdmin
+            ? () { Navigator.pop(context); showLowBalanceAlert(context, _lowBalance); }
+            : null,
         onSelect: (i) {
           Navigator.pop(context);
           setState(() => _selectedIndex = i);
@@ -241,6 +270,8 @@ class _MenuSheet extends StatefulWidget {
   final List<_NavItem> items;
   final int selectedIndex;
   final String roleLabel;
+  final int lowBalanceCount;
+  final VoidCallback? onBell;
   final ValueChanged<int> onSelect;
   final VoidCallback onRefresh;
   final VoidCallback onLogout;
@@ -248,6 +279,8 @@ class _MenuSheet extends StatefulWidget {
     required this.items,
     required this.selectedIndex,
     required this.roleLabel,
+    this.lowBalanceCount = 0,
+    this.onBell,
     required this.onSelect,
     required this.onRefresh,
     required this.onLogout,
@@ -380,6 +413,32 @@ class _MenuSheetState extends State<_MenuSheet> with SingleTickerProviderStateMi
                           style: TextStyle(fontSize: 11.5, fontWeight: FontWeight.w700, color: dayColor))),
                     ]),
                   ])),
+                  if (widget.onBell != null)
+                    Stack(clipBehavior: Clip.none, children: [
+                      IconButton(
+                        onPressed: widget.onBell,
+                        icon: Icon(Icons.notifications_rounded,
+                            color: widget.lowBalanceCount > 0
+                                ? const Color(0xFFE53935) : Colors.grey),
+                        tooltip: 'คาบเรียนใกล้หมด',
+                      ),
+                      if (widget.lowBalanceCount > 0)
+                        Positioned(
+                          right: 4, top: 4,
+                          child: Container(
+                            padding: const EdgeInsets.symmetric(horizontal: 5, vertical: 1),
+                            constraints: const BoxConstraints(minWidth: 18),
+                            decoration: BoxDecoration(
+                              color: Colors.red,
+                              borderRadius: BorderRadius.circular(9),
+                              border: Border.all(color: Colors.white, width: 1.5),
+                            ),
+                            child: Text('${widget.lowBalanceCount}',
+                                textAlign: TextAlign.center,
+                                style: const TextStyle(fontSize: 10, color: Colors.white, fontWeight: FontWeight.bold)),
+                          ),
+                        ),
+                    ]),
                   IconButton(
                     onPressed: () => Navigator.pop(context),
                     icon: const Icon(Icons.close, color: Colors.grey),
