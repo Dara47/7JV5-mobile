@@ -1,5 +1,7 @@
 import 'package:flutter/material.dart';
 import '../models/models.dart';
+import '../services/firestore_service.dart';
+import '../screens/package_form_dialog.dart';
 
 /// คัดแพ็กเกจที่ยัง active และคาบ "หมดแล้ว (≤0)" หรือ "ใกล้หมด (1–3)"
 /// เรียงเหลือน้อยสุดขึ้นก่อน
@@ -58,19 +60,46 @@ class LowBalanceList extends StatelessWidget {
             child: Text('$title (${items.length})',
                 style: TextStyle(fontWeight: FontWeight.bold, fontSize: 14, color: color)),
           ),
-          ...items.map((p) => _row(p, color)),
+          ...items.map((p) => _LowBalanceRow(p: p, color: color)),
         ],
       );
+}
 
-  Widget _row(PackageModel p, Color color) => Container(
-        margin: const EdgeInsets.symmetric(horizontal: 4, vertical: 3),
-        padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 10),
-        decoration: BoxDecoration(
-          color: color.withValues(alpha: 0.06),
-          borderRadius: BorderRadius.circular(12),
-          border: Border.all(color: color.withValues(alpha: 0.25)),
-        ),
-        child: Row(children: [
+/// แถวนักเรียน 1 ราย: ข้อมูล + ป้ายสถานะติดตาม + ปุ่ม แก้ไข/เรียนต่อ/ไม่เรียนต่อ
+class _LowBalanceRow extends StatelessWidget {
+  final PackageModel p;
+  final Color color;
+  const _LowBalanceRow({required this.p, required this.color});
+
+  static const _green = Color(0xFF2E7D32);
+  static const _grey = Color(0xFF757575);
+
+  Future<void> _setStatus(BuildContext context, String? value) async {
+    final messenger = ScaffoldMessenger.of(context);
+    // กดป้ายเดิมซ้ำ = ยกเลิก (กลับเป็นยังไม่ระบุ)
+    final next = (p.renewStatus == value) ? null : value;
+    await FirestoreService.updatePackageFields(p.id, {'renewStatus': next});
+    final msg = next == 'continue'
+        ? 'ทำเครื่องหมาย "เรียนต่อ"'
+        : next == 'stop'
+            ? 'ทำเครื่องหมาย "ไม่เรียนต่อ"'
+            : 'ล้างสถานะแล้ว';
+    messenger.showSnackBar(SnackBar(content: Text(msg), duration: const Duration(seconds: 1)));
+  }
+
+  @override
+  Widget build(BuildContext context) {
+    final st = p.renewStatus; // 'continue' / 'stop' / null
+    return Container(
+      margin: const EdgeInsets.symmetric(horizontal: 4, vertical: 3),
+      padding: const EdgeInsets.fromLTRB(12, 10, 12, 8),
+      decoration: BoxDecoration(
+        color: color.withValues(alpha: 0.06),
+        borderRadius: BorderRadius.circular(12),
+        border: Border.all(color: color.withValues(alpha: 0.25)),
+      ),
+      child: Column(crossAxisAlignment: CrossAxisAlignment.start, children: [
+        Row(children: [
           Expanded(
             child: Column(crossAxisAlignment: CrossAxisAlignment.start, children: [
               Text(p.studentName.isEmpty ? '(ไม่มีชื่อ)' : p.studentName,
@@ -86,6 +115,7 @@ class LowBalanceList extends StatelessWidget {
             ]),
           ),
           const SizedBox(width: 8),
+          if (st != null) ...[_statusChip(st), const SizedBox(width: 6)],
           Container(
             padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 5),
             decoration: BoxDecoration(color: color, borderRadius: BorderRadius.circular(20)),
@@ -93,5 +123,83 @@ class LowBalanceList extends StatelessWidget {
                 style: const TextStyle(color: Colors.white, fontWeight: FontWeight.bold, fontSize: 12)),
           ),
         ]),
-      );
+        const SizedBox(height: 6),
+        // ปุ่มจัดการ (Wrap กันล้นจอแคบ)
+        Wrap(
+          spacing: 6, runSpacing: 4,
+          children: [
+            _btn(
+              icon: Icons.edit_outlined,
+              label: 'แก้ไข',
+              accent: const Color(0xFF1976D2),
+              active: false,
+              onTap: () => showPackageForm(context, existing: p),
+            ),
+            _btn(
+              icon: Icons.check_circle_outline,
+              label: 'เรียนต่อ',
+              accent: _green,
+              active: st == 'continue',
+              onTap: () => _setStatus(context, 'continue'),
+            ),
+            _btn(
+              icon: Icons.cancel_outlined,
+              label: 'ไม่เรียนต่อ',
+              accent: _grey,
+              active: st == 'stop',
+              onTap: () => _setStatus(context, 'stop'),
+            ),
+          ],
+        ),
+      ]),
+    );
+  }
+
+  Widget _statusChip(String st) {
+    final isGo = st == 'continue';
+    final c = isGo ? _green : _grey;
+    return Container(
+      padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 4),
+      decoration: BoxDecoration(
+        color: c.withValues(alpha: 0.12),
+        borderRadius: BorderRadius.circular(20),
+        border: Border.all(color: c.withValues(alpha: 0.5)),
+      ),
+      child: Row(mainAxisSize: MainAxisSize.min, children: [
+        Icon(isGo ? Icons.check_circle : Icons.cancel, size: 13, color: c),
+        const SizedBox(width: 3),
+        Text(isGo ? 'เรียนต่อ' : 'ไม่เรียนต่อ',
+            style: TextStyle(fontSize: 11, fontWeight: FontWeight.bold, color: c)),
+      ]),
+    );
+  }
+
+  Widget _btn({
+    required IconData icon,
+    required String label,
+    required Color accent,
+    required bool active,
+    required VoidCallback onTap,
+  }) {
+    return Material(
+      color: active ? accent : accent.withValues(alpha: 0.08),
+      borderRadius: BorderRadius.circular(8),
+      child: InkWell(
+        borderRadius: BorderRadius.circular(8),
+        onTap: onTap,
+        child: Padding(
+          padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 6),
+          child: Row(mainAxisSize: MainAxisSize.min, children: [
+            Icon(icon, size: 15, color: active ? Colors.white : accent),
+            const SizedBox(width: 4),
+            Text(label,
+                style: TextStyle(
+                    fontSize: 12,
+                    fontWeight: FontWeight.w600,
+                    color: active ? Colors.white : accent)),
+          ]),
+        ),
+      ),
+    );
+  }
 }
