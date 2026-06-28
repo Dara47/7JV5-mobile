@@ -14,7 +14,7 @@ List<PackageModel> lowBalancePackages(List<PackageModel> all) {
 
 /// รายการ "คาบเรียนใกล้หมด" แบบฝังในหน้า (ไม่ใช่ป๊อปอัป) — แสดงข้อมูลอย่างเดียว copy ชื่อได้
 /// แยกกลุ่ม 🔴 หมดแล้ว(≤0) / 🟠 ใกล้หมด(1–3) เรียงเหลือน้อยสุด
-class LowBalanceList extends StatelessWidget {
+class LowBalanceList extends StatefulWidget {
   final List<PackageModel> packages;
   final EdgeInsets padding;
   const LowBalanceList({
@@ -23,12 +23,19 @@ class LowBalanceList extends StatelessWidget {
     this.padding = const EdgeInsets.fromLTRB(12, 8, 12, 100),
   });
 
+  @override
+  State<LowBalanceList> createState() => _LowBalanceListState();
+}
+
+class _LowBalanceListState extends State<LowBalanceList> {
   static const _red = Color(0xFFE53935);
   static const _orange = Color(0xFFFB8C00);
+  static const _pageSize = 30;
+  int _visible = _pageSize;
 
   @override
   Widget build(BuildContext context) {
-    final pkgs = lowBalancePackages(packages);
+    final pkgs = lowBalancePackages(widget.packages);
     if (pkgs.isEmpty) {
       return Center(
         child: Column(mainAxisSize: MainAxisSize.min, children: [
@@ -39,29 +46,52 @@ class LowBalanceList extends StatelessWidget {
         ]),
       );
     }
-    final expired = pkgs.where((p) => p.isExpired).toList();
-    final low = pkgs.where((p) => p.isLowBalance).toList();
+    // pkgs เรียงเหลือน้อยสุดก่อน → หมดแล้ว(≤0) มาก่อน ใกล้หมด(1–3) เสมอ
+    final allExpired = pkgs.where((p) => p.isExpired).toList();
+    final allLow = pkgs.where((p) => p.isLowBalance).toList();
+    // แสดงแค่ _visible รายการแรกรวมทั้ง 2 กลุ่ม (กันเครื่องอืดตอนรายการเยอะ)
+    final shownExpired = allExpired.take(_visible).toList();
+    final lowBudget = _visible - allExpired.length;
+    final shownLow = lowBudget > 0 ? allLow.take(lowBudget).toList() : const <PackageModel>[];
+    final remaining = pkgs.length - shownExpired.length - shownLow.length;
+
     return SelectionArea(
       child: ListView(
-        padding: padding,
+        padding: widget.padding,
         children: [
-          if (expired.isNotEmpty) _group('🔴 หมดแล้ว', expired, _red),
-          if (low.isNotEmpty) _group('🟠 ใกล้หมด (1–3 คาบ)', low, _orange),
+          if (shownExpired.isNotEmpty) _group('🔴 หมดแล้ว', allExpired.length, shownExpired, _red),
+          if (shownLow.isNotEmpty) _group('🟠 ใกล้หมด (1–3 คาบ)', allLow.length, shownLow, _orange),
+          if (remaining > 0) _loadMore(remaining),
         ],
       ),
     );
   }
 
-  Widget _group(String title, List<PackageModel> items, Color color) => Column(
+  Widget _group(String title, int totalCount, List<PackageModel> items, Color color) => Column(
         crossAxisAlignment: CrossAxisAlignment.start,
         children: [
           Padding(
             padding: const EdgeInsets.fromLTRB(6, 10, 6, 6),
-            child: Text('$title (${items.length})',
+            child: Text('$title ($totalCount)',
                 style: TextStyle(fontWeight: FontWeight.bold, fontSize: 14, color: color)),
           ),
           ...items.map((p) => _LowBalanceRow(p: p, color: color)),
         ],
+      );
+
+  Widget _loadMore(int remaining) => Padding(
+        padding: const EdgeInsets.fromLTRB(4, 10, 4, 6),
+        child: OutlinedButton.icon(
+          onPressed: () => setState(() => _visible += _pageSize),
+          icon: const Icon(Icons.expand_more, color: _orange),
+          label: Text('โหลดเพิ่ม • เหลืออีก $remaining รายการ',
+              style: const TextStyle(color: _orange, fontWeight: FontWeight.bold)),
+          style: OutlinedButton.styleFrom(
+            minimumSize: const Size.fromHeight(46),
+            side: const BorderSide(color: _orange),
+            shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(12)),
+          ),
+        ),
       );
 }
 

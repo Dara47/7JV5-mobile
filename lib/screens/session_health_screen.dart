@@ -11,9 +11,11 @@ class SessionHealthScreen extends StatefulWidget {
 
 class _SessionHealthScreenState extends State<SessionHealthScreen> {
   static const _teal = Color(0xFF00897B);
+  static const _pageSize = 30;
   bool _loading = true;
   String? _error;
   SessionHealthReport? _report;
+  int _visible = _pageSize;
 
   @override
   void initState() {
@@ -22,7 +24,7 @@ class _SessionHealthScreenState extends State<SessionHealthScreen> {
   }
 
   Future<void> _run() async {
-    setState(() { _loading = true; _error = null; });
+    setState(() { _loading = true; _error = null; _visible = _pageSize; });
     try {
       final r = await FirestoreService.checkSessionHealth();
       if (mounted) setState(() { _report = r; _loading = false; });
@@ -104,7 +106,22 @@ class _SessionHealthScreenState extends State<SessionHealthScreen> {
           Text('รายการที่ไม่ตรง (${r.issues.length})',
               style: const TextStyle(fontSize: 15, fontWeight: FontWeight.bold)),
           const SizedBox(height: 8),
-          ...r.issues.map(_issueCard),
+          ...r.issues.take(_visible).map(_issueCard),
+          if (r.issues.length > _visible)
+            Padding(
+              padding: const EdgeInsets.only(top: 4, bottom: 8),
+              child: OutlinedButton.icon(
+                onPressed: () => setState(() => _visible += _pageSize),
+                icon: const Icon(Icons.expand_more, color: _teal),
+                label: Text('โหลดเพิ่ม • เหลืออีก ${r.issues.length - _visible} รายการ',
+                    style: const TextStyle(color: _teal, fontWeight: FontWeight.bold)),
+                style: OutlinedButton.styleFrom(
+                  minimumSize: const Size.fromHeight(46),
+                  side: const BorderSide(color: _teal),
+                  shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(12)),
+                ),
+              ),
+            ),
         ],
       ],
     );
