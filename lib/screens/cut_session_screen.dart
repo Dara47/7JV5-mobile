@@ -121,12 +121,22 @@ class _CutSessionScreenState extends State<CutSessionScreen> {
         backgroundColor: _kPurple,
         foregroundColor: Colors.white,
         actions: [
-          TextButton.icon(
-            onPressed: () => setState(() => _calendarView = !_calendarView),
-            icon: Icon(_calendarView ? Icons.view_list_rounded : Icons.calendar_month,
-                color: Colors.white, size: 18),
-            label: Text(_calendarView ? 'รายการ' : 'ปฏิทิน',
-                style: const TextStyle(color: Colors.white, fontSize: 13)),
+          Padding(
+            padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 8),
+            child: ElevatedButton.icon(
+              onPressed: () => setState(() => _calendarView = !_calendarView),
+              icon: Icon(_calendarView ? Icons.view_list_rounded : Icons.calendar_month,
+                  color: _kPurple, size: 24),
+              label: Text(_calendarView ? 'รายการ' : 'ปฏิทิน',
+                  style: const TextStyle(color: _kPurple, fontSize: 17, fontWeight: FontWeight.bold)),
+              style: ElevatedButton.styleFrom(
+                backgroundColor: Colors.white,
+                foregroundColor: _kPurple,
+                padding: const EdgeInsets.symmetric(horizontal: 18, vertical: 12),
+                shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(12)),
+                elevation: 2,
+              ),
+            ),
           ),
         ],
       ),

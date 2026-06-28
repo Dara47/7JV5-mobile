@@ -210,6 +210,7 @@ class _AdminLeaveCard extends StatelessWidget {
       elevation: 1,
       child: Padding(
         padding: const EdgeInsets.all(12),
+        child: SelectionArea(
         child: Column(crossAxisAlignment: CrossAxisAlignment.start, children: [
           Row(children: [
             Container(
@@ -304,6 +305,7 @@ class _AdminLeaveCard extends StatelessWidget {
             ]),
           ],
         ]),
+        ),
       ),
     );
   }
@@ -682,6 +684,7 @@ class _UserLeaveViewState extends State<_UserLeaveView> {
                 elevation: 1,
                 child: Padding(
                   padding: const EdgeInsets.all(12),
+                  child: SelectionArea(
                   child: Column(crossAxisAlignment: CrossAxisAlignment.start, children: [
                     Row(children: [
                       const Icon(Icons.calendar_today, size: 15, color: Colors.grey),
@@ -724,6 +727,7 @@ class _UserLeaveViewState extends State<_UserLeaveView> {
                           style: const TextStyle(fontSize: 12, color: Colors.blueGrey)),
                     ],
                   ]),
+                  ),
                 ),
               );
             },
