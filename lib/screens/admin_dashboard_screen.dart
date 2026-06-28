@@ -4,28 +4,16 @@ import '../utils/date_format.dart';
 const _kOrange = Color(0xFFF97316);
 const _kOrangeDeep = Color(0xFFFF8F00);
 
-/// หน้า "วันนี้" (ภาพรวมสำหรับ admin) — รวมตัวเลขสำคัญในจอเดียว
-/// แตะแต่ละแถว → เด้งไปหน้า/ป๊อปอัปรายละเอียด (reuse ของเดิม ไม่อ่านข้อมูลซ้ำ)
+/// หน้า "คาบเรียนใกล้หมด" (สำหรับ admin) — เหลือเฉพาะฟังก์ชันคาบเรียนใกล้หมด
+/// แตะแถว → เด้งป๊อปอัปรายชื่อนักเรียนที่ควรชวนต่อแพ็ก (reuse ของเดิม)
 class AdminDashboardScreen extends StatelessWidget {
-  final int pendingCuts;
-  final int pendingLeaves;
   final int lowBalanceCount;
-  final int todayClasses;
-  final VoidCallback onTapCuts;
-  final VoidCallback onTapLeaves;
   final VoidCallback onTapLowBalance;
-  final VoidCallback onTapToday;
 
   const AdminDashboardScreen({
     super.key,
-    required this.pendingCuts,
-    required this.pendingLeaves,
     required this.lowBalanceCount,
-    required this.todayClasses,
-    required this.onTapCuts,
-    required this.onTapLeaves,
     required this.onTapLowBalance,
-    required this.onTapToday,
   });
 
   @override
@@ -39,36 +27,12 @@ class AdminDashboardScreen extends StatelessWidget {
             padding: const EdgeInsets.fromLTRB(16, 18, 16, 100),
             children: [
               _Tile(
-                icon: Icons.content_cut,
-                color: const Color(0xFF7E57C2),
-                label: 'รอตัดคาบ',
-                sub: 'คาบที่ถึงเวลาตัดแล้ว',
-                count: pendingCuts,
-                onTap: onTapCuts,
-              ),
-              _Tile(
-                icon: Icons.event_busy,
-                color: const Color(0xFFE65100),
-                label: 'ใบลารออนุมัติ',
-                sub: 'คำขอลาที่ยังไม่ได้ตัดสิน',
-                count: pendingLeaves,
-                onTap: onTapLeaves,
-              ),
-              _Tile(
                 icon: Icons.notifications_active_rounded,
                 color: const Color(0xFFE53935),
                 label: 'คาบเรียนใกล้หมด',
                 sub: 'นักเรียนที่ควรชวนต่อแพ็ก',
                 count: lowBalanceCount,
                 onTap: onTapLowBalance,
-              ),
-              _Tile(
-                icon: Icons.calendar_month_rounded,
-                color: const Color(0xFF1976D2),
-                label: 'คาบเรียนวันนี้',
-                sub: 'ดูปฏิทินคาบทั้งหมด',
-                count: todayClasses,
-                onTap: onTapToday,
               ),
             ],
           ),
@@ -107,7 +71,7 @@ class AdminDashboardScreen extends StatelessWidget {
             ),
             const SizedBox(width: 14),
             Expanded(child: Column(crossAxisAlignment: CrossAxisAlignment.start, children: [
-              const Text('ภาพรวมวันนี้',
+              const Text('คาบเรียนใกล้หมด',
                   style: TextStyle(fontSize: 22, fontWeight: FontWeight.bold, color: Colors.white)),
               const SizedBox(height: 3),
               Row(children: [

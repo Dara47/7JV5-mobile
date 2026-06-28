@@ -43,7 +43,6 @@ class _HomeScreenState extends State<HomeScreen> {
   // Badge counts (admin only)
   int _pendingCuts = 0;
   int _pendingLeaves = 0;
-  int _todayClasses = 0;
   List<PackageModel> _lowBalance = const [];
   bool _autoAlertDone = false;
   StreamSubscription? _cutSub;
@@ -61,13 +60,10 @@ class _HomeScreenState extends State<HomeScreen> {
         final count = list.where((r) => r.isPending).length;
         if (mounted) setState(() => _pendingLeaves = count);
       });
-      // คาบใกล้หมด + คาบวันนี้ → คำนวณจาก packages ชุดเดียว (อ่านรอบเดียว)
+      // คาบใกล้หมด → คำนวณจาก packages ชุดเดียว (อ่านรอบเดียว)
       _pkgSub = FirestoreService.watchAllPackages().listen((pkgs) {
         if (!mounted) return;
-        setState(() {
-          _lowBalance = lowBalancePackages(pkgs);
-          _todayClasses = _countTodayClasses(pkgs);
-        });
+        setState(() => _lowBalance = lowBalancePackages(pkgs));
         _maybeAutoAlert();
       });
     }
@@ -87,25 +83,6 @@ class _HomeScreenState extends State<HomeScreen> {
     });
   }
 
-  /// นับจำนวนคาบ "วันนี้" จากแพ็กเกจที่ active (วันที่เจาะจง=ตรงวันนี้, ประจำ=ตรง weekday)
-  /// — ใช้ข้อมูล packages ชุดเดียวกับคาบใกล้หมด ไม่อ่านซ้ำ
-  int _countTodayClasses(List<PackageModel> pkgs) {
-    const dayMap = {'อา': 7, 'จ': 1, 'อ': 2, 'พ': 3, 'พฤ': 4, 'ศ': 5, 'ส': 6};
-    final todayStr = todayThaiStr();
-    final weekday = nowThai().weekday;
-    var count = 0;
-    for (final p in pkgs) {
-      if (p.status != 'active') continue;
-      for (final s in p.effectiveSlots) {
-        final isToday = (s.date != null && s.date!.isNotEmpty)
-            ? s.date == todayStr
-            : dayMap[s.day] == weekday;
-        if (isToday) count++;
-      }
-    }
-    return count;
-  }
-
   @override
   void dispose() {
     _cutSub?.cancel();
@@ -121,24 +98,17 @@ class _HomeScreenState extends State<HomeScreen> {
     final k = _refreshKey;
     if (u.isAdmin) {
       return [
-        AdminDashboardScreen(
-          key: ValueKey('dash_$k'),
-          pendingCuts: _pendingCuts,
-          pendingLeaves: _pendingLeaves,
-          lowBalanceCount: _lowBalance.length,
-          todayClasses: _todayClasses,
-          onTapCuts: () => setState(() => _selectedIndex = 3),
-          onTapLeaves: () => setState(() => _selectedIndex = 5),
-          onTapLowBalance: () => showLowBalanceAlert(context, _lowBalance),
-          onTapToday: () => Navigator.of(context).push(MaterialPageRoute(
-            builder: (_) => const ScheduleCalendarScreen(title: 'ปฏิทินคาบเรียน'))),
-        ),
         UsersListScreen(key: ValueKey('users_$k')),
         PackagesScreen(key: ValueKey('packages_$k'), teacherViewOnly: true),
         CutSessionScreen(key: ValueKey('cut_$k')),
         TeacherScheduleScreen(key: ValueKey('schedule_$k')),
         LeaveRequestScreen(key: ValueKey('leave_$k'), appUser: u),
         ReportsScreen(key: ValueKey('reports_$k')),
+        AdminDashboardScreen(
+          key: ValueKey('dash_$k'),
+          lowBalanceCount: _lowBalance.length,
+          onTapLowBalance: () => showLowBalanceAlert(context, _lowBalance),
+        ),
         SettingsScreen(key: ValueKey('settings_$k')),
       ];
     }
@@ -164,14 +134,14 @@ class _HomeScreenState extends State<HomeScreen> {
     final u = widget.appUser;
     if (u.isAdmin) {
       return [
-        _NavItem(Icons.dashboard_rounded, 'วันนี้', const Color(0xFFF59E0B),
-            badge: _pendingCuts + _pendingLeaves + _lowBalance.length),
         const _NavItem(Icons.people, 'ผู้ใช้', Color(0xFF3B82F6)),
         const _NavItem(Icons.groups, 'ครู–ศิษย์', Color(0xFFF97316)),
         _NavItem(Icons.content_cut, 'ตัดคาบ', const Color(0xFF7E57C2), badge: _pendingCuts),
         const _NavItem(Icons.person_pin, 'เวลาครู', Color(0xFF2E7D32)),
         _NavItem(Icons.event_busy, 'ใบลา', const Color(0xFFE65100), badge: _pendingLeaves),
         const _NavItem(Icons.bar_chart, 'รายงาน', Color(0xFF00897B)),
+        _NavItem(Icons.notifications_active_rounded, 'คาบใกล้หมด', const Color(0xFFE53935),
+            badge: _lowBalance.length),
         const _NavItem(Icons.settings, 'ตั้งค่า', Color(0xFF607D8B)),
       ];
     }
