@@ -49,7 +49,10 @@ class JV5App extends StatelessWidget {
           if (snap.connectionState == ConnectionState.waiting) {
             return const Scaffold(body: Center(child: CircularProgressIndicator()));
           }
-          if (snap.hasData) {
+          // เฉพาะผู้ใช้ที่ล็อกอินจริง (อีเมล=แอดมิน) เท่านั้นที่เข้าหน้าหลักจาก stream นี้
+          // ผู้ใช้ anonymous (ครู/นักเรียนเข้าด้วยรหัส) จัดการเองผ่าน LoginScreen → push HomeScreen
+          // กันบั๊ก "ไม่มี user doc = admin" ไม่ให้ anonymous หลุดเข้าหน้าแอดมิน
+          if (snap.hasData && !snap.data!.isAnonymous) {
             return FutureBuilder<AppUser>(
               future: FirestoreService.getAppUser(snap.data!.uid, email: snap.data!.email ?? ''),
               builder: (context, userSnap) {

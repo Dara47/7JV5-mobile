@@ -45,6 +45,13 @@ class _LoginScreenState extends State<LoginScreen> {
     if (code.isEmpty) { setState(() => _codeError = 'กรุณาใส่รหัสผู้ใช้'); return; }
     setState(() { _codeLoading = true; _codeError = null; });
     try {
+      // ล็อกอินแบบ anonymous ก่อน เพื่อให้ผ่าน Firestore Rules เฟส 2 (request.auth != null)
+      // ถ้า Anonymous provider ยังไม่เปิด → ข้ามไป ทำงานแบบเดิม (rules ยังเปิดอยู่)
+      try {
+        if (FirebaseAuth.instance.currentUser == null) {
+          await FirebaseAuth.instance.signInAnonymously();
+        }
+      } catch (_) {/* anonymous ยังไม่เปิด — อ่านได้ตราบที่ rules ยังเปิด */}
       final appUser = await FirestoreService.getAppUserByCode(code);
       if (!mounted) return;
       if (appUser == null) { setState(() => _codeError = 'ไม่พบรหัสผู้ใช้นี้ กรุณาตรวจสอบอีกครั้ง'); return; }

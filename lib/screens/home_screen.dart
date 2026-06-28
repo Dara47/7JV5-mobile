@@ -146,6 +146,8 @@ class _HomeScreenState extends State<HomeScreen> {
     ));
     if (ok == true) {
       if (widget.isCodeLogin) {
+        // เคลียร์ session anonymous (ถ้ามี) แล้วกลับหน้า login
+        await FirebaseAuth.instance.signOut();
         if (mounted) Navigator.of(context).pop();
       } else {
         FirebaseAuth.instance.signOut();
