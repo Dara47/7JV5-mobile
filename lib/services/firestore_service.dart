@@ -600,6 +600,38 @@ class FirestoreService {
     await _db.collection('packages').doc(id).update({...data, 'updatedAt': FieldValue.serverTimestamp()});
   }
 
+  /// ตรวจสุขภาพข้อมูลคาบ (อ่านอย่างเดียว — ไม่แก้ไขอะไร)
+  /// เทียบ "จำนวน session ที่ completed จริง" กับ "เรียนแล้ว (= รวม − เหลือ)" ของแต่ละแพ็ก
+  /// แพ็กที่ไม่ตรง = อาจมี drift หรือเป็นข้อมูลที่นำเข้ามาแบบกำหนด used ไว้ (ไม่มี session record)
+  static Future<SessionHealthReport> checkSessionHealth() async {
+    final pkgSnap = await _db.collection('packages').get();
+    final packages = pkgSnap.docs.map(PackageModel.fromDoc).toList();
+
+    // นับ session completed ต่อ packageId (อ่านทั้ง collection ครั้งเดียว)
+    final sessSnap =
+        await _db.collection('sessions').where('status', isEqualTo: 'completed').get();
+    final completedByPkg = <String, int>{};
+    for (final d in sessSnap.docs) {
+      final pid = (d.data()['packageId'] ?? '') as String;
+      if (pid.isEmpty) continue;
+      completedByPkg[pid] = (completedByPkg[pid] ?? 0) + 1;
+    }
+
+    final issues = <SessionHealthIssue>[];
+    var ok = 0;
+    for (final p in packages) {
+      final c = completedByPkg[p.id] ?? 0;
+      if (c == p.usedSessions) {
+        ok++;
+      } else {
+        issues.add(SessionHealthIssue(pkg: p, completedCount: c));
+      }
+    }
+    // เรียงตามขนาดความต่างมากสุดก่อน
+    issues.sort((a, b) => b.diff.abs().compareTo(a.diff.abs()));
+    return SessionHealthReport(totalPackages: packages.length, okCount: ok, issues: issues);
+  }
+
   static Future<void> adjustSessions(String id, {int totalDelta = 0, int remainingDelta = 0, String? studentId}) async {
     await _db.collection('packages').doc(id).update({
       if (totalDelta != 0) 'totalSessions': FieldValue.increment(totalDelta),
@@ -970,4 +1002,30 @@ class FirestoreService {
   static Future<void> deleteAdminPayroll(String id) async {
     await _db.collection('sevenj_admin_payroll').doc(id).delete();
   }
+}
+
+/// ผลตรวจสุขภาพข้อมูลคาบ (จาก checkSessionHealth) — อ่านอย่างเดียว
+class SessionHealthReport {
+  final int totalPackages;
+  final int okCount;
+  final List<SessionHealthIssue> issues;
+  const SessionHealthReport({
+    required this.totalPackages,
+    required this.okCount,
+    required this.issues,
+  });
+  bool get allHealthy => issues.isEmpty;
+}
+
+/// แพ็ก 1 รายการที่ "เรียนแล้ว" ไม่ตรงกับจำนวน session completed จริง
+class SessionHealthIssue {
+  final PackageModel pkg;
+  final int completedCount; // จำนวน session completed จริงในฐานข้อมูล
+  const SessionHealthIssue({required this.pkg, required this.completedCount});
+
+  /// เรียนแล้วตามแพ็ก (= รวม − เหลือ)
+  int get expectedUsed => pkg.usedSessions;
+
+  /// ต่าง = session จริง − เรียนแล้วตามแพ็ก (บวก=session มากกว่า, ลบ=น้อยกว่า)
+  int get diff => completedCount - expectedUsed;
 }
