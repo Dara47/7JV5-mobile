@@ -598,7 +598,9 @@ class _UserListState extends State<_UserList> {
                       }
 
                       // ── ตารางเรียน: วัน/วันที่ + เวลา ทุก slot (ดูได้ทันทีไม่ต้องคลิกเข้า) ──
-                      final scheduleLines = <String>[];
+                      // คาบที่ระบุวันที่และผ่านมาแล้ว → ทำเครื่องหมาย "ผ่านแล้ว" (สีเทา)
+                      final today = DateTime(now.year, now.month, now.day);
+                      final scheduleLines = <({String text, bool past})>[];
                       for (final p in pkgs) {
                         for (final s in p.effectiveSlots) {
                           final datePart = (s.date != null && s.date!.isNotEmpty)
@@ -607,7 +609,12 @@ class _UserListState extends State<_UserList> {
                           final timePart = s.startTime.isNotEmpty
                               ? '${s.startTime}${s.endTime.isNotEmpty ? '–${s.endTime}' : ''} น.'
                               : '';
-                          scheduleLines.add('$datePart  $timePart'.trim());
+                          bool past = false;
+                          if (s.date != null && s.date!.isNotEmpty) {
+                            final d = parseDateStr(s.date!);
+                            if (d != null && DateTime(d.year, d.month, d.day).isBefore(today)) past = true;
+                          }
+                          scheduleLines.add((text: '$datePart  $timePart'.trim(), past: past));
                         }
                       }
 
@@ -681,7 +688,9 @@ class _UserListState extends State<_UserList> {
                           // แถว 3: ตารางเรียน (วัน/วันที่ + เวลา ทุก slot)
                           if (scheduleLines.isNotEmpty) ...[
                             const SizedBox(height: 4),
-                            ...scheduleLines.asMap().entries.map((e) => Padding(
+                            ...scheduleLines.asMap().entries.map((e) {
+                              final past = e.value.past;
+                              return Padding(
                               padding: const EdgeInsets.only(top: 2),
                               child: Row(crossAxisAlignment: CrossAxisAlignment.start, children: [
                                 SizedBox(
@@ -689,12 +698,30 @@ class _UserListState extends State<_UserList> {
                                   child: Text('${e.key + 1}.',
                                       style: TextStyle(fontSize: 11.5, fontWeight: FontWeight.bold, color: Colors.grey.shade500)),
                                 ),
-                                const Icon(Icons.event_outlined, size: 12, color: Color(0xFFF97316)),
+                                Icon(past ? Icons.event_busy : Icons.event_outlined, size: 12,
+                                    color: past ? Colors.grey.shade400 : const Color(0xFFF97316)),
                                 const SizedBox(width: 4),
-                                Expanded(child: Text(e.value,
-                                    style: const TextStyle(fontSize: 11.5, color: Colors.black54))),
+                                Flexible(child: Text(e.value.text,
+                                    style: TextStyle(
+                                      fontSize: 11.5,
+                                      color: past ? Colors.grey.shade400 : Colors.black54,
+                                      decoration: past ? TextDecoration.lineThrough : null,
+                                    ))),
+                                if (past) ...[
+                                  const SizedBox(width: 4),
+                                  Container(
+                                    padding: const EdgeInsets.symmetric(horizontal: 5, vertical: 1),
+                                    decoration: BoxDecoration(
+                                      color: Colors.grey.shade200,
+                                      borderRadius: BorderRadius.circular(5),
+                                    ),
+                                    child: Text('ผ่านแล้ว',
+                                        style: TextStyle(fontSize: 9.5, color: Colors.grey.shade600, fontWeight: FontWeight.w600)),
+                                  ),
+                                ],
                               ]),
-                            )),
+                            );
+                            }),
                           ],
                         ]),
                       );
