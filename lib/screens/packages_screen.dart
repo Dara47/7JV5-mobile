@@ -772,7 +772,7 @@ class _TeacherGroupViewState extends State<_TeacherGroupView> {
           elevation: 2,
           shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(14)),
           child: ExpansionTile(
-            initiallyExpanded: true,
+            initiallyExpanded: false, // เริ่มแบบหุบ — กดลูกศรเองค่อยโหลด/แสดง (กันหน่วงตอนเปิดหน้า)
             shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(14)),
             collapsedShape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(14)),
             leading: CircleAvatar(
