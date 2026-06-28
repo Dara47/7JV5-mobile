@@ -582,7 +582,14 @@ class FirestoreService {
   }
 
   static Future<void> deletePackage(String id) async {
-    await _db.collection('packages').doc(id).delete();
+    final batch = _db.batch();
+    batch.delete(_db.collection('packages').doc(id));
+    // ลบ session ที่ยังไม่เรียน (scheduled/อื่นๆ) ของแพ็กเกจนี้ — เก็บ completed ไว้ทำรายงาน
+    final sess = await _db.collection('sessions').where('packageId', isEqualTo: id).get();
+    for (final d in sess.docs) {
+      if ((d.data()['status'] as String? ?? '') != 'completed') batch.delete(d.reference);
+    }
+    await batch.commit();
   }
 
   static Future<void> addPackage(Map<String, dynamic> data) async {
@@ -709,6 +716,50 @@ class FirestoreService {
 
   static Future<void> updateUser(String id, Map<String, dynamic> data) async {
     await _db.collection('users').doc(id).update({...data, 'updatedAt': FieldValue.serverTimestamp()});
+  }
+
+  /// แก้ผู้ใช้ + ถ้า "ชื่อ" เปลี่ยน → อัปเดตชื่อที่ denormalize ไว้ทุกที่ให้ตรงกัน
+  /// (packages/sessions/teacherSlots/leaveRequests) — กันชื่อเก่าค้างคนละที่
+  static Future<void> updateUserCascade(
+      String id, String role, Map<String, dynamic> data, {String? oldName}) async {
+    await _db.collection('users').doc(id).update({...data, 'updatedAt': FieldValue.serverTimestamp()});
+    final newName = (data['name'] as String?)?.trim();
+    if (newName == null || newName.isEmpty || newName == oldName?.trim()) return;
+
+    final nameField = role == 'student' ? 'studentName' : 'teacherName';
+    final idField = role == 'student' ? 'studentId' : 'teacherId';
+
+    // เก็บ (ref, ข้อมูลที่จะอัปเดต) ทั้งหมดแล้ว commit เป็นช่วงๆ (≤400)
+    final updates = <({DocumentReference ref, Map<String, dynamic> data})>[];
+    final ts = FieldValue.serverTimestamp();
+
+    final pkgs = await _db.collection('packages').where(idField, isEqualTo: id).get();
+    for (final d in pkgs.docs) {
+      updates.add((ref: d.reference, data: {nameField: newName, 'updatedAt': ts}));
+    }
+    final sess = await _db.collection('sessions').where(idField, isEqualTo: id).get();
+    for (final d in sess.docs) {
+      updates.add((ref: d.reference, data: {nameField: newName, 'updatedAt': ts}));
+    }
+    if (role == 'teacher') {
+      final tslot = await _db.collection('teacherSlots').doc(id).get();
+      if (tslot.exists) {
+        updates.add((ref: tslot.reference, data: {'teacherName': newName, 'updatedAt': ts}));
+      }
+    }
+    final lr = await _db.collection('leaveRequests').where('userId', isEqualTo: id).get();
+    for (final d in lr.docs) {
+      updates.add((ref: d.reference, data: {'userName': newName, 'updatedAt': ts}));
+    }
+
+    var batch = _db.batch();
+    int ops = 0;
+    for (final u in updates) {
+      batch.update(u.ref, u.data);
+      ops++;
+      if (ops >= 400) { await batch.commit(); batch = _db.batch(); ops = 0; }
+    }
+    if (ops > 0) await batch.commit();
   }
 
   static Future<void> deleteUser(String id) async {

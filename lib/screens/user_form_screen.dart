@@ -93,7 +93,8 @@ class _UserFormScreenState extends State<UserFormScreen> {
 
     try {
       if (_isEdit) {
-        await FirestoreService.updateUser(widget.existing!.id, data);
+        await FirestoreService.updateUserCascade(
+            widget.existing!.id, _role, data, oldName: widget.existing!.name);
       } else {
         await FirestoreService.addUser(data);
       }
