@@ -44,7 +44,6 @@ class _HomeScreenState extends State<HomeScreen> {
   int _pendingCuts = 0;
   int _pendingLeaves = 0;
   List<PackageModel> _lowBalance = const [];
-  bool _autoAlertDone = false;
   StreamSubscription? _cutSub;
   StreamSubscription? _leaveSub;
   StreamSubscription? _pkgSub;
@@ -61,26 +60,12 @@ class _HomeScreenState extends State<HomeScreen> {
         if (mounted) setState(() => _pendingLeaves = count);
       });
       // คาบใกล้หมด → คำนวณจาก packages ชุดเดียว (อ่านรอบเดียว)
+      // ไม่เด้งป๊อปอัปอัตโนมัติแล้ว — ผู้ใช้กดดูเองที่เมนู "คาบใกล้หมด" / กระดิ่ง
       _pkgSub = FirestoreService.watchAllPackages().listen((pkgs) {
         if (!mounted) return;
         setState(() => _lowBalance = lowBalancePackages(pkgs));
-        _maybeAutoAlert();
       });
     }
-  }
-
-  /// เด้งป๊อปอัปเตือนคาบใกล้หมดอัตโนมัติ "ครั้งเดียวต่อการเปิดแอป"
-  /// (ข้ามถ้าไม่มีใครใกล้หมด หรือกด "ไม่ต้องเตือนวันนี้" ไปแล้ว)
-  void _maybeAutoAlert() {
-    if (_autoAlertDone) return;
-    if (_lowBalance.isEmpty || lowBalanceDismissedToday()) {
-      _autoAlertDone = true;
-      return;
-    }
-    _autoAlertDone = true;
-    WidgetsBinding.instance.addPostFrameCallback((_) {
-      if (mounted) showLowBalanceAlert(context, _lowBalance);
-    });
   }
 
   @override
