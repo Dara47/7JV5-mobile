@@ -328,6 +328,8 @@ class _UserLeaveViewState extends State<_UserLeaveView> {
     final teacherCodeCtrl = TextEditingController();
     final studentNameCtrl = TextEditingController();
     final studentCodeCtrl = TextEditingController();
+    // ครูเลือกนักเรียนได้หลายคนในใบลาเดียว (ลาสอนหลายคนในวันเดียว)
+    final selectedStudents = <({String name, String code})>[];
     final isStudent = widget.appUser.role == 'student';
     final isTeacher = widget.appUser.role == 'teacher';
 
@@ -484,18 +486,24 @@ class _UserLeaveViewState extends State<_UserLeaveView> {
                 ],
 
                 if (isTeacher) ...[
-                  const Text('🎓 นักเรียนที่จะลาสอน', style: TextStyle(fontSize: 13, fontWeight: FontWeight.w600)),
+                  const Text('🎓 นักเรียนที่จะลาสอน (เลือกได้หลายคน)', style: TextStyle(fontSize: 13, fontWeight: FontWeight.w600)),
                   const SizedBox(height: 6),
                   if (myStudents.isNotEmpty) ...[
                     Wrap(
                       spacing: 6, runSpacing: 6,
                       children: myStudents.map((s) {
-                        final selected = studentNameCtrl.text == s.name && studentCodeCtrl.text == s.code;
+                        final selected = selectedStudents.any((x) => x.name == s.name && x.code == s.code);
                         final label = s.code.isNotEmpty ? '${s.name} (${s.code})' : s.name;
                         return GestureDetector(
                           onTap: () => setSheet(() {
-                            studentNameCtrl.text = s.name;
-                            studentCodeCtrl.text = s.code;
+                            // toggle เลือก/ยกเลิก แล้วรวมชื่อ+รหัสที่เลือกทั้งหมด
+                            if (selected) {
+                              selectedStudents.removeWhere((x) => x.name == s.name && x.code == s.code);
+                            } else {
+                              selectedStudents.add((name: s.name, code: s.code));
+                            }
+                            studentNameCtrl.text = selectedStudents.map((x) => x.name).join(', ');
+                            studentCodeCtrl.text = selectedStudents.map((x) => x.code).join(', ');
                           }),
                           child: Container(
                             padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 6),
@@ -504,16 +512,28 @@ class _UserLeaveViewState extends State<_UserLeaveView> {
                               borderRadius: BorderRadius.circular(20),
                               border: Border.all(color: selected ? Colors.orange.shade400 : Colors.grey.shade300),
                             ),
-                            child: Text(label, style: TextStyle(
-                              fontSize: 12,
-                              color: selected ? Colors.orange.shade800 : Colors.black87,
-                              fontWeight: selected ? FontWeight.w600 : FontWeight.normal,
-                            )),
+                            child: Row(mainAxisSize: MainAxisSize.min, children: [
+                              if (selected) ...[
+                                Icon(Icons.check_circle, size: 14, color: Colors.orange.shade700),
+                                const SizedBox(width: 4),
+                              ],
+                              Text(label, style: TextStyle(
+                                fontSize: 12,
+                                color: selected ? Colors.orange.shade800 : Colors.black87,
+                                fontWeight: selected ? FontWeight.w600 : FontWeight.normal,
+                              )),
+                            ]),
                           ),
                         );
                       }).toList(),
                     ),
                     const SizedBox(height: 8),
+                    if (selectedStudents.length > 1)
+                      Padding(
+                        padding: const EdgeInsets.only(bottom: 4),
+                        child: Text('เลือก ${selectedStudents.length} คน — จะลาสอนทั้งหมดในใบเดียว',
+                            style: TextStyle(fontSize: 11, color: Colors.orange.shade700, fontWeight: FontWeight.w600)),
+                      ),
                   ],
                   Row(crossAxisAlignment: CrossAxisAlignment.start, children: [
                     Expanded(
