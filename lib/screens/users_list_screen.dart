@@ -147,8 +147,26 @@ class _UserList extends StatefulWidget {
 }
 
 class _UserListState extends State<_UserList> {
-  static const _pageSize = 20;
-  int _visible = _pageSize;
+  static const _pageSize = 20;     // โหมดปกติ: ดึง/โหลดเพิ่มทีละ 20
+  static const _searchCap = 50;    // โหมดค้นหา: แสดงผลสูงสุด 50
+  int _fetchLimit = _pageSize;     // จำนวนที่ดึงจาก Firestore ในโหมดปกติ
+
+  // cache stream ไว้ สร้างใหม่เฉพาะตอน "โหมด/limit" เปลี่ยน (กัน resubscribe ทุก build)
+  Stream<List<UserModel>>? _stream;
+  String? _streamKey;
+  List<UserModel>? _last; // ข้อมูลล่าสุด กันจอกระพริบตอนสลับ stream (โหลดเพิ่ม/ค้นหา)
+
+  Stream<List<UserModel>> _ensureStream(bool searching) {
+    final key = searching ? 'all' : 'lim_$_fetchLimit';
+    if (_streamKey != key) {
+      _streamKey = key;
+      _stream = FirestoreService.watchUsers(
+        role: widget.role,
+        limit: searching ? null : _fetchLimit, // ค้นหา=ดึงทั้งหมด, ปกติ=จำกัด
+      );
+    }
+    return _stream!;
+  }
 
   // ── โหมดเลือกหลายคนเพื่อลบ ──
   bool _selectMode = false;
@@ -157,9 +175,10 @@ class _UserListState extends State<_UserList> {
   @override
   void didUpdateWidget(covariant _UserList old) {
     super.didUpdateWidget(old);
-    // เปลี่ยนคำค้น → เริ่มนับใหม่ที่ 20
-    if (old.search != widget.search) {
-      _visible = _pageSize;
+    // สลับโหมดปกติ↔ค้นหา → เคลียร์ cache (กันโชว์ข้อมูลข้ามโหมด) + กลับมาปกติเริ่มที่ 20
+    if (old.search.isEmpty != widget.search.isEmpty) {
+      _last = null;
+      if (widget.search.isEmpty) { _fetchLimit = _pageSize; }
     }
   }
 
@@ -375,40 +394,47 @@ class _UserListState extends State<_UserList> {
   Widget build(BuildContext context) {
     final role = widget.role;
     final search = widget.search;
+    final searching = search.isNotEmpty;
     return StreamBuilder<List<UserModel>>(
-      stream: FirestoreService.watchUsers(role: role),
+      stream: _ensureStream(searching),
       builder: (context, snap) {
-        if (snap.connectionState == ConnectionState.waiting) {
-          return const Center(child: CircularProgressIndicator());
-        }
         if (snap.hasError) {
           return Center(child: Text('ข้อผิดพลาด: ${snap.error}'));
         }
-        final all = snap.data ?? [];
-        final filtered = search.isEmpty
-            ? all
-            : all.where((u) =>
+        if (snap.hasData) { _last = snap.data; }
+        // โหลดครั้งแรก (ยังไม่มีข้อมูลเดิม) → spinner; ตอนโหลดเพิ่ม/สลับโหมด ใช้ข้อมูลเดิมกันจอกระพริบ
+        if (_last == null) {
+          return const Center(child: CircularProgressIndicator());
+        }
+        final fetched = snap.data ?? _last!;
+        // โหมดค้นหา: กรองจากทั้งหมด (กลางคำ ชื่อ+รหัส) / โหมดปกติ: ใช้ที่ดึงมาทั้งก้อน
+        final filtered = searching
+            ? fetched.where((u) =>
                 u.name.toLowerCase().contains(search) ||
-                u.code.toLowerCase().contains(search)).toList();
+                u.code.toLowerCase().contains(search)).toList()
+            : fetched;
 
         if (filtered.isEmpty) {
           return Center(
             child: Column(mainAxisSize: MainAxisSize.min, children: [
               Icon(role == 'student' ? Icons.school_outlined : Icons.person_outlined, size: 56, color: Colors.grey.shade300),
               const SizedBox(height: 8),
-              Text(search.isEmpty ? 'ยังไม่มี${role == "student" ? "นักเรียน" : "ครู"}' : 'ไม่พบผลการค้นหา',
+              Text(searching ? 'ไม่พบผลการค้นหา' : 'ยังไม่มี${role == "student" ? "นักเรียน" : "ครู"}',
                   style: const TextStyle(color: Colors.grey)),
             ]),
           );
         }
 
-        // แสดงทีละ 20 รายการ (กดโหลดเพิ่มได้) — มีช่องค้นหาแล้วไม่ต้องโหลดทั้งหมด
-        final visible = _visible.clamp(0, filtered.length);
-        final shown = filtered.take(visible).toList();
-        final hasMore = filtered.length > visible;
+        // ── จำนวนที่แสดง + แถวท้าย ──
+        // ค้นหา: แสดงสูงสุด 50 (เกินบอกให้พิมพ์เพิ่ม)
+        // ปกติ: แสดงเท่าที่ดึงมา; ถ้าดึงเต็ม limit = อาจมีอีก → ปุ่มโหลดเพิ่ม
+        final matchCount = filtered.length;
+        final shown = searching ? filtered.take(_searchCap).toList() : filtered;
+        final searchOverflow = searching && matchCount > _searchCap;
+        final hasMore = !searching && fetched.length >= _fetchLimit;
 
         return Column(children: [
-          _selectionBar(filtered),
+          _selectionBar(shown),
           Expanded(child: StreamBuilder<List<SessionModel>>(
           stream: role == 'student' ? FirestoreService.watchTodaySessions() : null,
           builder: (context, sessSnap) {
@@ -420,15 +446,15 @@ class _UserListState extends State<_UserList> {
           itemBuilder: (context, i) {
             // แถวท้ายสุด
             if (i == shown.length) {
+              // โหมดปกติ + ยังมีอีก → ปุ่มโหลดเพิ่ม 20
               if (hasMore) {
-                final remaining = filtered.length - visible;
                 return Padding(
                   padding: const EdgeInsets.symmetric(vertical: 10),
                   child: Center(
                     child: OutlinedButton.icon(
-                      onPressed: () => setState(() => _visible += _pageSize),
+                      onPressed: () => setState(() => _fetchLimit += _pageSize),
                       icon: const Icon(Icons.expand_more, size: 18),
-                      label: Text('โหลดเพิ่ม (เหลืออีก $remaining)'),
+                      label: const Text('โหลดเพิ่ม 20 รายการ'),
                       style: OutlinedButton.styleFrom(
                         foregroundColor: const Color(0xFFF97316),
                         side: const BorderSide(color: Color(0xFFF97316)),
@@ -439,9 +465,22 @@ class _UserListState extends State<_UserList> {
                   ),
                 );
               }
+              // โหมดค้นหา + ผลเกิน 50 → บอกให้พิมพ์เพิ่ม
+              if (searchOverflow) {
+                return Padding(
+                  padding: const EdgeInsets.symmetric(vertical: 8, horizontal: 12),
+                  child: Center(
+                    child: Text('พบ $matchCount รายการ — แสดง $_searchCap แรก พิมพ์ให้เจาะจงขึ้นเพื่อแคบลง',
+                        textAlign: TextAlign.center,
+                        style: TextStyle(fontSize: 12, color: Colors.orange.shade800, fontWeight: FontWeight.w600)),
+                  ),
+                );
+              }
+              // ที่เหลือ: แสดงครบแล้ว
               return Padding(
                 padding: const EdgeInsets.symmetric(vertical: 8),
-                child: Center(child: Text('แสดงครบ ${filtered.length} รายการ',
+                child: Center(child: Text(
+                    searching ? 'พบ $matchCount รายการ' : 'แสดงครบ $matchCount รายการ',
                     style: TextStyle(fontSize: 12, color: Colors.grey.shade500))),
               );
             }

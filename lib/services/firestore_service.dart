@@ -9,9 +9,14 @@ class FirestoreService {
   /// ผู้ใช้ที่ล็อกอินอยู่ตอนนี้ — ใช้แนบชื่อผู้ดูแลใน audit log
   static AppUser? currentUser;
 
-  static Stream<List<UserModel>> watchUsers({String? role}) {
+  /// ดูรายชื่อผู้ใช้แบบ realtime
+  /// - [limit] != null → ดึงแค่ N คน (ลด reads ตอนเปิดหน้า) ใช้กับโหมดปกติ
+  /// - [limit] == null → ดึงทั้งหมด (ใช้ตอนค้นหา เพื่อค้นได้ครบทุกคน)
+  /// ไม่ใส่ orderBy ฝั่ง server (กันต้องสร้าง composite index กับ where role) → เรียงตาม code ในเครื่อง
+  static Stream<List<UserModel>> watchUsers({String? role, int? limit}) {
     Query<Map<String, dynamic>> q = _db.collection('users');
     if (role != null) q = q.where('role', isEqualTo: role);
+    if (limit != null) q = q.limit(limit);
     return q.snapshots().map((s) => s.docs.map(UserModel.fromDoc).toList()
       ..sort((a, b) => a.code.compareTo(b.code)));
   }
