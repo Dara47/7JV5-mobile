@@ -476,6 +476,23 @@ class FirestoreService {
     if (ops > 0) await batch.commit();
   }
 
+  /// เปลี่ยนครูของแพ็กเกจ: อัปเดต session ที่ "ยังไม่เรียน" (ไม่ใช่ completed) ให้เป็นครูใหม่
+  /// คาบ completed = ประวัติครูที่สอนจริง → ไม่แตะ
+  static Future<void> reassignSessionsTeacher(
+      String packageId, String teacherId, String teacherName) async {
+    final snap = await _db.collection('sessions')
+        .where('packageId', isEqualTo: packageId)
+        .get();
+    final batch = _db.batch();
+    int ops = 0;
+    for (final d in snap.docs) {
+      if ((d.data()['status'] as String?) == 'completed') continue; // ประวัติ คงครูเดิม
+      batch.update(d.reference, {'teacherId': teacherId, 'teacherName': teacherName});
+      ops++;
+    }
+    if (ops > 0) await batch.commit();
+  }
+
   /// session ทั้งหมด (ทุกสถานะ) — สำหรับปฏิทิน admin
   static Stream<List<SessionModel>> watchAllSessions() {
     return _db.collection('sessions').snapshots()

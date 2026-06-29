@@ -369,9 +369,17 @@ class _PackageFormSheetState extends State<_PackageFormSheet> {
 
     try {
       if (_isEdit) {
+        final teacherChanged = _teacher!.id != widget.existing!.teacherId;
         await FirestoreService.updatePackageFields(widget.existing!.id, data,
             auditAction: 'แก้ไขแพ็กเกจ',
-            auditDetail: '${_student!.name} (${_student!.code}) · รวม $total คาบ');
+            auditDetail: teacherChanged
+                ? '${_student!.name} (${_student!.code}) · เปลี่ยนครู ${widget.existing!.teacherName} → ${_teacher!.name} · รวม $total คาบ'
+                : '${_student!.name} (${_student!.code}) · รวม $total คาบ');
+        // เปลี่ยนครู → ย้ายคาบที่ยังไม่เรียน (scheduled) ไปครูใหม่ (completed = ประวัติ คงครูเดิม)
+        if (teacherChanged) {
+          await FirestoreService.reassignSessionsTeacher(
+              widget.existing!.id, _teacher!.id, _teacher!.name);
+        }
         await FirestoreService.resyncPackageSchedule(widget.existing!.id);
       } else {
         await FirestoreService.addPackage(data,
@@ -456,8 +464,8 @@ class _PackageFormSheetState extends State<_PackageFormSheet> {
                       ),
                       const SizedBox(height: 14),
 
-                      // ── ครู ──
-                      _label('🎓 ครู', required: !_isEdit),
+                      // ── ครู ── (แก้ไขได้แม้ตอนแก้แพ็กเกจ — เปลี่ยนครูได้)
+                      _label('🎓 ครู', required: true),
                       const SizedBox(height: 6),
                       UserSearchField(
                         users: _teachers,
@@ -465,13 +473,36 @@ class _PackageFormSheetState extends State<_PackageFormSheet> {
                         currentCode: _teacher?.code,
                         hint: 'เลือกครู...',
                         title: 'ค้นหาครู',
-                        enabled: !_isEdit,
+                        enabled: true,
                         color: const Color(0xFF2E7D32),
                         onSelected: (u) {
                           setState(() { _teacher = u; _teacherSlot = null; });
                           _loadTeacherSlot(u.id);
                         },
                       ),
+                      // แจ้งเตือนเมื่อเปลี่ยนครูตอนแก้แพ็กเกจ — คาบที่ยังไม่เรียนจะย้ายไปครูใหม่ คาบที่เรียนแล้วคงครูเดิม
+                      if (_isEdit && _teacher != null && _teacher!.id != widget.existing!.teacherId) ...[
+                        const SizedBox(height: 8),
+                        Container(
+                          padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 10),
+                          decoration: BoxDecoration(
+                            color: const Color(0xFFFFF3E0),
+                            borderRadius: BorderRadius.circular(10),
+                            border: Border.all(color: Colors.orange.shade300),
+                          ),
+                          child: Row(children: [
+                            const Icon(Icons.swap_horiz, size: 18, color: Color(0xFFE65100)),
+                            const SizedBox(width: 8),
+                            Expanded(
+                              child: Text(
+                                'เปลี่ยนครู: ${widget.existing!.teacherName} → ${_teacher!.name}\n'
+                                'คาบที่ยังไม่เรียนจะย้ายไปครูใหม่ (คาบที่เรียนแล้วคงครูเดิมไว้เป็นประวัติ)',
+                                style: const TextStyle(fontSize: 12, color: Color(0xFFE65100), height: 1.4),
+                              ),
+                            ),
+                          ]),
+                        ),
+                      ],
                       // ── เวลาว่างครู ──
                       if (_teacher != null) ...[
                         const SizedBox(height: 8),
