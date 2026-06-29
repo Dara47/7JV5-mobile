@@ -47,35 +47,52 @@ class _HomeScreenState extends State<HomeScreen> {
   int _pendingCuts = 0;
   int _pendingLeaves = 0;
   List<PackageModel> _lowBalance = const [];
-  StreamSubscription? _cutSub;
+  // ข้อมูลดิบสำหรับคำนวณ badge — เปิด listener "ชุดเดียว" ใช้ทั้ง คาบใกล้หมด + รอตัดคาบ
+  // เดิมเปิด watchAllPackages ซ้ำ 2 ตัว (ตรง ๆ + ข้างใน watchPendingCuts) → ทุก snapshot ต้อง
+  // parse ทั้ง collection 2 รอบ + คำนวณ ทำให้ main thread ตัน (กดแก้ไขไม่ตอบสนอง)
+  List<PackageModel> _allPkgs = const [];
+  List<SessionModel> _todaySessions = const [];
   StreamSubscription? _leaveSub;
   StreamSubscription? _pkgSub;
+  StreamSubscription? _sessSub;
 
   @override
   void initState() {
     super.initState();
     if (widget.appUser.isAdmin) {
-      _cutSub = FirestoreService.watchPendingCuts().listen((list) {
-        if (mounted) setState(() => _pendingCuts = list.length);
-      });
       _leaveSub = FirestoreService.watchLeaveRequests().listen((list) {
         final count = list.where((r) => r.isPending).length;
         if (mounted) setState(() => _pendingLeaves = count);
       });
-      // คาบใกล้หมด → คำนวณจาก packages ชุดเดียว (อ่านรอบเดียว)
-      // ไม่เด้งป๊อปอัปอัตโนมัติแล้ว — ผู้ใช้กดดูเองที่เมนู "คาบใกล้หมด" / กระดิ่ง
+      // เปิด packages + sessions(วันนี้) อย่างละตัวเดียว แล้วคำนวณทั้ง คาบใกล้หมด + รอตัดคาบ จากชุดเดียวกัน
+      // (ยังคง badge realtime — แค่ parse รอบเดียวต่อ snapshot แทน 2 รอบ)
       _pkgSub = FirestoreService.watchAllPackages().listen((pkgs) {
-        if (!mounted) return;
-        setState(() => _lowBalance = lowBalancePackages(pkgs));
+        _allPkgs = pkgs;
+        _recomputeBadges();
+      });
+      _sessSub = FirestoreService.watchSessionsForDate(nowThai()).listen((s) {
+        _todaySessions = s;
+        _recomputeBadges();
       });
     }
   }
 
+  /// คำนวณ badge (คาบใกล้หมด + รอตัดคาบ) จากข้อมูลชุดเดียว — เลี่ยง parse/ฟังซ้ำ
+  void _recomputeBadges() {
+    if (!mounted) return;
+    setState(() {
+      _lowBalance = lowBalancePackages(_allPkgs);
+      _pendingCuts = FirestoreService
+          .computePendingCutsForDate(_allPkgs, _todaySessions, nowThai())
+          .length;
+    });
+  }
+
   @override
   void dispose() {
-    _cutSub?.cancel();
     _leaveSub?.cancel();
     _pkgSub?.cancel();
+    _sessSub?.cancel();
     super.dispose();
   }
 
