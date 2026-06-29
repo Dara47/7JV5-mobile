@@ -38,6 +38,9 @@ class HomeScreen extends StatefulWidget {
 
 class _HomeScreenState extends State<HomeScreen> {
   int _selectedIndex = 0;
+  // โหลดหน้าแบบ lazy: build เฉพาะหน้าที่เคยเปิด (กันโหลด Firestore ทุกหน้าพร้อมกันตอนเปิดแอป)
+  // มือถือเดิมขาว/อืดเพราะ IndexedStack build ทุกหน้า → ทุก listener ทำงานพร้อมกัน
+  final Set<int> _visited = {0};
   int _refreshKey = 0;
 
   // Badge counts (admin only)
@@ -180,7 +183,7 @@ class _HomeScreenState extends State<HomeScreen> {
         roleLabel: _roleLabel,
         onSelect: (i) {
           Navigator.pop(context);
-          setState(() => _selectedIndex = i);
+          setState(() { _selectedIndex = i; _visited.add(i); });
         },
         onRefresh: () { Navigator.pop(context); _refresh(); },
         onLogout: () { Navigator.pop(context); _logout(); },
@@ -192,9 +195,16 @@ class _HomeScreenState extends State<HomeScreen> {
   Widget build(BuildContext context) {
     final screens = _screens;
     if (_selectedIndex >= screens.length) _selectedIndex = 0;
+    _visited.add(_selectedIndex);
+    // หน้าที่ยังไม่เคยเปิด → ใส่ placeholder เบา ๆ แทน (ยังไม่ build/ยังไม่ subscribe Firestore)
+    // หน้าที่เปิดแล้วยังคงอยู่ใน stack (เก็บ state เหมือน IndexedStack เดิม แค่ค่อย ๆ โหลด)
+    final lazyScreens = [
+      for (var i = 0; i < screens.length; i++)
+        _visited.contains(i) ? screens[i] : const SizedBox.shrink(),
+    ];
 
     return Scaffold(
-      body: IndexedStack(index: _selectedIndex, children: screens),
+      body: IndexedStack(index: _selectedIndex, children: lazyScreens),
       floatingActionButtonLocation: FloatingActionButtonLocation.centerFloat,
       floatingActionButton: _HomeButton(badge: _totalBadge, onTap: _openMenu),
     );
