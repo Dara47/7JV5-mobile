@@ -599,18 +599,25 @@ class _UserListState extends State<_UserList> {
 
                       // ── ตารางเรียน: วัน/วันที่ + เวลา ทุก slot (ดูได้ทันทีไม่ต้องคลิกเข้า) ──
                       // คาบที่ระบุวันที่และเวลา "ผ่านไปแล้ว" → ขีดฆ่า + ป้าย "ผ่านแล้ว" (สีเทา)
-                      final scheduleLines = <({String text, bool past})>[];
+                      final scheduleLines = <({String text, bool past, String sortKey})>[];
+                      const dayOrder = {'อา': 0, 'จ': 1, 'อ': 2, 'พ': 3, 'พฤ': 4, 'ศ': 5, 'ส': 6};
                       for (final p in pkgs) {
                         for (final s in p.effectiveSlots) {
-                          final datePart = (s.date != null && s.date!.isNotEmpty)
+                          final hasDate = s.date != null && s.date!.isNotEmpty;
+                          final datePart = hasDate
                               ? '${thaiDayAbbrFromStr(s.date!)} ${thaiShortDateFromStr(s.date!)}'
                               : 'ทุก${s.day}';
                           final timePart = s.startTime.isNotEmpty
                               ? '${s.startTime}${s.endTime.isNotEmpty ? '–${s.endTime}' : ''} น.'
                               : '';
-                          scheduleLines.add((text: '$datePart  $timePart'.trim(), past: s.isPast));
+                          // คีย์เรียง: คาบมีวันที่เจาะจงก่อน (เรียงวันที่+เวลา) แล้วตามด้วยคาบประจำ (เรียงตามวันในสัปดาห์+เวลา)
+                          final sortKey = hasDate
+                              ? '0_${s.date}_${s.startTime}'
+                              : '1_${(dayOrder[s.day] ?? 9)}_${s.startTime}';
+                          scheduleLines.add((text: '$datePart  $timePart'.trim(), past: s.isPast, sortKey: sortKey));
                         }
                       }
+                      scheduleLines.sort((a, b) => a.sortKey.compareTo(b.sortKey));
 
                       // ── หมายเหตุ/ชื่อคอร์ส จากแพ็กเกจ (แสดงให้เห็นทันที) ──
                       final notes = <String>[];
