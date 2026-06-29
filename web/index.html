@@ -53,8 +53,9 @@
   <style>
     #boot-loader {
       position: fixed; inset: 0; display: flex; flex-direction: column;
-      align-items: center; justify-content: center; gap: 18px;
+      align-items: center; justify-content: center; gap: 18px; padding: 24px;
       background: #FFF7ED; font-family: 'Roboto', system-ui, sans-serif; z-index: 0;
+      text-align: center;
     }
     #boot-loader img { width: 96px; height: 96px; object-fit: contain; opacity: .9; }
     #boot-loader .spin {
@@ -63,6 +64,13 @@
       animation: boot-spin 0.9s linear infinite;
     }
     #boot-loader .txt { color: #9A3412; font-size: 14px; }
+    #boot-loader .err-title { color: #B91C1C; font-size: 18px; font-weight: 700; }
+    #boot-loader .err-msg { color: #7C2D12; font-size: 14px; line-height: 1.6; max-width: 360px; }
+    #boot-loader .err-btn {
+      margin-top: 6px; padding: 12px 28px; font-size: 15px; font-weight: 600;
+      color: #fff; background: #F97316; border: none; border-radius: 999px; cursor: pointer;
+    }
+    #boot-loader .err-btn:active { background: #EA580C; }
     @keyframes boot-spin { to { transform: rotate(360deg); } }
   </style>
   <div id="boot-loader">
@@ -70,21 +78,56 @@
     <div class="spin"></div>
     <div class="txt">กำลังโหลด…</div>
   </div>
-  <!--
-    You can customize the "flutter_bootstrap.js" script.
-    This is useful to provide a custom configuration to the Flutter loader
-    or to give the user feedback during the initialization process.
-
-    For more details:
-    * https://docs.flutter.dev/platform-integration/web/initialization
-  -->
-  <script src="flutter_bootstrap.js" async></script>
-  <!-- ลบหน้าจอโหลดเมื่อ Flutter วาดเฟรมแรกแล้ว -->
   <script>
-    window.addEventListener('flutter-first-frame', function () {
+    // ---- ตัวช่วยแสดงข้อความบนหน้าโหลด (ใช้ทั้งกรณีเบราว์เซอร์เก่า/โหลดนานเกิน) ----
+    function bootShowError(title, msg, btnLabel, btnAction) {
       var el = document.getElementById('boot-loader');
-      if (el) el.remove();
-    });
+      if (!el) return;
+      var btn = btnLabel
+        ? '<button class="err-btn" onclick="' + btnAction + '">' + btnLabel + '</button>'
+        : '';
+      el.innerHTML =
+        '<img src="icons/Icon-192.png" alt="7J English" onerror="this.style.display=\'none\'">' +
+        '<div class="err-title">' + title + '</div>' +
+        '<div class="err-msg">' + msg + '</div>' + btn;
+    }
+
+    // ---- 1) เช็คเบราว์เซอร์เก่า: แอปต้องใช้ WebAssembly (CanvasKit) ----
+    // เครื่อง/เบราว์เซอร์เก่าที่ไม่รองรับจะจอขาว → แจ้งให้อัปเดตแทน
+    var browserOk = (typeof WebAssembly === 'object') &&
+                    (typeof Promise !== 'undefined') &&
+                    !!window.fetch;
+    if (!browserOk) {
+      bootShowError(
+        'เบราว์เซอร์เก่าเกินไป',
+        'แอปนี้ต้องใช้เบราว์เซอร์รุ่นใหม่ กรุณา<b>อัปเดต Google Chrome</b> ' +
+        '(หรือเปิดด้วย Chrome แทนเบราว์เซอร์ในแอปอื่น เช่น LINE/Facebook) แล้วลองใหม่อีกครั้ง'
+      );
+    } else {
+      // ---- 2) โหลดแอปตามปกติ + ตั้ง timeout กันค้างหน้าโหลด ----
+      var booted = false;
+      window.addEventListener('flutter-first-frame', function () {
+        booted = true;
+        var el = document.getElementById('boot-loader');
+        if (el) el.remove();
+      });
+      // ถ้าวาดเฟรมแรกไม่สำเร็จใน 20 วินาที = โหลดนานผิดปกติ/ค้าง → ให้ทางเลือกผู้ใช้
+      setTimeout(function () {
+        if (booted) return;
+        bootShowError(
+          'โหลดนานผิดปกติ',
+          'อาจเป็นเพราะอินเทอร์เน็ตช้า หรือข้อมูลแอปเวอร์ชันเก่าค้างอยู่ในเครื่อง<br>' +
+          'ลองกดปุ่มด้านล่างเพื่อโหลดใหม่ ถ้ายังไม่หายให้ล้างข้อมูลเว็บไซต์/แคชแล้วเปิดใหม่',
+          'โหลดใหม่', 'location.reload()'
+        );
+      }, 20000);
+
+      // โหลด Flutter
+      var s = document.createElement('script');
+      s.src = 'flutter_bootstrap.js';
+      s.async = true;
+      document.body.appendChild(s);
+    }
   </script>
 </body>
 </html>

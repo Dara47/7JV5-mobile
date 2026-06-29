@@ -10,8 +10,60 @@ import 'widgets/app_watermark.dart';
 
 void main() async {
   WidgetsFlutterBinding.ensureInitialized();
-  await Firebase.initializeApp(options: firebaseOptionsForEnv);
-  runApp(const JV5App());
+  try {
+    await Firebase.initializeApp(options: firebaseOptionsForEnv);
+    runApp(const JV5App());
+  } catch (e) {
+    // Firebase init ล้มเหลว (เน็ตหลุด/โดน firewall/เครื่องเก่า) — เดิมจะค้างหน้าโหลดจอขาวเงียบ ๆ
+    // ตอนนี้วาดหน้า error ให้ผู้ใช้กด "ลองใหม่" ได้ (runApp ทำให้ flutter-first-frame ยิง → boot-loader หาย)
+    runApp(StartupErrorApp(error: e.toString()));
+  }
+}
+
+/// หน้าจอ error ตอนเปิดแอปไม่สำเร็จ (แทนจอขาว/ค้าง) — มีปุ่มลองใหม่
+class StartupErrorApp extends StatelessWidget {
+  final String error;
+  const StartupErrorApp({super.key, required this.error});
+
+  @override
+  Widget build(BuildContext context) {
+    return MaterialApp(
+      debugShowCheckedModeBanner: false,
+      home: Scaffold(
+        backgroundColor: const Color(0xFFFFF7ED),
+        body: Center(
+          child: Padding(
+            padding: const EdgeInsets.all(28),
+            child: Column(
+              mainAxisSize: MainAxisSize.min,
+              children: [
+                const Icon(Icons.wifi_off_rounded, size: 64, color: Color(0xFFB91C1C)),
+                const SizedBox(height: 16),
+                const Text('เปิดแอปไม่สำเร็จ',
+                    style: TextStyle(fontSize: 20, fontWeight: FontWeight.bold, color: Color(0xFF7C2D12))),
+                const SizedBox(height: 10),
+                const Text(
+                  'เชื่อมต่อระบบไม่ได้ อาจเป็นเพราะอินเทอร์เน็ตไม่เสถียร\nกรุณาตรวจสอบการเชื่อมต่อแล้วลองใหม่อีกครั้ง',
+                  textAlign: TextAlign.center,
+                  style: TextStyle(fontSize: 14, height: 1.6, color: Color(0xFF9A3412)),
+                ),
+                const SizedBox(height: 22),
+                FilledButton.icon(
+                  style: FilledButton.styleFrom(
+                    backgroundColor: const Color(0xFFF97316),
+                    padding: const EdgeInsets.symmetric(horizontal: 28, vertical: 14),
+                  ),
+                  onPressed: () => main(),
+                  icon: const Icon(Icons.refresh),
+                  label: const Text('ลองใหม่'),
+                ),
+              ],
+            ),
+          ),
+        ),
+      ),
+    );
+  }
 }
 
 class JV5App extends StatelessWidget {
