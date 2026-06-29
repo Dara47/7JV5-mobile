@@ -333,7 +333,9 @@ class _PackageFormSheetState extends State<_PackageFormSheet> {
           'slots': merged.map((s) => s.toMap()).toList(),
           if (_notesCtrl.text.isNotEmpty) 'notes': _notesCtrl.text.trim(),
           'isGroup': _isGroup || _existingPkg!.isGroup,
-        });
+        },
+        auditAction: 'เพิ่มคาบเรียน',
+        auditDetail: '${_student!.name} (${_student!.code}): +${_slots.length} ช่วง');
         await FirestoreService.resyncPackageSchedule(_existingPkg!.id);
         if (mounted) Navigator.pop(context);
       } catch (e) {
@@ -367,10 +369,13 @@ class _PackageFormSheetState extends State<_PackageFormSheet> {
 
     try {
       if (_isEdit) {
-        await FirestoreService.updatePackageFields(widget.existing!.id, data);
+        await FirestoreService.updatePackageFields(widget.existing!.id, data,
+            auditAction: 'แก้ไขแพ็กเกจ',
+            auditDetail: '${_student!.name} (${_student!.code}) · รวม $total คาบ');
         await FirestoreService.resyncPackageSchedule(widget.existing!.id);
       } else {
-        await FirestoreService.addPackage(data);
+        await FirestoreService.addPackage(data,
+            audit: '${_student!.name} (${_student!.code}) กับ ${_teacher!.name} · $total คาบ');
       }
       if (mounted) Navigator.pop(context);
     } catch (e) {

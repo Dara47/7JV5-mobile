@@ -177,7 +177,7 @@ class PackageCard extends StatelessWidget {
       actions: [
         TextButton(onPressed: () => Navigator.pop(context), child: const Text('ยกเลิก')),
         TextButton(
-          onPressed: () async { Navigator.pop(context); await FirestoreService.deletePackage(pkg.id); },
+          onPressed: () async { Navigator.pop(context); await FirestoreService.deletePackage(pkg.id, audit: '${pkg.studentName} (${pkg.studentCode}) กับ ${pkg.teacherName}'); },
           child: const Text('ลบ', style: TextStyle(color: Colors.red)),
         ),
       ],
@@ -211,11 +211,14 @@ class PackageCard extends StatelessWidget {
             if (n <= 0) return;
             Navigator.pop(dialogCtx);
             try {
+              final who = '${pkg.studentName} (${pkg.studentCode})';
               if (isAdd) {
-                await FirestoreService.adjustSessions(pkg.id, totalDelta: n, remainingDelta: n, studentId: pkg.studentId);
+                await FirestoreService.adjustSessions(pkg.id, totalDelta: n, remainingDelta: n, studentId: pkg.studentId,
+                    audit: '$who · +$n คาบ (รวม ${pkg.totalSessions}→${pkg.totalSessions + n})');
               } else {
                 final deduct = n.clamp(1, pkg.remainingSessions > 0 ? pkg.remainingSessions : n);
-                await FirestoreService.adjustSessions(pkg.id, totalDelta: -deduct, remainingDelta: -deduct, studentId: pkg.studentId);
+                await FirestoreService.adjustSessions(pkg.id, totalDelta: -deduct, remainingDelta: -deduct, studentId: pkg.studentId,
+                    audit: '$who · -$deduct คาบ (รวม ${pkg.totalSessions}→${pkg.totalSessions - deduct})');
               }
             } catch (e) {
               if (context.mounted) {
@@ -228,6 +231,17 @@ class PackageCard extends StatelessWidget {
         ),
       ],
     ));
+  }
+
+  /// สรุปช่วงเวลาแบบสั้นสำหรับ audit log เช่น "29/06 จ 10:00, ทุกพ 14:00"
+  String _slotsSummary(List<SlotItem> slots) {
+    if (slots.isEmpty) return '(ไม่มีคาบ)';
+    return slots.map((s) {
+      final datePart = (s.date != null && s.date!.isNotEmpty)
+          ? '${thaiShortDateFromStr(s.date!)} ${s.day}'
+          : 'ทุก${s.day}';
+      return '$datePart ${s.startTime}'.trim();
+    }).join(', ');
   }
 
   void _tapReschedule(BuildContext context) => _showReschedule(context);
@@ -317,7 +331,12 @@ class PackageCard extends StatelessWidget {
                 'scheduledDate': (f.date != null && f.date!.isNotEmpty) ? f.date : FieldValue.delete(),
               };
             }
-            await FirestoreService.updatePackageFields(pkg.id, data);
+            // สรุปก่อน→หลัง ลง audit log
+            final before = _slotsSummary(pkg.effectiveSlots);
+            final after = _slotsSummary(slots);
+            await FirestoreService.updatePackageFields(pkg.id, data,
+                auditAction: 'ย้าย/แก้ตารางเรียน',
+                auditDetail: '${pkg.studentName} (${pkg.studentCode}): $before → $after');
             await FirestoreService.resyncPackageSchedule(pkg.id);
           },
           style: ElevatedButton.styleFrom(backgroundColor: const Color(0xFFF97316), foregroundColor: Colors.white),

@@ -586,7 +586,7 @@ class FirestoreService {
     });
   }
 
-  static Future<void> deletePackage(String id) async {
+  static Future<void> deletePackage(String id, {String? audit}) async {
     final batch = _db.batch();
     batch.delete(_db.collection('packages').doc(id));
     // ลบ session ที่ยังไม่เรียน (scheduled/อื่นๆ) ของแพ็กเกจนี้ — เก็บ completed ไว้ทำรายงาน
@@ -595,14 +595,20 @@ class FirestoreService {
       if ((d.data()['status'] as String? ?? '') != 'completed') batch.delete(d.reference);
     }
     await batch.commit();
+    if (audit != null) await logAudit('ลบแพ็กเกจ', detail: audit);
   }
 
-  static Future<void> addPackage(Map<String, dynamic> data) async {
+  static Future<void> addPackage(Map<String, dynamic> data, {String? audit}) async {
     await _db.collection('packages').add({...data, 'createdAt': FieldValue.serverTimestamp()});
+    if (audit != null) await logAudit('เพิ่มแพ็กเกจ', detail: audit);
   }
 
-  static Future<void> updatePackageFields(String id, Map<String, dynamic> data) async {
+  /// แก้ฟิลด์ในแพ็กเกจ — ส่ง [auditAction] เมื่อต้องการบันทึกลง audit log
+  /// (toggle ติดตาม/เรียนต่อ ไม่ต้องส่ง จะได้ไม่รก log)
+  static Future<void> updatePackageFields(String id, Map<String, dynamic> data,
+      {String? auditAction, String auditDetail = ''}) async {
     await _db.collection('packages').doc(id).update({...data, 'updatedAt': FieldValue.serverTimestamp()});
+    if (auditAction != null) await logAudit(auditAction, detail: auditDetail);
   }
 
   /// ตรวจสุขภาพข้อมูลคาบ (อ่านอย่างเดียว — ไม่แก้ไขอะไร)
@@ -637,7 +643,7 @@ class FirestoreService {
     return SessionHealthReport(totalPackages: packages.length, okCount: ok, issues: issues);
   }
 
-  static Future<void> adjustSessions(String id, {int totalDelta = 0, int remainingDelta = 0, String? studentId}) async {
+  static Future<void> adjustSessions(String id, {int totalDelta = 0, int remainingDelta = 0, String? studentId, String? audit}) async {
     await _db.collection('packages').doc(id).update({
       if (totalDelta != 0) 'totalSessions': FieldValue.increment(totalDelta),
       if (remainingDelta != 0) 'remainingSessions': FieldValue.increment(remainingDelta),
@@ -649,6 +655,7 @@ class FirestoreService {
         if (totalDelta < 0) 'totalRemoved': FieldValue.increment(-totalDelta),
       });
     }
+    if (audit != null) await logAudit(totalDelta >= 0 ? 'เพิ่มคาบ' : 'ลบคาบ', detail: audit);
   }
 
   // ── User management ──────────────────────────────────────────────────────
