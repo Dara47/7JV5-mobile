@@ -8,6 +8,7 @@ import 'payroll_screen.dart';
 import 'import_users_screen.dart';
 import 'admin_profile_screen.dart';
 import 'session_health_screen.dart';
+import 'anomaly_check_screen.dart';
 
 class SettingsScreen extends StatefulWidget {
   const SettingsScreen({super.key});
@@ -352,6 +353,24 @@ class _SettingsScreenState extends State<SettingsScreen> {
                   label: const Text('ตรวจสุขภาพข้อมูลคาบ', style: TextStyle(fontSize: 16, fontWeight: FontWeight.bold, color: Color(0xFF00897B))),
                   style: OutlinedButton.styleFrom(
                     side: const BorderSide(color: Color(0xFF00897B)),
+                    shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(12)),
+                  ),
+                ),
+              ),
+              const SizedBox(height: 10),
+              Text(
+                'ตรวจค่าผิดปกติในตาราง เช่น เวลากลับด้าน คาบสั้น/ยาวผิดปกติ เวลาดึก คาบซ้ำ โควตาเพี้ยน — อ่านอย่างเดียว ไม่แก้ไขข้อมูล',
+                style: TextStyle(fontSize: 12, color: Colors.grey.shade600),
+              ),
+              const SizedBox(height: 8),
+              SizedBox(
+                height: 52,
+                child: OutlinedButton.icon(
+                  onPressed: () => Navigator.push(context, MaterialPageRoute(builder: (_) => const AnomalyCheckScreen())),
+                  icon: const Icon(Icons.report_problem_outlined, color: Color(0xFF7E57C2)),
+                  label: const Text('ตรวจค่าผิดปกติ', style: TextStyle(fontSize: 16, fontWeight: FontWeight.bold, color: Color(0xFF7E57C2))),
+                  style: OutlinedButton.styleFrom(
+                    side: const BorderSide(color: Color(0xFF7E57C2)),
                     shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(12)),
                   ),
                 ),

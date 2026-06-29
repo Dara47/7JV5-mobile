@@ -643,6 +643,83 @@ class FirestoreService {
     return SessionHealthReport(totalPackages: packages.length, okCount: ok, issues: issues);
   }
 
+  static int? _timeToMin(String t) {
+    final p = t.split(':');
+    if (p.length < 2) return null;
+    final h = int.tryParse(p[0]);
+    final m = int.tryParse(p[1]);
+    if (h == null || m == null) return null;
+    return h * 60 + m;
+  }
+
+  /// ตรวจค่าผิดปกติในตาราง/แพ็กเกจ (อ่านอย่างเดียว — ไม่แก้ไข) สแกนเฉพาะแพ็กที่ใช้งานอยู่
+  /// แดง = ข้อมูลผิดจริง (โควตาเพี้ยน/เวลากลับด้าน), ส้ม = น่าสงสัยอาจตั้งใจ (เวลาแปลก/วันไกล/ซ้ำ)
+  static Future<AnomalyReport> checkAnomalies() async {
+    final pkgSnap = await _db.collection('packages').get();
+    final packages = pkgSnap.docs.map(PackageModel.fromDoc)
+        .where((p) => p.status == 'active').toList();
+    final issues = <AnomalyIssue>[];
+    final now = nowThai();
+
+    for (final p in packages) {
+      final total = p.totalSessions, remaining = p.remainingSessions;
+      // ── โควตา (error) ──
+      if (total <= 0) issues.add(AnomalyIssue(pkg: p, isError: true, message: 'จำนวนคาบรวม ≤ 0 (รวม $total)'));
+      if (remaining < 0) issues.add(AnomalyIssue(pkg: p, isError: true, message: 'คงเหลือติดลบ (เหลือ $remaining)'));
+      if (remaining > total) issues.add(AnomalyIssue(pkg: p, isError: true, message: 'คงเหลือเกินจำนวนรวม (เหลือ $remaining > รวม $total)'));
+
+      // ── ราย slot ──
+      final seen = <String>{};
+      final perDate = <String, int>{};
+      for (final s in p.effectiveSlots) {
+        final label = (s.date != null && s.date!.isNotEmpty)
+            ? '${thaiShortDateFromStr(s.date!)} ${s.day}'
+            : 'ทุก${s.day}';
+        final sm = s.startTime.isEmpty ? null : _timeToMin(s.startTime);
+        final em = s.endTime.isEmpty ? null : _timeToMin(s.endTime);
+
+        if (s.startTime.isEmpty || s.endTime.isEmpty) {
+          issues.add(AnomalyIssue(pkg: p, isError: true, message: 'คาบไม่มีเวลาเริ่ม/สิ้นสุด ($label)'));
+        } else if (sm == null || em == null) {
+          issues.add(AnomalyIssue(pkg: p, isError: true, message: 'รูปแบบเวลาไม่ถูกต้อง ($label ${s.startTime}–${s.endTime})'));
+        } else if (em <= sm) {
+          issues.add(AnomalyIssue(pkg: p, isError: true, message: 'เวลาสิ้นสุดไม่เกินเวลาเริ่ม ($label ${s.startTime}–${s.endTime})'));
+        } else {
+          final dur = em - sm;
+          if (dur < 10) issues.add(AnomalyIssue(pkg: p, isError: false, message: 'คาบสั้นผิดปกติ ($dur นาที: $label ${s.startTime}–${s.endTime})'));
+          if (dur > 180) issues.add(AnomalyIssue(pkg: p, isError: false, message: 'คาบยาวผิดปกติ ($dur นาที: $label)'));
+          if (sm < 360 || sm >= 1260) issues.add(AnomalyIssue(pkg: p, isError: false, message: 'เวลาเรียนผิดปกติ ($label ${s.startTime})'));
+        }
+
+        // วันที่
+        if (s.date != null && s.date!.isNotEmpty) {
+          final d = parseDateStr(s.date!);
+          if (d == null) {
+            issues.add(AnomalyIssue(pkg: p, isError: true, message: 'วันที่ไม่ถูกต้อง (${s.date})'));
+          } else {
+            final diffDays = d.difference(DateTime(now.year, now.month, now.day)).inDays;
+            if (diffDays < -365) issues.add(AnomalyIssue(pkg: p, isError: false, message: 'วันที่เป็นอดีตนานผิดปกติ (${thaiShortDateFromStr(s.date!)})'));
+            if (diffDays > 365) issues.add(AnomalyIssue(pkg: p, isError: false, message: 'วันที่อนาคตไกลผิดปกติ (${thaiShortDateFromStr(s.date!)})'));
+          }
+          perDate[s.date!] = (perDate[s.date!] ?? 0) + 1;
+        }
+
+        // ซ้ำ (วันที่/วัน + เวลาเริ่ม เดียวกัน)
+        final key = '${s.date ?? s.day}_${s.startTime}';
+        if (!seen.add(key)) {
+          issues.add(AnomalyIssue(pkg: p, isError: false, message: 'คาบซ้ำ ($label ${s.startTime})'));
+        }
+      }
+      // วันเดียวหลายคาบผิดปกติ (> 4)
+      perDate.forEach((date, c) {
+        if (c > 4) issues.add(AnomalyIssue(pkg: p, isError: false, message: 'วันเดียว $c คาบ (${thaiShortDateFromStr(date)})'));
+      });
+    }
+
+    issues.sort((a, b) => (a.isError == b.isError) ? 0 : (a.isError ? -1 : 1)); // error ก่อน
+    return AnomalyReport(scannedPackages: packages.length, issues: issues);
+  }
+
   static Future<void> adjustSessions(String id, {int totalDelta = 0, int remainingDelta = 0, String? studentId, String? audit}) async {
     await _db.collection('packages').doc(id).update({
       if (totalDelta != 0) 'totalSessions': FieldValue.increment(totalDelta),
@@ -1052,4 +1129,22 @@ class SessionHealthIssue {
   /// นำเข้าเก่า = มีเรียนแล้ว(>0) แต่ไม่มี record คาบจริงเลย (completedCount==0)
   /// = ข้อมูลโอนย้ายจาก V4.1.2 ที่ใส่ used มาเลย ไม่ใช่ความผิดพลาด
   bool get isLegacy => completedCount == 0;
+}
+
+/// รายงานค่าผิดปกติในตาราง/แพ็กเกจ (อ่านอย่างเดียว)
+class AnomalyReport {
+  final int scannedPackages;
+  final List<AnomalyIssue> issues;
+  const AnomalyReport({required this.scannedPackages, required this.issues});
+  bool get allClean => issues.isEmpty;
+  List<AnomalyIssue> get errors => issues.where((i) => i.isError).toList();
+  List<AnomalyIssue> get warnings => issues.where((i) => !i.isError).toList();
+}
+
+/// ค่าผิดปกติ 1 รายการ — isError=true แดง (ผิดจริง), false ส้ม (น่าสงสัย)
+class AnomalyIssue {
+  final PackageModel pkg;
+  final bool isError;
+  final String message;
+  const AnomalyIssue({required this.pkg, required this.isError, required this.message});
 }
