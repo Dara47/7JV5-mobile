@@ -13,6 +13,20 @@ class _AuditLogScreenState extends State<AuditLogScreen> {
   final _searchCtrl = TextEditingController();
   String _q = '';
 
+  // แสดงทีละ 20 รายการ กดโหลดเพิ่มทีละ 20 (โหลดเท่าที่ดู — ไม่ดึงทั้งหมด)
+  int _limit = 20;
+  Stream<List<AuditLogModel>>? _stream;
+  int _streamFor = -1;
+
+  /// แคช stream ตาม _limit — สร้างใหม่เฉพาะตอน limit เปลี่ยน (ไม่ให้ resubscribe ทุกครั้งที่พิมพ์ค้นหา)
+  Stream<List<AuditLogModel>> _logStream() {
+    if (_stream == null || _streamFor != _limit) {
+      _streamFor = _limit;
+      _stream = FirestoreService.watchAuditLogs(limit: _limit);
+    }
+    return _stream!;
+  }
+
   @override
   void initState() {
     super.initState();
@@ -60,7 +74,7 @@ class _AuditLogScreenState extends State<AuditLogScreen> {
         ),
         Expanded(
           child: StreamBuilder<List<AuditLogModel>>(
-            stream: FirestoreService.watchAuditLogs(),
+            stream: _logStream(),
             builder: (context, snap) {
               if (snap.connectionState == ConnectionState.waiting) {
                 return const Center(child: CircularProgressIndicator());
@@ -81,15 +95,33 @@ class _AuditLogScreenState extends State<AuditLogScreen> {
                 ]));
               }
 
-              return ListView.separated(
+              // มีรายการเพิ่มให้โหลดเมื่อ จำนวนที่ดึงมา == limit (อาจมีมากกว่านี้)
+              final hasMore = all.length >= _limit;
+              return ListView.builder(
                 padding: const EdgeInsets.fromLTRB(12, 8, 12, 24),
-                itemCount: logs.length,
-                separatorBuilder: (_, __) => const SizedBox(height: 6),
+                itemCount: logs.length + (hasMore ? 1 : 0),
                 itemBuilder: (_, i) {
+                  // แถวสุดท้าย = ปุ่มโหลดเพิ่ม
+                  if (i >= logs.length) {
+                    return Padding(
+                      padding: const EdgeInsets.only(top: 10),
+                      child: OutlinedButton.icon(
+                        onPressed: () => setState(() => _limit += 20),
+                        icon: const Icon(Icons.expand_more, size: 18),
+                        label: const Text('โหลดเพิ่ม 20 รายการ'),
+                        style: OutlinedButton.styleFrom(
+                          foregroundColor: const Color(0xFF37474F),
+                          side: const BorderSide(color: Color(0xFF37474F)),
+                          shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(12)),
+                          padding: const EdgeInsets.symmetric(vertical: 12),
+                        ),
+                      ),
+                    );
+                  }
                   final l = logs[i];
                   final c = _actionColor(l.action);
                   return Card(
-                    margin: EdgeInsets.zero,
+                    margin: const EdgeInsets.only(bottom: 6),
                     shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(12)),
                     elevation: 1,
                     child: Padding(
