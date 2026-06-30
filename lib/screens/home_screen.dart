@@ -1,5 +1,4 @@
 import 'dart:async';
-import 'dart:ui';
 import 'package:flutter/material.dart';
 import 'package:firebase_auth/firebase_auth.dart';
 import '../models/models.dart';
@@ -40,7 +39,10 @@ class _HomeScreenState extends State<HomeScreen> {
   int _selectedIndex = 0;
   // โหลดหน้าแบบ lazy: build เฉพาะหน้าที่เคยเปิด (กันโหลด Firestore ทุกหน้าพร้อมกันตอนเปิดแอป)
   // มือถือเดิมขาว/อืดเพราะ IndexedStack build ทุกหน้า → ทุก listener ทำงานพร้อมกัน
-  final Set<int> _visited = {0};
+  final Set<int> _visited = {};
+  // หลัง login เจอ "หน้าหลัก" (กริดเมนูเต็มจอ) เสมอ ยังไม่เปิดเมนูใด (ยังไม่ subscribe Firestore หน้าใด)
+  // กดไอคอน → เข้าเมนูนั้น, ปุ่มโฮมลอยล่างในทุกเมนู = กลับหน้าหลักนี้
+  bool _atHome = true;
   int _refreshKey = 0;
 
   // Badge counts (admin only)
@@ -189,30 +191,20 @@ class _HomeScreenState extends State<HomeScreen> {
     }
   }
 
-  void _openMenu() {
-    showModalBottomSheet(
-      context: context,
-      backgroundColor: Colors.transparent,
-      isScrollControlled: true,
-      builder: (_) => _MenuSheet(
-        items: _navItems,
-        selectedIndex: _selectedIndex,
-        roleLabel: _roleLabel,
-        onSelect: (i) {
-          Navigator.pop(context);
-          setState(() { _selectedIndex = i; _visited.add(i); });
-        },
-        onRefresh: () { Navigator.pop(context); _refresh(); },
-        onLogout: () { Navigator.pop(context); _logout(); },
-      ),
-    );
+  /// เปิดเมนูจากหน้าหลัก
+  void _openScreen(int i) {
+    setState(() { _atHome = false; _selectedIndex = i; _visited.add(i); });
   }
+
+  /// กลับหน้าหลัก (กริดเมนู) — เรียกจากปุ่มโฮมลอยล่างในทุกเมนู
+  void _goHome() => setState(() => _atHome = true);
 
   @override
   Widget build(BuildContext context) {
     final screens = _screens;
     if (_selectedIndex >= screens.length) _selectedIndex = 0;
-    _visited.add(_selectedIndex);
+    // มาร์ก visited เฉพาะตอนอยู่ในเมนู (อยู่หน้าหลักยังไม่ build/subscribe หน้าใด)
+    if (!_atHome) _visited.add(_selectedIndex);
     // หน้าที่ยังไม่เคยเปิด → ใส่ placeholder เบา ๆ แทน (ยังไม่ build/ยังไม่ subscribe Firestore)
     // หน้าที่เปิดแล้วยังคงอยู่ใน stack (เก็บ state เหมือน IndexedStack เดิม แค่ค่อย ๆ โหลด)
     final lazyScreens = [
@@ -221,9 +213,23 @@ class _HomeScreenState extends State<HomeScreen> {
     ];
 
     return Scaffold(
-      body: IndexedStack(index: _selectedIndex, children: lazyScreens),
+      body: Stack(children: [
+        IndexedStack(index: _selectedIndex, children: lazyScreens),
+        // หน้าหลัก (กริดเมนู) วางทับเป็น overlay ทึบ — เมนูข้างใต้คง state ไว้ ไม่ถูก dispose
+        if (_atHome)
+          Positioned.fill(child: _HomePage(
+            items: _navItems,
+            selectedIndex: _selectedIndex,
+            roleLabel: _roleLabel,
+            onSelect: _openScreen,
+            onRefresh: _refresh,
+            onLogout: _logout,
+          )),
+      ]),
       floatingActionButtonLocation: FloatingActionButtonLocation.centerFloat,
-      floatingActionButton: _HomeButton(badge: _totalBadge, onTap: _openMenu),
+      // อยู่หน้าหลักไม่ต้องมีปุ่ม (กริดอยู่ตรงหน้าแล้ว); อยู่ในเมนู → ปุ่มโฮม = กลับหน้าหลัก
+      floatingActionButton:
+          _atHome ? null : _HomeButton(badge: _totalBadge, onTap: _goHome),
     );
   }
 }
@@ -252,7 +258,7 @@ class _HomeButton extends StatelessWidget {
               BoxShadow(color: _kOrange.withAlpha(110), blurRadius: 14, offset: const Offset(0, 5)),
             ],
           ),
-          child: const Icon(Icons.apps_rounded, color: Colors.white, size: 30),
+          child: const Icon(Icons.home_rounded, color: Colors.white, size: 30),
         ),
         if (badge > 0)
           Positioned(
@@ -278,14 +284,14 @@ class _HomeButton extends StatelessWidget {
 
 // ── Menu popup (iOS-style app grid) ───────────────────────────────────────────
 
-class _MenuSheet extends StatefulWidget {
+class _HomePage extends StatefulWidget {
   final List<_NavItem> items;
   final int selectedIndex;
   final String roleLabel;
   final ValueChanged<int> onSelect;
   final VoidCallback onRefresh;
   final VoidCallback onLogout;
-  const _MenuSheet({
+  const _HomePage({
     required this.items,
     required this.selectedIndex,
     required this.roleLabel,
@@ -295,10 +301,10 @@ class _MenuSheet extends StatefulWidget {
   });
 
   @override
-  State<_MenuSheet> createState() => _MenuSheetState();
+  State<_HomePage> createState() => _HomePageState();
 }
 
-class _MenuSheetState extends State<_MenuSheet> with SingleTickerProviderStateMixin {
+class _HomePageState extends State<_HomePage> with SingleTickerProviderStateMixin {
   late final AnimationController _ctrl;
 
   @override
@@ -362,115 +368,104 @@ class _MenuSheetState extends State<_MenuSheet> with SingleTickerProviderStateMi
 
     final dayColor = _dayColor();
 
-    return ClipRRect(
-      borderRadius: const BorderRadius.vertical(top: Radius.circular(24)),
-      child: BackdropFilter(
-        filter: ImageFilter.blur(sigmaX: 12, sigmaY: 12),
-        child: Container(
-          decoration: BoxDecoration(
-            color: Colors.white.withAlpha(245),
-            borderRadius: const BorderRadius.vertical(top: Radius.circular(24)),
+    // หน้าหลักเต็มจอ (ทึบ) — วางทับ IndexedStack เป็น landing หลัง login
+    return Container(
+      color: const Color(0xFFF7F8FA),
+      child: DecoratedBox(
+        decoration: BoxDecoration(
+          gradient: LinearGradient(
+            begin: Alignment.topCenter, end: Alignment.bottomCenter,
+            colors: [dayColor.withValues(alpha: 0.12), Colors.transparent],
+            stops: const [0.0, 0.45],
           ),
-          child: SafeArea(
-            top: false,
-            child: Column(mainAxisSize: MainAxisSize.min, children: [
-              // Handle
-              Container(
-                margin: const EdgeInsets.only(top: 10, bottom: 4),
-                width: 40, height: 4,
-                decoration: BoxDecoration(color: Colors.grey.shade300, borderRadius: BorderRadius.circular(2)),
-              ),
-              // Header (พื้นหลังไล่สี "ตามวัน" + คำทักทายตามเวลา + วันที่ไทย)
-              Container(
-                decoration: BoxDecoration(
-                  gradient: LinearGradient(
-                    begin: Alignment.topLeft, end: Alignment.bottomRight,
-                    colors: [dayColor.withValues(alpha: 0.14), dayColor.withValues(alpha: 0.02)],
-                  ),
+        ),
+        child: SafeArea(
+          child: Column(children: [
+            // Header (พื้นหลังไล่สี "ตามวัน" + คำทักทายตามเวลา + วันที่ไทย)
+            Container(
+              decoration: BoxDecoration(
+                gradient: LinearGradient(
+                  begin: Alignment.topLeft, end: Alignment.bottomRight,
+                  colors: [dayColor.withValues(alpha: 0.14), dayColor.withValues(alpha: 0.02)],
                 ),
-                padding: const EdgeInsets.fromLTRB(20, 10, 12, 10),
-                child: Row(children: [
-                  Container(
-                    width: 42, height: 42,
-                    decoration: BoxDecoration(
-                      gradient: const LinearGradient(
-                        colors: [_kOrange, Color(0xFFFF8F00)],
-                        begin: Alignment.topLeft, end: Alignment.bottomRight,
-                      ),
-                      borderRadius: BorderRadius.circular(12),
-                      boxShadow: [
-                        BoxShadow(color: _kOrange.withAlpha(80), blurRadius: 8, offset: const Offset(0, 3)),
-                      ],
+              ),
+              padding: const EdgeInsets.fromLTRB(20, 12, 16, 12),
+              child: Row(children: [
+                Container(
+                  width: 46, height: 46,
+                  decoration: BoxDecoration(
+                    gradient: const LinearGradient(
+                      colors: [_kOrange, Color(0xFFFF8F00)],
+                      begin: Alignment.topLeft, end: Alignment.bottomRight,
                     ),
-                    child: const Center(child: Text('7J',
-                        style: TextStyle(color: Colors.white, fontWeight: FontWeight.bold, fontSize: 15))),
+                    borderRadius: BorderRadius.circular(12),
+                    boxShadow: [
+                      BoxShadow(color: _kOrange.withAlpha(80), blurRadius: 8, offset: const Offset(0, 3)),
+                    ],
                   ),
-                  const SizedBox(width: 12),
-                  Expanded(child: Column(crossAxisAlignment: CrossAxisAlignment.start, children: [
-                    Text('${_greeting().text} ${_greeting().emoji}',
-                        style: const TextStyle(fontSize: 12, fontWeight: FontWeight.w600, color: Color(0xFFE65100))),
-                    const SizedBox(height: 1),
-                    Text(widget.roleLabel, style: const TextStyle(fontWeight: FontWeight.bold, fontSize: 15)),
-                    const SizedBox(height: 3),
-                    // แถววันที่ไทย ใช้ "สีประจำวัน"
-                    Row(children: [
-                      Icon(Icons.event_rounded, size: 13, color: dayColor),
-                      const SizedBox(width: 4),
-                      Flexible(child: Text(thaiDateFull(nowThai()),
-                          overflow: TextOverflow.ellipsis,
-                          style: TextStyle(fontSize: 11.5, fontWeight: FontWeight.w700, color: dayColor))),
-                    ]),
-                  ])),
-                  IconButton(
-                    onPressed: () => Navigator.pop(context),
-                    icon: const Icon(Icons.close, color: Colors.grey),
-                  ),
-                ]),
-              ),
-              const Divider(height: 1),
-
-              // App grid
-              Flexible(
-                child: GridView.builder(
-                  shrinkWrap: true,
-                  padding: const EdgeInsets.fromLTRB(12, 16, 12, 8),
-                  gridDelegate: SliverGridDelegateWithFixedCrossAxisCount(
-                    crossAxisCount: cols,
-                    childAspectRatio: 0.82,
-                    crossAxisSpacing: 4,
-                    mainAxisSpacing: 12,
-                  ),
-                  itemCount: items.length,
-                  itemBuilder: (_, i) => _staggered(i, items.length, _AppTile(
-                    item: items[i],
-                    selected: widget.selectedIndex == i,
-                    onTap: () => widget.onSelect(i),
-                  )),
+                  child: const Center(child: Text('7J',
+                      style: TextStyle(color: Colors.white, fontWeight: FontWeight.bold, fontSize: 16))),
                 ),
-              ),
+                const SizedBox(width: 12),
+                Expanded(child: Column(crossAxisAlignment: CrossAxisAlignment.start, children: [
+                  Text('${_greeting().text} ${_greeting().emoji}',
+                      style: const TextStyle(fontSize: 12.5, fontWeight: FontWeight.w600, color: Color(0xFFE65100))),
+                  const SizedBox(height: 1),
+                  Text(widget.roleLabel, style: const TextStyle(fontWeight: FontWeight.bold, fontSize: 16)),
+                  const SizedBox(height: 3),
+                  // แถววันที่ไทย ใช้ "สีประจำวัน"
+                  Row(children: [
+                    Icon(Icons.event_rounded, size: 13, color: dayColor),
+                    const SizedBox(width: 4),
+                    Flexible(child: Text(thaiDateFull(nowThai()),
+                        overflow: TextOverflow.ellipsis,
+                        style: TextStyle(fontSize: 12, fontWeight: FontWeight.w700, color: dayColor))),
+                  ]),
+                ])),
+              ]),
+            ),
+            const Divider(height: 1),
 
-              const Divider(height: 1),
-              // Footer
-              Padding(
-                padding: const EdgeInsets.fromLTRB(16, 6, 16, 8),
-                child: Row(children: [
-                  Expanded(child: TextButton.icon(
-                    onPressed: widget.onRefresh,
-                    icon: const Icon(Icons.refresh, size: 18, color: Colors.grey),
-                    label: const Text('รีเฟรช', style: TextStyle(fontSize: 13, color: Colors.grey)),
-                    style: TextButton.styleFrom(alignment: Alignment.centerLeft),
-                  )),
-                  Text('Version 5.6.28', style: TextStyle(fontSize: 11, color: Colors.grey.shade400)),
-                  const SizedBox(width: 8),
-                  TextButton.icon(
-                    onPressed: widget.onLogout,
-                    icon: const Icon(Icons.logout, size: 18, color: Colors.red),
-                    label: const Text('ออก', style: TextStyle(fontSize: 13, color: Colors.red)),
-                  ),
-                ]),
+            // App grid
+            Expanded(
+              child: GridView.builder(
+                padding: const EdgeInsets.fromLTRB(12, 20, 12, 8),
+                gridDelegate: SliverGridDelegateWithFixedCrossAxisCount(
+                  crossAxisCount: cols,
+                  childAspectRatio: 0.82,
+                  crossAxisSpacing: 4,
+                  mainAxisSpacing: 16,
+                ),
+                itemCount: items.length,
+                itemBuilder: (_, i) => _staggered(i, items.length, _AppTile(
+                  item: items[i],
+                  selected: widget.selectedIndex == i,
+                  onTap: () => widget.onSelect(i),
+                )),
               ),
-            ]),
-          ),
+            ),
+
+            const Divider(height: 1),
+            // Footer
+            Padding(
+              padding: const EdgeInsets.fromLTRB(16, 6, 16, 8),
+              child: Row(children: [
+                Expanded(child: TextButton.icon(
+                  onPressed: widget.onRefresh,
+                  icon: const Icon(Icons.refresh, size: 18, color: Colors.grey),
+                  label: const Text('รีเฟรช', style: TextStyle(fontSize: 13, color: Colors.grey)),
+                  style: TextButton.styleFrom(alignment: Alignment.centerLeft),
+                )),
+                Text('Version 5.6.28', style: TextStyle(fontSize: 11, color: Colors.grey.shade400)),
+                const SizedBox(width: 8),
+                TextButton.icon(
+                  onPressed: widget.onLogout,
+                  icon: const Icon(Icons.logout, size: 18, color: Colors.red),
+                  label: const Text('ออก', style: TextStyle(fontSize: 13, color: Colors.red)),
+                ),
+              ]),
+            ),
+          ]),
         ),
       ),
     );
