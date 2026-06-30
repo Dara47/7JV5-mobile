@@ -1001,6 +1001,20 @@ class FirestoreService {
     await logAudit('ลบใบลา', detail: who ?? id);
   }
 
+  /// ลบใบลาหลายรายการพร้อมกัน (batch, แบ่งก้อนละ 450) — คืนจำนวนที่ลบ
+  static Future<int> deleteLeaveRequests(List<String> ids) async {
+    if (ids.isEmpty) return 0;
+    for (var i = 0; i < ids.length; i += 450) {
+      final batch = _db.batch();
+      for (final id in ids.sublist(i, (i + 450) > ids.length ? ids.length : i + 450)) {
+        batch.delete(_db.collection('leaveRequests').doc(id));
+      }
+      await batch.commit();
+    }
+    await logAudit('ลบใบลา', detail: 'ลบหลายรายการ ${ids.length} ใบ');
+    return ids.length;
+  }
+
   // ── Teacher slots ─────────────────────────────────────────────────────────
 
   static Stream<TeacherSlotModel?> watchTeacherSlot(String teacherId) {

@@ -26,10 +26,101 @@ class _AdminLeaveView extends StatefulWidget {
 
 class _AdminLeaveViewState extends State<_AdminLeaveView> {
   String _filter = 'pending';
+  // แสดงทีละ 20 รายการ กดโหลดเพิ่มทีละ 20
+  int _limit = 20;
+  // โหมดติ๊กเลือกเพื่อลบหลายรายการ
+  bool _selectMode = false;
+  final Set<String> _selectedIds = {};
 
   List<LeaveRequestModel> _filtered(List<LeaveRequestModel> all) {
     if (_filter == 'all') return all;
     return all.where((r) => r.status == _filter).toList();
+  }
+
+  /// เปลี่ยนแท็บกรอง — รีเซ็ตจำนวนที่แสดง + ออกจากโหมดเลือก
+  void _setFilter(String f) => setState(() {
+    _filter = f;
+    _limit = 20;
+    _selectMode = false;
+    _selectedIds.clear();
+  });
+
+  void _confirmDeleteSelected() {
+    final ids = _selectedIds.toList();
+    if (ids.isEmpty) return;
+    showDialog(
+      context: context,
+      builder: (_) => AlertDialog(
+        title: const Text('ลบใบลา'),
+        content: Text('ลบใบลาที่เลือก ${ids.length} รายการ?'),
+        actions: [
+          TextButton(onPressed: () => Navigator.pop(context), child: const Text('ยกเลิก')),
+          TextButton(
+            onPressed: () async {
+              Navigator.pop(context);
+              await FirestoreService.deleteLeaveRequests(ids);
+              if (mounted) {
+                setState(() { _selectMode = false; _selectedIds.clear(); });
+                ScaffoldMessenger.of(context).showSnackBar(
+                  SnackBar(content: Text('ลบแล้ว ${ids.length} รายการ'), backgroundColor: Colors.red));
+              }
+            },
+            child: const Text('ลบ', style: TextStyle(color: Colors.red)),
+          ),
+        ],
+      ),
+    );
+  }
+
+  /// แถบเครื่องมือเลือก/ลบ — แสดงเมื่อมีรายการ
+  Widget _selectToolbar(List<LeaveRequestModel> shown) {
+    if (!_selectMode) {
+      return Align(
+        alignment: Alignment.centerRight,
+        child: Padding(
+          padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 2),
+          child: TextButton.icon(
+            onPressed: () => setState(() => _selectMode = true),
+            icon: const Icon(Icons.checklist, size: 18),
+            label: const Text('เลือกเพื่อลบ'),
+            style: TextButton.styleFrom(foregroundColor: _kColor),
+          ),
+        ),
+      );
+    }
+    final allSelected = shown.isNotEmpty && shown.every((r) => _selectedIds.contains(r.id));
+    return Container(
+      color: Colors.orange.shade50,
+      padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 4),
+      child: Row(children: [
+        TextButton.icon(
+          onPressed: () => setState(() {
+            if (allSelected) {
+              for (final r in shown) { _selectedIds.remove(r.id); }
+            } else {
+              for (final r in shown) { _selectedIds.add(r.id); }
+            }
+          }),
+          icon: Icon(allSelected ? Icons.check_box : Icons.check_box_outline_blank, size: 18),
+          label: Text(allSelected ? 'ไม่เลือก' : 'เลือกทั้งหมด'),
+          style: TextButton.styleFrom(foregroundColor: _kColor),
+        ),
+        const Spacer(),
+        Text('เลือก ${_selectedIds.length}', style: TextStyle(fontSize: 12, color: Colors.grey.shade700)),
+        const SizedBox(width: 8),
+        ElevatedButton.icon(
+          onPressed: _selectedIds.isEmpty ? null : _confirmDeleteSelected,
+          icon: const Icon(Icons.delete_outline, size: 18),
+          label: const Text('ลบ'),
+          style: ElevatedButton.styleFrom(backgroundColor: Colors.red, foregroundColor: Colors.white),
+        ),
+        IconButton(
+          tooltip: 'ยกเลิก',
+          onPressed: () => setState(() { _selectMode = false; _selectedIds.clear(); }),
+          icon: const Icon(Icons.close),
+        ),
+      ]),
+    );
   }
 
   void _confirmApprove(LeaveRequestModel r) {
@@ -143,23 +234,25 @@ class _AdminLeaveViewState extends State<_AdminLeaveView> {
               child: Row(children: [
                 _FilterChip(label: 'รอพิจารณา', count: all.where((r) => r.isPending).length,
                     selected: _filter == 'pending', color: Colors.orange,
-                    onTap: () => setState(() => _filter = 'pending')),
+                    onTap: () => _setFilter('pending')),
                 const SizedBox(width: 6),
                 _FilterChip(label: 'อนุมัติ', count: all.where((r) => r.isApproved).length,
                     selected: _filter == 'approved', color: Colors.green,
-                    onTap: () => setState(() => _filter = 'approved')),
+                    onTap: () => _setFilter('approved')),
                 const SizedBox(width: 6),
                 _FilterChip(label: 'ปฏิเสธ', count: all.where((r) => r.isRejected).length,
                     selected: _filter == 'rejected', color: Colors.red,
-                    onTap: () => setState(() => _filter = 'rejected')),
+                    onTap: () => _setFilter('rejected')),
                 const SizedBox(width: 6),
                 _FilterChip(label: 'ทั้งหมด', count: all.length,
                     selected: _filter == 'all', color: Colors.blueGrey,
-                    onTap: () => setState(() => _filter = 'all')),
+                    onTap: () => _setFilter('all')),
               ]),
             ),
 
-            if (pending > 0 && _filter == 'pending')
+            if (shown.isNotEmpty) _selectToolbar(shown),
+
+            if (pending > 0 && _filter == 'pending' && !_selectMode)
               Container(
                 width: double.infinity,
                 padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 6),
@@ -175,17 +268,61 @@ class _AdminLeaveViewState extends State<_AdminLeaveView> {
                       const SizedBox(height: 8),
                       const Text('ไม่มีใบลา', style: TextStyle(color: Colors.grey)),
                     ]))
-                  : ListView.separated(
-                      padding: const EdgeInsets.fromLTRB(12, 8, 12, 24),
-                      itemCount: shown.length,
-                      separatorBuilder: (_, __) => const SizedBox(height: 6),
-                      itemBuilder: (_, i) => _AdminLeaveCard(
-                        leave: shown[i],
-                        onApprove: () => _confirmApprove(shown[i]),
-                        onReject: () => _confirmReject(shown[i]),
-                        onDelete: () => _confirmDelete(shown[i]),
-                      ),
-                    ),
+                  : Builder(builder: (_) {
+                      final visible = shown.take(_limit).toList();
+                      final remaining = shown.length - visible.length;
+                      return ListView.builder(
+                        padding: const EdgeInsets.fromLTRB(12, 8, 12, 24),
+                        itemCount: visible.length + (remaining > 0 ? 1 : 0),
+                        itemBuilder: (_, i) {
+                          // แถวสุดท้าย = ปุ่มโหลดเพิ่ม
+                          if (i >= visible.length) {
+                            return Padding(
+                              padding: const EdgeInsets.only(top: 10),
+                              child: OutlinedButton.icon(
+                                onPressed: () => setState(() => _limit += 20),
+                                icon: const Icon(Icons.expand_more, size: 18),
+                                label: Text('โหลดเพิ่ม (เหลืออีก $remaining)'),
+                                style: OutlinedButton.styleFrom(
+                                  foregroundColor: _kColor,
+                                  side: const BorderSide(color: _kColor),
+                                  shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(12)),
+                                  padding: const EdgeInsets.symmetric(vertical: 12),
+                                ),
+                              ),
+                            );
+                          }
+                          final r = visible[i];
+                          final card = _AdminLeaveCard(
+                            leave: r,
+                            onApprove: () => _confirmApprove(r),
+                            onReject: () => _confirmReject(r),
+                            onDelete: () => _confirmDelete(r),
+                          );
+                          if (!_selectMode) {
+                            return Padding(padding: const EdgeInsets.only(bottom: 6), child: card);
+                          }
+                          // โหมดเลือก: ติ๊ก checkbox + ปิดปุ่มภายในการ์ดชั่วคราว
+                          final checked = _selectedIds.contains(r.id);
+                          return Padding(
+                            padding: const EdgeInsets.only(bottom: 6),
+                            child: GestureDetector(
+                              onTap: () => setState(() =>
+                                  checked ? _selectedIds.remove(r.id) : _selectedIds.add(r.id)),
+                              child: Row(crossAxisAlignment: CrossAxisAlignment.start, children: [
+                                Checkbox(
+                                  value: checked,
+                                  activeColor: _kColor,
+                                  onChanged: (v) => setState(() =>
+                                      v == true ? _selectedIds.add(r.id) : _selectedIds.remove(r.id)),
+                                ),
+                                Expanded(child: AbsorbPointer(child: card)),
+                              ]),
+                            ),
+                          );
+                        },
+                      );
+                    }),
             ),
           ]);
         },
