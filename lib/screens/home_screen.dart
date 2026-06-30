@@ -213,7 +213,9 @@ class _HomeScreenState extends State<HomeScreen> {
     ];
 
     return Scaffold(
-      body: Stack(children: [
+      // StackFit.expand: บังคับเต็มจอเสมอ — ตอนอยู่หน้าหลัก _visited ว่าง ทุกหน้าใน
+      // IndexedStack เป็น SizedBox 0 ถ้าไม่บังคับ Stack จะยุบเหลือ 0 = จอเปล่า
+      body: Stack(fit: StackFit.expand, children: [
         IndexedStack(index: _selectedIndex, children: lazyScreens),
         // หน้าหลัก (กริดเมนู) วางทับเป็น overlay ทึบ — เมนูข้างใต้คง state ไว้ ไม่ถูก dispose
         if (_atHome)
