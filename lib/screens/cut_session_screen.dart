@@ -257,7 +257,8 @@ class _CutSessionScreenState extends State<CutSessionScreen> {
                       ]),
                     )
                   : ListView.separated(
-                      padding: const EdgeInsets.fromLTRB(12, 8, 12, 24),
+                      // เผื่อที่ด้านล่างให้พ้นปุ่มโฮมลอย (FAB 60px + ระยะขอบ) ไม่ให้บังการ์ดสุดท้าย
+                      padding: const EdgeInsets.fromLTRB(12, 8, 12, 96),
                       itemCount: items.length,
                       separatorBuilder: (_, __) => const SizedBox(height: 6),
                       itemBuilder: (_, i) {
@@ -292,7 +293,12 @@ class _CutSessionScreenState extends State<CutSessionScreen> {
                                   Row(children: [
                                     const Icon(Icons.person_outlined, size: 14, color: Color(0xFF2E7D32)),
                                     const SizedBox(width: 4),
-                                    Text(pkg.teacherName, style: const TextStyle(fontSize: 12, color: Colors.black87)),
+                                    Expanded(
+                                      child: Text(pkg.teacherName,
+                                          style: const TextStyle(fontSize: 12, color: Colors.black87),
+                                          maxLines: 2,
+                                          overflow: TextOverflow.ellipsis),
+                                    ),
                                   ]),
                                   const SizedBox(height: 4),
                                   Row(children: [
