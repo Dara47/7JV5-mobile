@@ -1,5 +1,6 @@
 import 'dart:async';
 import 'package:flutter/material.dart';
+import 'package:web/web.dart' as web;
 import '../models/models.dart';
 import '../services/firestore_service.dart';
 import '../services/notification_service.dart';
@@ -79,6 +80,9 @@ class _TeacherDashboardScreenState extends State<TeacherDashboardScreen> {
             UpcomingClassCard(info: next, isTeacher: true),
             const SizedBox(height: 12),
           ],
+
+          // ── ปุ่มเข้าห้องเรียน Google Meet (ลิงก์ของครูเอง) ──────────────
+          _meetButton(),
 
           // ── Stats row ────────────────────────────────────────────────
           Row(children: [
@@ -176,6 +180,42 @@ class _TeacherDashboardScreenState extends State<TeacherDashboardScreen> {
         ]),
       ]),
     ),
+  );
+
+  /// ปุ่มเข้าห้องเรียน Google Meet — เปิดลิงก์ของครูเอง (googleMeetLink ใน user doc)
+  /// ถ้าครูยังไม่ได้ตั้งลิงก์ → ไม่แสดงปุ่ม (admin ตั้งให้ในเมนูจัดการผู้ใช้)
+  Widget _meetButton() => StreamBuilder<UserModel?>(
+    stream: FirestoreService.watchUser(widget.appUser.uid),
+    builder: (context, snap) {
+      final link = snap.data?.googleMeetLink?.trim();
+      if (link == null || link.isEmpty) return const SizedBox.shrink();
+      return Padding(
+        padding: const EdgeInsets.only(bottom: 12),
+        child: InkWell(
+          onTap: () => web.window.open(link, '_blank'),
+          borderRadius: BorderRadius.circular(12),
+          child: Container(
+            padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 13),
+            decoration: BoxDecoration(
+              gradient: const LinearGradient(
+                  colors: [Color(0xFF1565C0), Color(0xFF1E88E5)],
+                  begin: Alignment.topLeft, end: Alignment.bottomRight),
+              borderRadius: BorderRadius.circular(12),
+              boxShadow: [BoxShadow(
+                  color: const Color(0xFF1565C0).withAlpha(60),
+                  blurRadius: 6, offset: const Offset(0, 2))],
+            ),
+            child: Row(children: [
+              const Icon(Icons.video_call_rounded, size: 24, color: Colors.white),
+              const SizedBox(width: 10),
+              Expanded(child: Text(_t('เข้าห้องเรียน Google Meet', 'Open Google Meet Room'),
+                  style: const TextStyle(color: Colors.white, fontWeight: FontWeight.w700, fontSize: 15))),
+              const Icon(Icons.open_in_new_rounded, size: 18, color: Colors.white70),
+            ]),
+          ),
+        ),
+      );
+    },
   );
 
   Widget _leaveShortcut(BuildContext context) => Card(
