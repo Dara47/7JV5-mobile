@@ -78,6 +78,92 @@
     <div class="spin"></div>
     <div class="txt">กำลังโหลด…</div>
   </div>
+
+  <!-- แบนเนอร์เตือนเมื่อเปิดจากเบราว์เซอร์ในแอป (LINE/Facebook/IG ฯลฯ) → แนะนำเปิดด้วย Chrome
+       เครื่อง/WebView เก่าใน in-app browser มักโหลด Flutter Web ไม่ขึ้น (จอขาว) — พาออก Chrome แก้ได้
+       เพิ่มอย่างเดียว ไม่แตะ logic บูตเดิม + ข้ามถ้าเปิดเป็นแอปที่ติดตั้งแล้ว (PWA standalone) -->
+  <style>
+    #inapp-banner {
+      position: fixed; top: 0; left: 0; right: 0; z-index: 2147483647;
+      background: #B91C1C; color: #fff; font-family: 'Roboto', system-ui, sans-serif;
+      padding: 10px 12px; box-shadow: 0 2px 10px rgba(0,0,0,.25);
+      display: flex; align-items: flex-start; gap: 10px;
+    }
+    #inapp-banner .ib-txt { flex: 1; font-size: 13px; line-height: 1.45; }
+    #inapp-banner .ib-txt b { font-weight: 700; }
+    #inapp-banner .ib-btns { display: flex; flex-direction: column; gap: 6px; }
+    #inapp-banner button {
+      white-space: nowrap; border: none; border-radius: 8px; padding: 8px 12px;
+      font-size: 13px; font-weight: 600; cursor: pointer;
+    }
+    #inapp-banner .ib-open { background: #fff; color: #B91C1C; }
+    #inapp-banner .ib-copy { background: rgba(255,255,255,.18); color: #fff; }
+    #inapp-banner .ib-close {
+      background: transparent; color: #fff; font-size: 20px; line-height: 1;
+      padding: 2px 6px; align-self: flex-start;
+    }
+  </style>
+  <script>
+    (function () {
+      try {
+        var ua = navigator.userAgent || '';
+        // เปิดเป็นแอปที่ติดตั้งแล้ว (PWA standalone) → ไม่ต้องเตือน
+        var standalone = (window.matchMedia &&
+            window.matchMedia('(display-mode: standalone)').matches) ||
+            window.navigator.standalone === true;
+        if (standalone) return;
+        // เบราว์เซอร์ในแอปยอดฮิต: LINE, Facebook, Messenger, Instagram, WeChat
+        var inApp = /Line\/|FBAN|FBAV|FB_IAB|FBIOS|Messenger|Instagram|MicroMessenger/i.test(ua);
+        if (!inApp) return;
+
+        var url = location.href;
+        function showBanner() {
+          if (document.getElementById('inapp-banner')) return;
+          var bar = document.createElement('div');
+          bar.id = 'inapp-banner';
+          bar.innerHTML =
+            '<div class="ib-txt">📱 เปิดจากในแอป LINE/Facebook อาจโหลดไม่ขึ้น<br>' +
+            'เพื่อใช้งานเต็มที่ กรุณา<b>เปิดด้วย Chrome</b> (แตะ ⋮ มุมขวาบน → เปิดด้วยเบราว์เซอร์)</div>' +
+            '<div class="ib-btns">' +
+            '<button class="ib-open">เปิด Chrome</button>' +
+            '<button class="ib-copy">คัดลอกลิงก์</button>' +
+            '</div>' +
+            '<button class="ib-close" aria-label="ปิด">&times;</button>';
+          document.body.appendChild(bar);
+
+          bar.querySelector('.ib-close').onclick = function () { bar.remove(); };
+
+          bar.querySelector('.ib-open').onclick = function () {
+            if (/Android/i.test(ua)) {
+              // เปิด URL เดิมด้วย Chrome ผ่าน Android intent (ถ้าไม่มี Chrome จะไม่ทำงาน → ใช้คัดลอกลิงก์แทน)
+              window.location.href = 'intent://' + location.host + location.pathname +
+                  location.search + '#Intent;scheme=https;package=com.android.chrome;end';
+            } else {
+              alert('แตะปุ่ม "แชร์/เปิดในเบราว์เซอร์" ของแอป แล้วเลือก Safari หรือ Chrome\n\n' +
+                    'หรือกด "คัดลอกลิงก์" แล้วนำไปวางในเบราว์เซอร์');
+            }
+          };
+
+          bar.querySelector('.ib-copy').onclick = function () {
+            function done() { var b = bar.querySelector('.ib-copy'); if (b) b.textContent = 'คัดลอกแล้ว ✓'; }
+            function fallbackCopy() {
+              var t = document.createElement('textarea');
+              t.value = url; document.body.appendChild(t); t.select();
+              try { document.execCommand('copy'); done(); } catch (e) {}
+              t.remove();
+            }
+            if (navigator.clipboard && navigator.clipboard.writeText) {
+              navigator.clipboard.writeText(url).then(done).catch(fallbackCopy);
+            } else { fallbackCopy(); }
+          };
+        }
+
+        if (document.body) showBanner();
+        else document.addEventListener('DOMContentLoaded', showBanner);
+      } catch (e) {/* เงียบไว้ ไม่ให้กระทบการบูตแอป */}
+    })();
+  </script>
+
   <script>
     // ---- ตัวช่วยแสดงข้อความบนหน้าโหลด (ใช้ทั้งกรณีเบราว์เซอร์เก่า/โหลดนานเกิน) ----
     function bootShowError(title, msg, btnLabel, btnAction) {
