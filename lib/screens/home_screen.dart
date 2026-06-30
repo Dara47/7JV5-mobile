@@ -458,7 +458,7 @@ class _HomePageState extends State<_HomePage> with SingleTickerProviderStateMixi
                   label: const Text('รีเฟรช', style: TextStyle(fontSize: 13, color: Colors.grey)),
                   style: TextButton.styleFrom(alignment: Alignment.centerLeft),
                 )),
-                Text('Version 5.6.28', style: TextStyle(fontSize: 11, color: Colors.grey.shade400)),
+                Text('Version 5.6.30', style: TextStyle(fontSize: 11, color: Colors.grey.shade400)),
                 const SizedBox(width: 8),
                 TextButton.icon(
                   onPressed: widget.onLogout,
