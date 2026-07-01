@@ -2,7 +2,6 @@ import 'dart:async';
 import 'package:cloud_firestore/cloud_firestore.dart';
 import '../models/models.dart';
 import '../utils/date_format.dart';
-import 'sheet_mirror.dart';
 
 class FirestoreService {
   static final _db = FirebaseFirestore.instance;
@@ -1095,26 +1094,15 @@ class FirestoreService {
   }
 
   static Future<void> addTeacherPayroll(Map<String, dynamic> data) async {
-    final ref = await _db.collection('sevenj_teacher_payroll').add(data);
-    unawaited(_mirrorTeacher(ref.id)); // สำเนาไป Google Sheet (ไม่บล็อกการบันทึก)
+    await _db.collection('sevenj_teacher_payroll').add(data);
   }
 
   static Future<void> updateTeacherPayroll(String id, Map<String, dynamic> data) async {
     await _db.collection('sevenj_teacher_payroll').doc(id).update(data);
-    unawaited(_mirrorTeacher(id));
   }
 
   static Future<void> deleteTeacherPayroll(String id) async {
     await _db.collection('sevenj_teacher_payroll').doc(id).delete();
-    unawaited(SheetMirror.deleteTeacher(id));
-  }
-
-  /// อ่านสถานะล่าสุดของงวดครูแล้วส่งสำเนาแถวไป Sheet (ใช้ตอน add/update)
-  static Future<void> _mirrorTeacher(String id) async {
-    try {
-      final snap = await _db.collection('sevenj_teacher_payroll').doc(id).get();
-      if (snap.exists) await SheetMirror.payrollTeacher(TeacherPayrollModel.fromDoc(snap));
-    } catch (_) {/* เงียบ ไม่ให้กระทบการบันทึก */}
   }
 
   static Future<List<AdminPayrollModel>> getAdminPayrolls() async {
@@ -1124,39 +1112,15 @@ class FirestoreService {
   }
 
   static Future<void> addAdminPayroll(Map<String, dynamic> data) async {
-    final ref = await _db.collection('sevenj_admin_payroll').add(data);
-    unawaited(_mirrorAdmin(ref.id));
+    await _db.collection('sevenj_admin_payroll').add(data);
   }
 
   static Future<void> updateAdminPayroll(String id, Map<String, dynamic> data) async {
     await _db.collection('sevenj_admin_payroll').doc(id).update(data);
-    unawaited(_mirrorAdmin(id));
   }
 
   static Future<void> deleteAdminPayroll(String id) async {
     await _db.collection('sevenj_admin_payroll').doc(id).delete();
-    unawaited(SheetMirror.deleteAdmin(id));
-  }
-
-  static Future<void> _mirrorAdmin(String id) async {
-    try {
-      final snap = await _db.collection('sevenj_admin_payroll').doc(id).get();
-      if (snap.exists) await SheetMirror.payrollAdmin(AdminPayrollModel.fromDoc(snap));
-    } catch (_) {/* เงียบ */}
-  }
-
-  /// ส่งข้อมูลค่าจ้าง "ทั้งหมด" ที่มีอยู่ขึ้น Sheet ครั้งเดียว (ใช้ตอนเริ่มใช้งาน/ซิงก์ซ้ำ)
-  /// คืนจำนวนรายการที่ส่ง — ยิงแบบเรียงทีละรายการกัน Apps Script รับไม่ทัน
-  static Future<int> backfillPayrollToSheet() async {
-    final teachers = await getTeacherPayrolls();
-    final admins = await getAdminPayrolls();
-    for (final e in teachers) {
-      await SheetMirror.payrollTeacher(e);
-    }
-    for (final e in admins) {
-      await SheetMirror.payrollAdmin(e);
-    }
-    return teachers.length + admins.length;
   }
 }
 

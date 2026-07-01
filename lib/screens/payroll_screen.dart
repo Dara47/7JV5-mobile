@@ -81,23 +81,6 @@ class _PayrollScreenState extends State<PayrollScreen>
     }
   }
 
-  Future<void> _syncToSheet() async {
-    final messenger = ScaffoldMessenger.of(context);
-    messenger.showSnackBar(const SnackBar(content: Text('กำลังส่งข้อมูลขึ้น Google Sheet...')));
-    try {
-      final n = await FirestoreService.backfillPayrollToSheet();
-      messenger.showSnackBar(SnackBar(
-        content: Text('ส่งขึ้น Google Sheet แล้ว $n รายการ'),
-        backgroundColor: Colors.green,
-      ));
-    } catch (e) {
-      messenger.showSnackBar(SnackBar(
-        content: Text('ส่งขึ้น Sheet ไม่สำเร็จ: $e'),
-        backgroundColor: Colors.red,
-      ));
-    }
-  }
-
   void _unlock() {
     if (_passCtrl.text.trim() == _kPass) {
       setState(() { _unlocked = true; _passError = false; });
@@ -248,7 +231,6 @@ class _PayrollScreenState extends State<PayrollScreen>
           ],
         ),
         actions: [
-          IconButton(icon: const Icon(Icons.cloud_upload_outlined), onPressed: _syncToSheet, tooltip: 'ซิงก์ขึ้น Google Sheet'),
           IconButton(icon: const Icon(Icons.refresh), onPressed: _load, tooltip: 'รีเฟรช'),
         ],
       ),
