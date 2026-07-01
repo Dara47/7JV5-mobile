@@ -34,18 +34,32 @@
   <link rel="manifest" href="manifest.json">
 
   <!-- ปิด/ถอน Service Worker เก่า + ล้าง cache เก่าที่เคยแคชแอปไว้
-       (แอปนี้ออนไลน์ตลอด ไม่ใช้ offline) → deploy แล้วผู้ใช้เห็นของใหม่ทันทีที่รีโหลด -->
+       (แอปนี้ออนไลน์ตลอด ไม่ใช้ offline — build ด้วย --pwa-strategy=none จึงไม่ register SW ใหม่)
+       ถ้าเจอ SW เก่าค้าง (มือถือที่เคยเข้าตอน build เสีย จะโดน SW เสิร์ฟไฟล์เสียข้าม HTTP cache)
+       → ถอน SW + ล้าง cache แล้ว "รีโหลด 1 ครั้ง" (กันวนด้วย sessionStorage) ให้โหลดของใหม่สด ๆ เอง -->
   <script>
-    if ('serviceWorker' in navigator) {
-      navigator.serviceWorker.getRegistrations().then(function (regs) {
-        regs.forEach(function (r) { r.unregister(); });
-      }).catch(function () {});
-    }
-    if (window.caches && caches.keys) {
-      caches.keys().then(function (keys) {
-        keys.forEach(function (k) { caches.delete(k); });
-      }).catch(function () {});
-    }
+    (function () {
+      try {
+        if (!('serviceWorker' in navigator)) return;
+        navigator.serviceWorker.getRegistrations().then(function (regs) {
+          var hadSW = regs.length > 0;
+          return Promise.all(regs.map(function (r) { return r.unregister(); })).then(function () {
+            if (window.caches && caches.keys) {
+              return caches.keys().then(function (keys) {
+                return Promise.all(keys.map(function (k) { return caches.delete(k); }));
+              }).then(function () { return hadSW; });
+            }
+            return hadSW;
+          });
+        }).then(function (hadSW) {
+          // เจอของเก่าค้าง → รีโหลดครั้งเดียวให้ได้เวอร์ชันสด (ไม่วน เพราะ flag ไว้ใน sessionStorage)
+          if (hadSW && !sessionStorage.getItem('sw_purged')) {
+            sessionStorage.setItem('sw_purged', '1');
+            location.reload();
+          }
+        }).catch(function () {});
+      } catch (e) {/* เงียบไว้ ไม่ให้กระทบการบูตแอป */}
+    })();
   </script>
 </head>
 <body>
