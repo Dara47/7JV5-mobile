@@ -7,6 +7,19 @@ import '../widgets/user_search_field.dart';
 
 const _kPass = 'ATAL190314';
 
+/// เรียงลำดับรายการค่าจ้าง:
+///  1) ยังไม่จ่าย (รอจ่าย) อยู่บน — จ่ายแล้วเลื่อนลงล่างสุด
+///  2) ภายในกลุ่มเดียวกัน เรียงตามวันที่เริ่ม (ใหม่สุดอยู่บน) ใช้ createdAt เป็นตัวสำรอง
+int _cmpPayroll(dynamic a, dynamic b) {
+  if (a.isPaid != b.isPaid) return a.isPaid ? 1 : -1;
+  final String ad = (a.dateFrom == null || (a.dateFrom as String).isEmpty)
+      ? a.createdAt : a.dateFrom;
+  final String bd = (b.dateFrom == null || (b.dateFrom as String).isEmpty)
+      ? b.createdAt : b.dateFrom;
+  final c = bd.compareTo(ad); // มาก → น้อย (ใหม่สุดอยู่บน)
+  return c != 0 ? c : (b.createdAt as String).compareTo(a.createdAt as String);
+}
+
 String _fmt(double n) {
   final s = n.toStringAsFixed(2);
   final parts = s.split('.');
@@ -195,10 +208,12 @@ class _PayrollScreenState extends State<PayrollScreen>
   Widget build(BuildContext context) {
     if (!_unlocked) return _lockScreen();
 
-    final tFiltered = _tSearch.isEmpty ? _teachers
-        : _teachers.where((e) => e.teacherName.toLowerCase().contains(_tSearch.toLowerCase())).toList();
-    final aFiltered = _aSearch.isEmpty ? _admins
-        : _admins.where((e) => e.adminName.toLowerCase().contains(_aSearch.toLowerCase())).toList();
+    final tFiltered = (_tSearch.isEmpty ? [..._teachers]
+        : _teachers.where((e) => e.teacherName.toLowerCase().contains(_tSearch.toLowerCase())).toList())
+      ..sort(_cmpPayroll);
+    final aFiltered = (_aSearch.isEmpty ? [..._admins]
+        : _admins.where((e) => e.adminName.toLowerCase().contains(_aSearch.toLowerCase())).toList())
+      ..sort(_cmpPayroll);
 
     return Scaffold(
       appBar: AppBar(
