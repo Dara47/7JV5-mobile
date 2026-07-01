@@ -81,6 +81,23 @@ class _UsersListScreenState extends State<UsersListScreen> with SingleTickerProv
     ));
   }
 
+  Future<void> _syncToSheet() async {
+    final messenger = ScaffoldMessenger.of(context);
+    messenger.showSnackBar(const SnackBar(content: Text('กำลังส่งผู้ใช้ขึ้น Google Sheet...')));
+    try {
+      final n = await FirestoreService.syncUsersToSheet();
+      messenger.showSnackBar(SnackBar(
+        content: Text('ส่งขึ้น Google Sheet แล้ว $n คน'),
+        backgroundColor: Colors.green,
+      ));
+    } catch (e) {
+      messenger.showSnackBar(SnackBar(
+        content: Text('ส่งขึ้น Sheet ไม่สำเร็จ: $e'),
+        backgroundColor: Colors.red,
+      ));
+    }
+  }
+
   @override
   Widget build(BuildContext context) {
     return Scaffold(
@@ -88,6 +105,13 @@ class _UsersListScreenState extends State<UsersListScreen> with SingleTickerProv
         title: const Text('จัดการผู้ใช้'),
         backgroundColor: const Color(0xFFF97316),
         foregroundColor: Colors.white,
+        actions: [
+          IconButton(
+            icon: const Icon(Icons.cloud_upload_outlined),
+            tooltip: 'ซิงก์ผู้ใช้ขึ้น Google Sheet',
+            onPressed: _syncToSheet,
+          ),
+        ],
         bottom: TabBar(
           controller: _tabs,
           labelColor: Colors.white,

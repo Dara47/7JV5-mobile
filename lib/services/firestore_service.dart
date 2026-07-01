@@ -2,6 +2,7 @@ import 'dart:async';
 import 'package:cloud_firestore/cloud_firestore.dart';
 import '../models/models.dart';
 import '../utils/date_format.dart';
+import 'sheet_mirror.dart';
 
 class FirestoreService {
   static final _db = FirebaseFirestore.instance;
@@ -795,8 +796,27 @@ class FirestoreService {
   }
 
   static Future<void> addUser(Map<String, dynamic> data) async {
-    await _db.collection('users').add({...data, 'createdAt': FieldValue.serverTimestamp()});
+    final ref = await _db.collection('users').add({...data, 'createdAt': FieldValue.serverTimestamp()});
     await logAudit('เพิ่มผู้ใช้', detail: '${data['name'] ?? ''} (${data['code'] ?? ''}) · ${data['role'] ?? ''}');
+    unawaited(_mirrorUser(ref.id)); // สำเนาไป Google Sheet
+  }
+
+  /// อ่านผู้ใช้ล่าสุดแล้วส่งสำเนาแถวไป Sheet (ใช้ตอน add/update)
+  static Future<void> _mirrorUser(String id) async {
+    try {
+      final snap = await _db.collection('users').doc(id).get();
+      if (snap.exists) await SheetMirror.upsertUser(UserModel.fromDoc(snap));
+    } catch (_) {/* เงียบ */}
+  }
+
+  /// ส่งผู้ใช้ทั้งหมดขึ้น Sheet ครั้งเดียว (backfill/ซิงก์ซ้ำ) — คืนจำนวนที่ส่ง
+  static Future<int> syncUsersToSheet() async {
+    final snap = await _db.collection('users').get();
+    final users = snap.docs.map(UserModel.fromDoc).toList();
+    for (final u in users) {
+      await SheetMirror.upsertUser(u);
+    }
+    return users.length;
   }
 
   /// รหัสผู้ใช้ทั้งหมดในระบบ (uppercase) — ใช้กันซ้ำตอน bulk import
@@ -854,6 +874,7 @@ class FirestoreService {
 
   static Future<void> updateUser(String id, Map<String, dynamic> data) async {
     await _db.collection('users').doc(id).update({...data, 'updatedAt': FieldValue.serverTimestamp()});
+    unawaited(_mirrorUser(id));
   }
 
   /// แก้ผู้ใช้ + ถ้า "ชื่อ" เปลี่ยน → อัปเดตชื่อที่ denormalize ไว้ทุกที่ให้ตรงกัน
@@ -861,6 +882,7 @@ class FirestoreService {
   static Future<void> updateUserCascade(
       String id, String role, Map<String, dynamic> data, {String? oldName}) async {
     await _db.collection('users').doc(id).update({...data, 'updatedAt': FieldValue.serverTimestamp()});
+    unawaited(_mirrorUser(id));
     final newName = (data['name'] as String?)?.trim();
     if (newName == null || newName.isEmpty || newName == oldName?.trim()) return;
 
@@ -902,6 +924,7 @@ class FirestoreService {
 
   static Future<void> deleteUser(String id) async {
     await _db.collection('users').doc(id).delete();
+    unawaited(SheetMirror.delete(SheetMirror.tUsers, id));
   }
 
   static Future<void> cascadeDeleteUser(String userId, String role) async {
@@ -933,6 +956,7 @@ class FirestoreService {
 
     await batch.commit();
     await logAudit('ลบผู้ใช้', detail: '$role · id $userId · ลบแพ็กเกจ ${pkgs.docs.length}');
+    unawaited(SheetMirror.delete(SheetMirror.tUsers, userId));
   }
 
   /// ลบผู้ใช้ที่เลือกหลายคน (cascade ทีละคน — เก็บประวัติรายงานไว้)
