@@ -31,10 +31,29 @@ class _AdminLeaveViewState extends State<_AdminLeaveView> {
   // โหมดติ๊กเลือกเพื่อลบหลายรายการ
   bool _selectMode = false;
   final Set<String> _selectedIds = {};
+  // คำค้นหา (ชื่อ/รหัส/เหตุผล/ครู/นักเรียน)
+  final _searchCtrl = TextEditingController();
+  String _search = '';
+  // สตรีมใบลา — สร้างครั้งเดียว กันไม่ให้ StreamBuilder รีเซ็ต (โหลดใหม่) ทุกครั้งที่ setState
+  // ถ้าสร้างใน build() ทุกคีย์ที่พิมพ์ค้นหาจะได้สตรีมใหม่ → เด้งหน้าโหลด → ช่องค้นหาหลุดโฟกัส (พิมพ์ได้ทีละตัว)
+  final _stream = FirestoreService.watchLeaveRequests();
+
+  @override
+  void dispose() {
+    _searchCtrl.dispose();
+    super.dispose();
+  }
 
   List<LeaveRequestModel> _filtered(List<LeaveRequestModel> all) {
-    if (_filter == 'all') return all;
-    return all.where((r) => r.status == _filter).toList();
+    var list = _filter == 'all' ? all : all.where((r) => r.status == _filter).toList();
+    final q = _search.trim().toLowerCase();
+    if (q.isNotEmpty) {
+      list = list.where((r) => [
+        r.userName, r.userCode, r.reason,
+        r.teacherName, r.teacherCode, r.studentName, r.studentCode,
+      ].any((f) => f.toLowerCase().contains(q))).toList();
+    }
+    return list;
   }
 
   /// เปลี่ยนแท็บกรอง — รีเซ็ตจำนวนที่แสดง + ออกจากโหมดเลือก
@@ -217,7 +236,7 @@ class _AdminLeaveViewState extends State<_AdminLeaveView> {
         foregroundColor: Colors.white,
       ),
       body: StreamBuilder<List<LeaveRequestModel>>(
-        stream: FirestoreService.watchLeaveRequests(),
+        stream: _stream,
         builder: (context, snap) {
           if (snap.connectionState == ConnectionState.waiting) {
             return const Center(child: CircularProgressIndicator());
@@ -248,6 +267,37 @@ class _AdminLeaveViewState extends State<_AdminLeaveView> {
                     selected: _filter == 'all', color: Colors.blueGrey,
                     onTap: () => _setFilter('all')),
               ]),
+            ),
+
+            // ช่องค้นหา
+            Padding(
+              padding: const EdgeInsets.fromLTRB(12, 8, 12, 4),
+              child: TextField(
+                controller: _searchCtrl,
+                onChanged: (v) => setState(() { _search = v; _limit = 20; }),
+                decoration: InputDecoration(
+                  hintText: 'ค้นหา ชื่อ / รหัส / เหตุผล / ครู',
+                  prefixIcon: const Icon(Icons.search, size: 20),
+                  suffixIcon: _search.isEmpty
+                      ? null
+                      : IconButton(
+                          icon: const Icon(Icons.clear, size: 20),
+                          onPressed: () => setState(() {
+                            _searchCtrl.clear();
+                            _search = '';
+                            _limit = 20;
+                          }),
+                        ),
+                  isDense: true,
+                  filled: true,
+                  fillColor: Colors.grey.shade100,
+                  contentPadding: const EdgeInsets.symmetric(vertical: 10),
+                  border: OutlineInputBorder(
+                    borderRadius: BorderRadius.circular(12),
+                    borderSide: BorderSide.none,
+                  ),
+                ),
+              ),
             ),
 
             if (shown.isNotEmpty) _selectToolbar(shown),

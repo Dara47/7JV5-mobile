@@ -21,6 +21,9 @@ class _ReportsScreenState extends State<ReportsScreen> {
   Map<String, String> _idToCode = {}; // userId → code (เติมรหัสให้ session เก่าที่ไม่มีรหัสฝังไว้)
   static const _pageSize = 20;
   int _visible = _pageSize; // แสดงทีละ 20 (กดโหลดเพิ่ม)
+  // สตรีมคาบที่เรียนเสร็จ — สร้างครั้งเดียว กัน StreamBuilder รีเซ็ต (เด้งหน้าโหลด) ทุกครั้งที่ setState
+  // ถ้าสร้างใน build() ทุกคีย์ที่พิมพ์ค้นหาจะได้สตรีมใหม่ → ช่องค้นหา (ที่อยู่ในสตรีม) หลุดโฟกัส (พิมพ์ได้ทีละตัว)
+  final _stream = FirestoreService.watchCompletedSessions();
 
   @override
   void initState() {
@@ -273,7 +276,7 @@ class _ReportsScreenState extends State<ReportsScreen> {
         foregroundColor: Colors.white,
       ),
       body: StreamBuilder<List<SessionModel>>(
-        stream: FirestoreService.watchCompletedSessions(),
+        stream: _stream,
         builder: (context, snap) {
           if (snap.connectionState == ConnectionState.waiting) {
             return const Center(child: CircularProgressIndicator());
