@@ -190,19 +190,38 @@ class _ReportsScreenState extends State<ReportsScreen> {
     if (ok == true) _exportWeek(all);
   }
 
-  /// ส่งออก Excel "คาบที่สอนแล้ว" ของสัปดาห์ปัจจุบัน (อา.–ส.)
+  /// ส่งออก Excel "คาบที่สอนแล้ว" — ตรงกับที่กรองบนจอ
+  /// - ถ้าเลือกช่วงวันที่ไว้ → ส่งออกตามช่วงนั้น
+  /// - ถ้าไม่ได้เลือก → ดีฟอลต์เป็นสัปดาห์ปัจจุบัน (อา.–ส.)
+  /// เคารพคำค้นด้วย (ครู/นักเรียน)
   /// 2 ชีต: สรุปรายครู + รายคาบละเอียด พร้อมยอดรวม
   void _exportWeek(List<SessionModel> all) {
-    final now = nowThai();
-    // สัปดาห์เริ่มวันอาทิตย์: weekday Mon=1..Sun=7 → Sun%7=0
-    final startSun = DateTime(now.year, now.month, now.day)
-        .subtract(Duration(days: now.weekday % 7));
-    final endSat = startSun.add(const Duration(days: 6));
-    final fromStr = toStorageDateStr(startSun);
-    final toStr = toStorageDateStr(endSat);
+    final String fromStr;
+    final String toStr;
+    if (_range != null) {
+      // ใช้ช่วงวันที่ที่ผู้ใช้เลือกบนจอ
+      fromStr = toStorageDateStr(_range!.start);
+      toStr = toStorageDateStr(_range!.end);
+    } else {
+      // ไม่ได้เลือกช่วง → ดีฟอลต์สัปดาห์ปัจจุบัน (อา.–ส.)
+      final now = nowThai();
+      // สัปดาห์เริ่มวันอาทิตย์: weekday Mon=1..Sun=7 → Sun%7=0
+      final startSun = DateTime(now.year, now.month, now.day)
+          .subtract(Duration(days: now.weekday % 7));
+      final endSat = startSun.add(const Duration(days: 6));
+      fromStr = toStorageDateStr(startSun);
+      toStr = toStorageDateStr(endSat);
+    }
 
+    final q = _query.trim().toLowerCase();
     final week = all
-        .where((s) => s.date.compareTo(fromStr) >= 0 && s.date.compareTo(toStr) <= 0)
+        .where((s) {
+          if (s.date.compareTo(fromStr) < 0 || s.date.compareTo(toStr) > 0) return false;
+          if (q.isEmpty) return true;
+          final hay = '${s.studentName} ${s.teacherName} '
+              '${_sCode(s) ?? ''} ${_tCode(s) ?? ''}'.toLowerCase();
+          return hay.contains(q);
+        })
         .toList()
       ..sort((a, b) {
         final d = a.date.compareTo(b.date);
@@ -211,7 +230,7 @@ class _ReportsScreenState extends State<ReportsScreen> {
 
     if (week.isEmpty) {
       ScaffoldMessenger.of(context).showSnackBar(SnackBar(
-        content: Text('สัปดาห์นี้ (${_fullDate(fromStr)} – ${_fullDate(toStr)}) ยังไม่มีคาบที่สอนเสร็จ')));
+        content: Text('ช่วง ${_fullDate(fromStr)} – ${_fullDate(toStr)} ยังไม่มีคาบที่สอนเสร็จ')));
       return;
     }
 
@@ -377,7 +396,8 @@ class _ReportsScreenState extends State<ReportsScreen> {
                 TextButton.icon(
                   onPressed: () => _promptExportPassword(all),
                   icon: const Icon(Icons.lock_outline, size: 18),
-                  label: const Text('Excel สัปดาห์นี้', style: TextStyle(fontSize: 13)),
+                  label: Text(_range != null ? 'Excel ช่วงที่เลือก' : 'Excel สัปดาห์นี้',
+                      style: const TextStyle(fontSize: 13)),
                   style: TextButton.styleFrom(foregroundColor: Colors.green.shade800),
                 ),
                 TextButton.icon(

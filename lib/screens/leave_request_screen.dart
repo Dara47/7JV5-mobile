@@ -426,7 +426,13 @@ class _AdminLeaveCard extends StatelessWidget {
           Row(children: [
             const Icon(Icons.calendar_today, size: 14, color: Colors.grey),
             const SizedBox(width: 4),
-            Text('วันลา: ${leave.shortDate}', style: const TextStyle(fontSize: 13, color: Colors.black87)),
+            Expanded(
+              child: Text(
+                'วันลา: ${leave.shortDate}'
+                '${leave.submittedLabel != null ? '  •  ส่งเมื่อ ${leave.submittedLabel}' : ''}',
+                style: const TextStyle(fontSize: 13, color: Colors.black87),
+              ),
+            ),
           ]),
           if (leave.hasTeacher) ...[
             const SizedBox(height: 4),
@@ -508,6 +514,10 @@ class _UserLeaveView extends StatefulWidget {
 }
 
 class _UserLeaveViewState extends State<_UserLeaveView> {
+  bool _isEn = false;
+
+  String _t(String th, String en) => _isEn ? en : th;
+
   Future<void> _showSubmitForm() async {
     String? selectedDate;
     final reasonCtrl = TextEditingController();
@@ -565,14 +575,14 @@ class _UserLeaveViewState extends State<_UserLeaveView> {
                 Row(children: [
                   const Icon(Icons.event_busy_outlined, color: _kColor),
                   const SizedBox(width: 10),
-                  const Text('ส่งใบลา', style: TextStyle(fontSize: 17, fontWeight: FontWeight.bold)),
+                  Text(_t('ส่งใบลา', 'Submit Leave'), style: const TextStyle(fontSize: 17, fontWeight: FontWeight.bold)),
                   const Spacer(),
                   IconButton(icon: const Icon(Icons.close), onPressed: () => Navigator.pop(ctx)),
                 ]),
                 const Divider(),
                 const SizedBox(height: 8),
 
-                const Text('📅 วันที่ลา', style: TextStyle(fontSize: 13, fontWeight: FontWeight.w600)),
+                Text(_t('📅 วันที่ลา', '📅 Leave date'), style: const TextStyle(fontSize: 13, fontWeight: FontWeight.w600)),
                 const SizedBox(height: 6),
                 GestureDetector(
                   onTap: () async {
@@ -597,7 +607,7 @@ class _UserLeaveViewState extends State<_UserLeaveView> {
                     child: Text(
                       selectedDate != null
                           ? '${selectedDate!.substring(8)}/${selectedDate!.substring(5, 7)}/${selectedDate!.substring(0, 4)}'
-                          : 'แตะเพื่อเลือกวันที่',
+                          : _t('แตะเพื่อเลือกวันที่', 'Tap to pick a date'),
                       style: TextStyle(
                         fontSize: 15,
                         color: selectedDate != null ? Colors.orange.shade800 : Colors.grey,
@@ -609,7 +619,7 @@ class _UserLeaveViewState extends State<_UserLeaveView> {
                 const SizedBox(height: 14),
 
                 if (isStudent) ...[
-                  const Text('👩‍🏫 ครูที่จะลาเรียน', style: TextStyle(fontSize: 13, fontWeight: FontWeight.w600)),
+                  Text(_t('👩‍🏫 ครูที่จะลาเรียน', '👩‍🏫 Teacher to take leave from'), style: const TextStyle(fontSize: 13, fontWeight: FontWeight.w600)),
                   const SizedBox(height: 6),
                   if (myTeachers.isNotEmpty) ...[
                     Wrap(
@@ -646,7 +656,7 @@ class _UserLeaveViewState extends State<_UserLeaveView> {
                       child: TextField(
                         controller: teacherNameCtrl,
                         decoration: InputDecoration(
-                          hintText: 'ชื่อครู',
+                          hintText: _t('ชื่อครู', 'Teacher name'),
                           filled: true, fillColor: Colors.grey.shade50,
                           border: OutlineInputBorder(borderRadius: BorderRadius.circular(10), borderSide: BorderSide(color: Colors.grey.shade300)),
                           enabledBorder: OutlineInputBorder(borderRadius: BorderRadius.circular(10), borderSide: BorderSide(color: Colors.grey.shade300)),
@@ -660,7 +670,7 @@ class _UserLeaveViewState extends State<_UserLeaveView> {
                       child: TextField(
                         controller: teacherCodeCtrl,
                         decoration: InputDecoration(
-                          hintText: 'รหัสครู',
+                          hintText: _t('รหัสครู', 'Teacher code'),
                           filled: true, fillColor: Colors.grey.shade50,
                           border: OutlineInputBorder(borderRadius: BorderRadius.circular(10), borderSide: BorderSide(color: Colors.grey.shade300)),
                           enabledBorder: OutlineInputBorder(borderRadius: BorderRadius.circular(10), borderSide: BorderSide(color: Colors.grey.shade300)),
@@ -673,7 +683,7 @@ class _UserLeaveViewState extends State<_UserLeaveView> {
                 ],
 
                 if (isTeacher) ...[
-                  const Text('🎓 นักเรียนที่จะลาสอน (เลือกได้หลายคน)', style: TextStyle(fontSize: 13, fontWeight: FontWeight.w600)),
+                  Text(_t('🎓 นักเรียนที่จะลาสอน (เลือกได้หลายคน)', '🎓 Students to cancel class for (multiple)'), style: const TextStyle(fontSize: 13, fontWeight: FontWeight.w600)),
                   const SizedBox(height: 6),
                   if (myStudents.isNotEmpty) ...[
                     Wrap(
@@ -718,7 +728,7 @@ class _UserLeaveViewState extends State<_UserLeaveView> {
                     if (selectedStudents.length > 1)
                       Padding(
                         padding: const EdgeInsets.only(bottom: 4),
-                        child: Text('เลือก ${selectedStudents.length} คน — จะลาสอนทั้งหมดในใบเดียว',
+                        child: Text(_t('เลือก ${selectedStudents.length} คน — จะลาสอนทั้งหมดในใบเดียว', 'Selected ${selectedStudents.length} — all in one request'),
                             style: TextStyle(fontSize: 11, color: Colors.orange.shade700, fontWeight: FontWeight.w600)),
                       ),
                   ],
@@ -728,7 +738,7 @@ class _UserLeaveViewState extends State<_UserLeaveView> {
                       child: TextField(
                         controller: studentNameCtrl,
                         decoration: InputDecoration(
-                          hintText: 'ชื่อนักเรียน',
+                          hintText: _t('ชื่อนักเรียน', 'Student name'),
                           filled: true, fillColor: Colors.grey.shade50,
                           border: OutlineInputBorder(borderRadius: BorderRadius.circular(10), borderSide: BorderSide(color: Colors.grey.shade300)),
                           enabledBorder: OutlineInputBorder(borderRadius: BorderRadius.circular(10), borderSide: BorderSide(color: Colors.grey.shade300)),
@@ -742,7 +752,7 @@ class _UserLeaveViewState extends State<_UserLeaveView> {
                       child: TextField(
                         controller: studentCodeCtrl,
                         decoration: InputDecoration(
-                          hintText: 'รหัสนักเรียน',
+                          hintText: _t('รหัสนักเรียน', 'Student code'),
                           filled: true, fillColor: Colors.grey.shade50,
                           border: OutlineInputBorder(borderRadius: BorderRadius.circular(10), borderSide: BorderSide(color: Colors.grey.shade300)),
                           enabledBorder: OutlineInputBorder(borderRadius: BorderRadius.circular(10), borderSide: BorderSide(color: Colors.grey.shade300)),
@@ -754,13 +764,13 @@ class _UserLeaveViewState extends State<_UserLeaveView> {
                   const SizedBox(height: 14),
                 ],
 
-                const Text('📝 เหตุผล', style: TextStyle(fontSize: 13, fontWeight: FontWeight.w600)),
+                Text(_t('📝 เหตุผล', '📝 Reason'), style: const TextStyle(fontSize: 13, fontWeight: FontWeight.w600)),
                 const SizedBox(height: 6),
                 TextField(
                   controller: reasonCtrl,
                   maxLines: 3,
                   decoration: InputDecoration(
-                    hintText: 'ระบุเหตุผลการลา...',
+                    hintText: _t('ระบุเหตุผลการลา...', 'Enter reason for leave...'),
                     filled: true, fillColor: Colors.grey.shade50,
                     border: OutlineInputBorder(borderRadius: BorderRadius.circular(10), borderSide: BorderSide(color: Colors.grey.shade300)),
                     enabledBorder: OutlineInputBorder(borderRadius: BorderRadius.circular(10), borderSide: BorderSide(color: Colors.grey.shade300)),
@@ -775,22 +785,22 @@ class _UserLeaveViewState extends State<_UserLeaveView> {
                     onPressed: () async {
                       if (selectedDate == null) {
                         ScaffoldMessenger.of(context).showSnackBar(
-                          const SnackBar(content: Text('กรุณาเลือกวันที่ลา')));
+                          SnackBar(content: Text(_t('กรุณาเลือกวันที่ลา', 'Please select a leave date'))));
                         return;
                       }
                       if (reasonCtrl.text.trim().isEmpty) {
                         ScaffoldMessenger.of(context).showSnackBar(
-                          const SnackBar(content: Text('กรุณาระบุเหตุผล')));
+                          SnackBar(content: Text(_t('กรุณาระบุเหตุผล', 'Please enter a reason'))));
                         return;
                       }
                       if (isStudent && teacherNameCtrl.text.trim().isEmpty && teacherCodeCtrl.text.trim().isEmpty) {
                         ScaffoldMessenger.of(context).showSnackBar(
-                          const SnackBar(content: Text('กรุณาระบุครูที่จะลาเรียน')));
+                          SnackBar(content: Text(_t('กรุณาระบุครูที่จะลาเรียน', 'Please specify the teacher'))));
                         return;
                       }
                       if (isTeacher && studentNameCtrl.text.trim().isEmpty && studentCodeCtrl.text.trim().isEmpty) {
                         ScaffoldMessenger.of(context).showSnackBar(
-                          const SnackBar(content: Text('กรุณาระบุนักเรียนที่จะลาสอน')));
+                          SnackBar(content: Text(_t('กรุณาระบุนักเรียนที่จะลาสอน', 'Please specify the student'))));
                         return;
                       }
                       Navigator.pop(ctx);
@@ -809,11 +819,11 @@ class _UserLeaveViewState extends State<_UserLeaveView> {
                       });
                       if (context.mounted) {
                         ScaffoldMessenger.of(context).showSnackBar(
-                          const SnackBar(content: Text('ส่งใบลาแล้ว'), backgroundColor: Colors.green));
+                          SnackBar(content: Text(_t('ส่งใบลาแล้ว', 'Leave request submitted')), backgroundColor: Colors.green));
                       }
                     },
                     icon: const Icon(Icons.send_outlined),
-                    label: const Text('ส่งใบลา', style: TextStyle(fontSize: 16, fontWeight: FontWeight.bold)),
+                    label: Text(_t('ส่งใบลา', 'Submit Leave'), style: const TextStyle(fontSize: 16, fontWeight: FontWeight.bold)),
                     style: ElevatedButton.styleFrom(
                       backgroundColor: _kColor, foregroundColor: Colors.white,
                       shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(12)),
@@ -833,16 +843,16 @@ class _UserLeaveViewState extends State<_UserLeaveView> {
     showDialog(
       context: context,
       builder: (_) => AlertDialog(
-        title: const Text('ยกเลิกใบลา'),
-        content: Text('ยกเลิกใบลาวันที่ ${r.shortDate}?'),
+        title: Text(_t('ยกเลิกใบลา', 'Cancel leave request')),
+        content: Text(_t('ยกเลิกใบลาวันที่ ${r.shortDate}?', 'Cancel leave request for ${r.shortDate}?')),
         actions: [
-          TextButton(onPressed: () => Navigator.pop(context), child: const Text('ไม่')),
+          TextButton(onPressed: () => Navigator.pop(context), child: Text(_t('ไม่', 'No'))),
           TextButton(
             onPressed: () async {
               Navigator.pop(context);
               await FirestoreService.deleteLeaveRequest(r.id);
             },
-            child: const Text('ยกเลิกใบลา', style: TextStyle(color: Colors.red)),
+            child: Text(_t('ยกเลิกใบลา', 'Cancel request'), style: const TextStyle(color: Colors.red)),
           ),
         ],
       ),
@@ -853,16 +863,24 @@ class _UserLeaveViewState extends State<_UserLeaveView> {
   Widget build(BuildContext context) {
     return Scaffold(
       appBar: AppBar(
-        title: const Text('ใบลาของฉัน'),
+        title: Text(_t('ใบลาของฉัน', 'My Leave')),
         backgroundColor: _kColor,
         foregroundColor: Colors.white,
+        actions: [
+          TextButton.icon(
+            onPressed: () => setState(() => _isEn = !_isEn),
+            icon: const Icon(Icons.translate, size: 16, color: Colors.white),
+            label: Text(_isEn ? 'TH' : 'EN',
+                style: const TextStyle(color: Colors.white, fontWeight: FontWeight.bold)),
+          ),
+        ],
       ),
       floatingActionButton: FloatingActionButton.extended(
         onPressed: _showSubmitForm,
         backgroundColor: _kColor,
         foregroundColor: Colors.white,
         icon: const Icon(Icons.add),
-        label: const Text('ส่งใบลา'),
+        label: Text(_t('ส่งใบลา', 'Submit')),
       ),
       body: StreamBuilder<List<LeaveRequestModel>>(
         stream: FirestoreService.watchMyLeaveRequests(widget.appUser.uid),
@@ -875,9 +893,9 @@ class _UserLeaveViewState extends State<_UserLeaveView> {
             return Center(child: Column(mainAxisSize: MainAxisSize.min, children: [
               Icon(Icons.event_available_outlined, size: 56, color: Colors.grey.shade300),
               const SizedBox(height: 8),
-              const Text('ยังไม่มีใบลา', style: TextStyle(color: Colors.grey)),
+              Text(_t('ยังไม่มีใบลา', 'No leave requests'), style: const TextStyle(color: Colors.grey)),
               const SizedBox(height: 4),
-              const Text('กด + ส่งใบลา เพื่อยื่นใบลา', style: TextStyle(color: Colors.grey, fontSize: 12)),
+              Text(_t('กด + ส่งใบลา เพื่อยื่นใบลา', 'Tap + Submit to request leave'), style: const TextStyle(color: Colors.grey, fontSize: 12)),
             ]));
           }
           return ListView.separated(
@@ -897,7 +915,7 @@ class _UserLeaveViewState extends State<_UserLeaveView> {
                     Row(children: [
                       const Icon(Icons.calendar_today, size: 15, color: Colors.grey),
                       const SizedBox(width: 6),
-                      Text('วันลา: ${r.shortDate}', style: const TextStyle(fontWeight: FontWeight.w600, fontSize: 14)),
+                      Text('${_t('วันลา', 'Leave date')}: ${r.shortDate}', style: const TextStyle(fontWeight: FontWeight.w600, fontSize: 14)),
                       const Spacer(),
                       Container(
                         padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 3),
@@ -917,21 +935,26 @@ class _UserLeaveViewState extends State<_UserLeaveView> {
                         ),
                       ],
                     ]),
+                    if (r.submittedLabel != null) ...[
+                      const SizedBox(height: 4),
+                      Text('${_t('ส่งเมื่อ', 'Submitted')}: ${r.submittedLabel}',
+                          style: const TextStyle(fontSize: 12, color: Colors.grey)),
+                    ],
                     if (r.hasTeacher) ...[
                       const SizedBox(height: 6),
-                      Text('ครู: ${r.teacherLabel}',
+                      Text('${_t('ครู', 'Teacher')}: ${r.teacherLabel}',
                           style: const TextStyle(fontSize: 13, color: Color(0xFF2E7D32), fontWeight: FontWeight.w600)),
                     ],
                     if (r.hasStudent) ...[
                       const SizedBox(height: 6),
-                      Text('นักเรียน: ${r.studentLabel}',
+                      Text('${_t('นักเรียน', 'Student')}: ${r.studentLabel}',
                           style: const TextStyle(fontSize: 13, color: Color(0xFFF97316), fontWeight: FontWeight.w600)),
                     ],
                     const SizedBox(height: 6),
-                    Text('เหตุผล: ${r.reason}', style: const TextStyle(fontSize: 13, color: Colors.black87)),
+                    Text('${_t('เหตุผล', 'Reason')}: ${r.reason}', style: const TextStyle(fontSize: 13, color: Colors.black87)),
                     if (r.adminNote != null && r.adminNote!.isNotEmpty) ...[
                       const SizedBox(height: 4),
-                      Text('หมายเหตุ admin: ${r.adminNote}',
+                      Text('${_t('หมายเหตุ admin', 'Admin note')}: ${r.adminNote}',
                           style: const TextStyle(fontSize: 12, color: Colors.blueGrey)),
                     ],
                   ]),

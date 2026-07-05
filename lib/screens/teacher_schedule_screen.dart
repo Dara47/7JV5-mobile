@@ -18,6 +18,17 @@ class _TeacherScheduleScreenState extends State<TeacherScheduleScreen> {
   String _search = '';
   static const _pageSize = 20;
   int _visible = _pageSize;
+  bool _isEn = false;
+
+  String _t(String th, String en) => _isEn ? en : th;
+
+  /// ปุ่มสลับภาษา EN/TH สำหรับ AppBar (เหมือนหน้าหลักครู)
+  Widget _langButton() => TextButton.icon(
+        onPressed: () => setState(() => _isEn = !_isEn),
+        icon: const Icon(Icons.translate, size: 16, color: Colors.white),
+        label: Text(_isEn ? 'TH' : 'EN',
+            style: const TextStyle(color: Colors.white, fontWeight: FontWeight.bold)),
+      );
 
   @override
   void initState() {
@@ -37,13 +48,14 @@ class _TeacherScheduleScreenState extends State<TeacherScheduleScreen> {
     if (widget.filterTeacherId != null) {
       return Scaffold(
         appBar: AppBar(
-          title: const Text('ตารางสอนของฉัน'),
+          title: Text(_t('ตารางสอนของฉัน', 'My Schedule')),
           backgroundColor: const Color(0xFF2E7D32),
           foregroundColor: Colors.white,
           actions: [
+            _langButton(),
             IconButton(
               icon: const Icon(Icons.calendar_month),
-              tooltip: 'ปฏิทินคาบเรียน',
+              tooltip: _t('ปฏิทินคาบเรียน', 'Class calendar'),
               onPressed: () => Navigator.push(context, MaterialPageRoute(
                 builder: (_) => ScheduleCalendarScreen(
                   filterTeacherId: widget.filterTeacherId,
@@ -58,10 +70,10 @@ class _TeacherScheduleScreenState extends State<TeacherScheduleScreen> {
           builder: (context, snap) {
             if (!snap.hasData) return const Center(child: CircularProgressIndicator());
             final teacher = snap.data;
-            if (teacher == null) return const Center(child: Text('ไม่พบข้อมูลครู'));
+            if (teacher == null) return Center(child: Text(_t('ไม่พบข้อมูลครู', 'Teacher not found')));
             return ListView(
               padding: const EdgeInsets.all(12),
-              children: [_TeacherCard(teacher: teacher, readOnly: true)],
+              children: [_TeacherCard(teacher: teacher, readOnly: true, isEn: _isEn)],
             );
           },
         ),
@@ -71,13 +83,14 @@ class _TeacherScheduleScreenState extends State<TeacherScheduleScreen> {
     // Admin view: show all teachers
     return Scaffold(
       appBar: AppBar(
-        title: const Text('เวลาว่างครู'),
+        title: Text(_t('เวลาว่างครู', 'Teacher Availability')),
         backgroundColor: const Color(0xFF2E7D32),
         foregroundColor: Colors.white,
         actions: [
+          _langButton(),
           IconButton(
             icon: const Icon(Icons.calendar_month),
-            tooltip: 'ปฏิทินคาบเรียน',
+            tooltip: _t('ปฏิทินคาบเรียน', 'Class calendar'),
             onPressed: () => Navigator.push(context, MaterialPageRoute(
               builder: (_) => const ScheduleCalendarScreen(title: 'ปฏิทินคาบเรียน (ทั้งหมด)'),
             )),
@@ -90,7 +103,7 @@ class _TeacherScheduleScreenState extends State<TeacherScheduleScreen> {
           child: TextField(
             controller: _searchCtrl,
             decoration: InputDecoration(
-              hintText: 'ค้นหาชื่อหรือรหัสครู...',
+              hintText: _t('ค้นหาชื่อหรือรหัสครู...', 'Search teacher name or code...'),
               prefixIcon: const Icon(Icons.search, size: 20),
               suffixIcon: _search.isNotEmpty
                   ? IconButton(icon: const Icon(Icons.clear, size: 18), onPressed: () => _searchCtrl.clear())
@@ -118,7 +131,7 @@ class _TeacherScheduleScreenState extends State<TeacherScheduleScreen> {
                 return Center(child: Column(mainAxisSize: MainAxisSize.min, children: [
                   Icon(Icons.person_search, size: 60, color: Colors.grey.shade300),
                   const SizedBox(height: 8),
-                  Text(_search.isEmpty ? 'ยังไม่มีครูในระบบ' : 'ไม่พบผลการค้นหา',
+                  Text(_search.isEmpty ? _t('ยังไม่มีครูในระบบ', 'No teachers yet') : _t('ไม่พบผลการค้นหา', 'No results found'),
                       style: const TextStyle(color: Colors.grey)),
                 ]));
               }
@@ -141,7 +154,7 @@ class _TeacherScheduleScreenState extends State<TeacherScheduleScreen> {
                       onMore: () => setState(() => _visible += _pageSize),
                     );
                   }
-                  return _TeacherCard(teacher: shown[i]);
+                  return _TeacherCard(teacher: shown[i], isEn: _isEn);
                 },
               );
             },
@@ -157,7 +170,10 @@ class _TeacherScheduleScreenState extends State<TeacherScheduleScreen> {
 class _TeacherCard extends StatelessWidget {
   final UserModel teacher;
   final bool readOnly; // true = มุมมองครู (รายงานอ่านอย่างเดียว ไม่กระทบข้อมูล admin)
-  const _TeacherCard({required this.teacher, this.readOnly = false});
+  final bool isEn;
+  const _TeacherCard({required this.teacher, this.readOnly = false, this.isEn = false});
+
+  String _t(String th, String en) => isEn ? en : th;
 
   @override
   Widget build(BuildContext context) {
@@ -186,19 +202,19 @@ class _TeacherCard extends StatelessWidget {
             final String statusLabel;
             if (isTeaching) {
               statusColor = Colors.orange;
-              statusLabel = '🟠 กำลังสอน';
+              statusLabel = _t('🟠 กำลังสอน', '🟠 Teaching');
             } else if (remaining <= 0 && totalSessions > 0) {
               statusColor = Colors.red;
-              statusLabel = '🔴 หมดคาบ';
+              statusLabel = _t('🔴 หมดคาบ', '🔴 No sessions left');
             } else if (remaining <= 3 && totalSessions > 0) {
               statusColor = Colors.orange.shade700;
-              statusLabel = '🟡 ใกล้หมด';
+              statusLabel = _t('🟡 ใกล้หมด', '🟡 Running low');
             } else if (slot != null) {
               statusColor = Colors.green;
-              statusLabel = '🟢 ใช้งานอยู่';
+              statusLabel = _t('🟢 ใช้งานอยู่', '🟢 Active');
             } else {
               statusColor = Colors.grey;
-              statusLabel = '⚪ ยังไม่ได้ตั้งเวลา';
+              statusLabel = _t('⚪ ยังไม่ได้ตั้งเวลา', '⚪ No schedule set');
             }
 
             return Card(
@@ -223,7 +239,7 @@ class _TeacherCard extends StatelessWidget {
                     TextButton.icon(
                       onPressed: () => _showReport(context, packages),
                       icon: const Icon(Icons.bar_chart, size: 16),
-                      label: const Text('รายงาน', style: TextStyle(fontSize: 12)),
+                      label: Text(_t('รายงาน', 'Report'), style: const TextStyle(fontSize: 12)),
                       style: TextButton.styleFrom(foregroundColor: Colors.blueGrey, padding: const EdgeInsets.symmetric(horizontal: 8)),
                     ),
                   ]),
@@ -259,13 +275,13 @@ class _TeacherCard extends StatelessWidget {
                                 Row(children: [
                                   Icon(Icons.calendar_month, size: 14, color: Colors.green.shade700),
                                   const SizedBox(width: 6),
-                                  Text('${slot.slots.length} ช่วงเวลา',
+                                  Text('${slot.slots.length} ${_t('ช่วงเวลา', 'slots')}',
                                       style: TextStyle(fontSize: 12, color: Colors.green.shade700, fontWeight: FontWeight.w600)),
                                   const Spacer(),
                                   if (!readOnly) ...[
                                     Icon(Icons.edit_calendar, size: 14, color: Colors.green.shade600),
                                     const SizedBox(width: 4),
-                                    Text('แก้ไข', style: TextStyle(fontSize: 11, color: Colors.green.shade600)),
+                                    Text(_t('แก้ไข', 'Edit'), style: TextStyle(fontSize: 11, color: Colors.green.shade600)),
                                   ],
                                 ]),
                                 const SizedBox(height: 6),
@@ -300,12 +316,12 @@ class _TeacherCard extends StatelessWidget {
                             : Row(children: [
                                 const Icon(Icons.calendar_today, size: 14, color: Colors.grey),
                                 const SizedBox(width: 6),
-                                Expanded(child: Text(readOnly ? 'ยังไม่ได้ตั้งวัน/เวลา' : 'แตะเพื่อตั้งวัน/เวลา',
+                                Expanded(child: Text(readOnly ? _t('ยังไม่ได้ตั้งวัน/เวลา', 'No date/time set') : _t('แตะเพื่อตั้งวัน/เวลา', 'Tap to set date/time'),
                                     style: const TextStyle(fontSize: 13, color: Colors.grey))),
                                 if (!readOnly) ...[
                                   const Icon(Icons.add_circle_outline, size: 14, color: Colors.grey),
                                   const SizedBox(width: 4),
-                                  Text('ตั้งค่า', style: TextStyle(fontSize: 11, color: Colors.grey.shade600)),
+                                  Text(_t('ตั้งค่า', 'Set'), style: TextStyle(fontSize: 11, color: Colors.grey.shade600)),
                                 ],
                               ]),
                       ),
@@ -332,8 +348,8 @@ class _TeacherCard extends StatelessWidget {
                             ),
                           )),
                           icon: const Icon(Icons.calendar_month, size: 18, color: Color(0xFF2E7D32)),
-                          label: const Text('ดูปฏิทินวันที่มีสอน',
-                              style: TextStyle(color: Color(0xFF2E7D32), fontWeight: FontWeight.bold)),
+                          label: Text(_t('ดูปฏิทินวันที่มีสอน', 'View teaching calendar'),
+                              style: const TextStyle(color: Color(0xFF2E7D32), fontWeight: FontWeight.bold)),
                           style: OutlinedButton.styleFrom(
                             side: const BorderSide(color: Color(0xFF2E7D32)),
                             padding: const EdgeInsets.symmetric(vertical: 12),
@@ -349,7 +365,7 @@ class _TeacherCard extends StatelessWidget {
                       Row(children: [
                         const Icon(Icons.groups_outlined, size: 16, color: Colors.blueGrey),
                         const SizedBox(width: 6),
-                        Text('นักเรียน ${students.length} คน', style: const TextStyle(fontSize: 13, fontWeight: FontWeight.w600, color: Colors.blueGrey)),
+                        Text('${_t('นักเรียน', 'Students')} ${students.length} ${_t('คน', '')}'.trim(), style: const TextStyle(fontSize: 13, fontWeight: FontWeight.w600, color: Colors.blueGrey)),
                       ]),
                       const SizedBox(height: 4),
                       Wrap(spacing: 6, runSpacing: 4, children: students.values.map((name) =>
@@ -360,18 +376,18 @@ class _TeacherCard extends StatelessWidget {
                         )).toList()),
                       const SizedBox(height: 10),
                     ] else ...[
-                      const Text('ยังไม่มีนักเรียน', style: TextStyle(fontSize: 12, color: Colors.grey)),
+                      Text(_t('ยังไม่มีนักเรียน', 'No students yet'), style: const TextStyle(fontSize: 12, color: Colors.grey)),
                       const SizedBox(height: 10),
                     ],
 
                     // Session counts
                     if (totalSessions > 0) ...[
                       Row(children: [
-                        _CountBox(label: 'รวมคาบสอน', value: '$totalSessions', color: Colors.blueGrey),
+                        _CountBox(label: _t('รวมคาบสอน', 'Total'), value: '$totalSessions', color: Colors.blueGrey),
                         const SizedBox(width: 8),
-                        _CountBox(label: 'สอนแล้ว', value: '$usedSessions', color: const Color(0xFF2E7D32)),
+                        _CountBox(label: _t('สอนแล้ว', 'Taught'), value: '$usedSessions', color: const Color(0xFF2E7D32)),
                         const SizedBox(width: 8),
-                        _CountBox(label: 'เหลือ', value: '$remaining', color: statusColor, bold: true),
+                        _CountBox(label: _t('เหลือ', 'Left'), value: '$remaining', color: statusColor, bold: true),
                       ]),
                       const SizedBox(height: 8),
                       Row(children: [
@@ -384,13 +400,14 @@ class _TeacherCard extends StatelessWidget {
                       ]),
                       const SizedBox(height: 4),
                       Text(
-                        'สูตร: เหลือ = รวม − สอนแล้ว  ($totalSessions − $usedSessions = $remaining)',
+                        _t('สูตร: เหลือ = รวม − สอนแล้ว  ($totalSessions − $usedSessions = $remaining)',
+                           'Formula: Left = Total − Taught  ($totalSessions − $usedSessions = $remaining)'),
                         style: const TextStyle(fontSize: 10, color: Colors.grey),
                       ),
                     ] else ...[
                       Container(
                         padding: const EdgeInsets.symmetric(vertical: 8),
-                        child: const Text('ยังไม่มีคาบสอน', style: TextStyle(fontSize: 12, color: Colors.grey)),
+                        child: Text(_t('ยังไม่มีคาบสอน', 'No sessions yet'), style: const TextStyle(fontSize: 12, color: Colors.grey)),
                       ),
                     ],
                     const SizedBox(height: 10),
@@ -402,10 +419,10 @@ class _TeacherCard extends StatelessWidget {
                   Container(
                     decoration: BoxDecoration(border: Border(top: BorderSide(color: Colors.grey.shade200)), borderRadius: const BorderRadius.vertical(bottom: Radius.circular(14))),
                     child: Row(children: [
-                      _ActionBtn(icon: Icons.edit_outlined, label: 'Edit', color: const Color(0xFF2E7D32),
+                      _ActionBtn(icon: Icons.edit_outlined, label: _t('แก้ไข', 'Edit'), color: const Color(0xFF2E7D32),
                           onTap: () => showTeacherSlotForm(context, teacher: teacher, existing: slot)),
                       _vDivider(),
-                      _ActionBtn(icon: Icons.delete_outline, label: 'ลบ', color: Colors.red,
+                      _ActionBtn(icon: Icons.delete_outline, label: _t('ลบ', 'Delete'), color: Colors.red,
                           onTap: () => _confirmDelete(context, slot)),
                     ]),
                   )
@@ -421,27 +438,27 @@ class _TeacherCard extends StatelessWidget {
 
   void _confirmDelete(BuildContext context, TeacherSlotModel? slot) {
     if (slot == null) {
-      ScaffoldMessenger.of(context).showSnackBar(const SnackBar(content: Text('ยังไม่มีข้อมูลเวลาว่างที่จะลบ')));
+      ScaffoldMessenger.of(context).showSnackBar(SnackBar(content: Text(_t('ยังไม่มีข้อมูลเวลาว่างที่จะลบ', 'No availability to delete'))));
       return;
     }
     showDialog(context: context, builder: (_) => AlertDialog(
-      title: const Text('ลบเวลาว่าง'),
-      content: Text('ลบข้อมูลเวลาว่างของ "${teacher.name}"?'),
+      title: Text(_t('ลบเวลาว่าง', 'Delete availability')),
+      content: Text(_t('ลบข้อมูลเวลาว่างของ "${teacher.name}"?', 'Delete availability for "${teacher.name}"?')),
       actions: [
-        TextButton(onPressed: () => Navigator.pop(context), child: const Text('ยกเลิก')),
+        TextButton(onPressed: () => Navigator.pop(context), child: Text(_t('ยกเลิก', 'Cancel'))),
         TextButton(
           onPressed: () async {
             Navigator.pop(context);
             await FirestoreService.deleteTeacherSlot(teacher.id);
           },
-          child: const Text('ลบ', style: TextStyle(color: Colors.red)),
+          child: Text(_t('ลบ', 'Delete'), style: const TextStyle(color: Colors.red)),
         ),
       ],
     ));
   }
 
   void _showReport(BuildContext context, List<PackageModel> packages) {
-    Navigator.push(context, MaterialPageRoute(builder: (_) => _TeacherReportScreen(teacher: teacher, packages: packages)));
+    Navigator.push(context, MaterialPageRoute(builder: (_) => _TeacherReportScreen(teacher: teacher, packages: packages, isEn: isEn)));
   }
 
   Widget _vDivider() => Container(width: 1, height: 48, color: Colors.grey.shade200);
@@ -492,7 +509,10 @@ class _ActionBtn extends StatelessWidget {
 class _TeacherReportScreen extends StatelessWidget {
   final UserModel teacher;
   final List<PackageModel> packages;
-  const _TeacherReportScreen({required this.teacher, required this.packages});
+  final bool isEn;
+  const _TeacherReportScreen({required this.teacher, required this.packages, this.isEn = false});
+
+  String _t(String th, String en) => isEn ? en : th;
 
   @override
   Widget build(BuildContext context) {
@@ -502,7 +522,7 @@ class _TeacherReportScreen extends StatelessWidget {
 
     return Scaffold(
       appBar: AppBar(
-        title: Text('รายงาน: ${teacher.name}'),
+        title: Text('${_t('รายงาน', 'Report')}: ${teacher.name}'),
         backgroundColor: const Color(0xFF2E7D32),
         foregroundColor: Colors.white,
       ),
@@ -518,16 +538,16 @@ class _TeacherReportScreen extends StatelessWidget {
             ]),
             const SizedBox(height: 12),
             Row(children: [
-              _RStat(label: 'รวมคาบสอน', value: '$totalSessions', color: Colors.blueGrey),
-              _RStat(label: 'สอนแล้ว', value: '$usedSessions', color: const Color(0xFF2E7D32)),
-              _RStat(label: 'เหลือ', value: '$remaining', color: remaining <= 3 ? Colors.orange : const Color(0xFF2E7D32)),
+              _RStat(label: _t('รวมคาบสอน', 'Total'), value: '$totalSessions', color: Colors.blueGrey),
+              _RStat(label: _t('สอนแล้ว', 'Taught'), value: '$usedSessions', color: const Color(0xFF2E7D32)),
+              _RStat(label: _t('เหลือ', 'Left'), value: '$remaining', color: remaining <= 3 ? Colors.orange : const Color(0xFF2E7D32)),
             ]),
           ]),
         )),
         const SizedBox(height: 12),
 
         // Per-student packages
-        Text('นักเรียน ${packages.length} คน', style: const TextStyle(fontWeight: FontWeight.bold, fontSize: 14)),
+        Text('${_t('นักเรียน', 'Students')} ${packages.length} ${_t('คน', '')}'.trim(), style: const TextStyle(fontWeight: FontWeight.bold, fontSize: 14)),
         const SizedBox(height: 8),
         ...packages.map((pkg) => Card(
           margin: const EdgeInsets.only(bottom: 8),
@@ -545,9 +565,9 @@ class _TeacherReportScreen extends StatelessWidget {
             ]),
             const SizedBox(height: 6),
             Row(children: [
-              _mini('รวม', '${pkg.totalSessions}', Colors.blueGrey),
-              _mini('สอนแล้ว', '${pkg.usedSessions}', const Color(0xFF2E7D32)),
-              _mini('เหลือ', '${pkg.remainingSessions}', pkg.statusColor),
+              _mini(_t('รวม', 'Total'), '${pkg.totalSessions}', Colors.blueGrey),
+              _mini(_t('สอนแล้ว', 'Taught'), '${pkg.usedSessions}', const Color(0xFF2E7D32)),
+              _mini(_t('เหลือ', 'Left'), '${pkg.remainingSessions}', pkg.statusColor),
             ]),
             const SizedBox(height: 4),
             ClipRRect(

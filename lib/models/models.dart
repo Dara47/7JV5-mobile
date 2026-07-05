@@ -343,6 +343,7 @@ class LeaveRequestModel {
   final String teacherCode;
   final String studentName; // นักเรียนที่ลาสอนในชั่วโมงเรียน (สำหรับครู)
   final String studentCode;
+  final Timestamp? createdAt; // เวลาที่ส่งใบลา (serverTimestamp)
 
   LeaveRequestModel({
     required this.id, required this.userId, required this.userName,
@@ -350,6 +351,7 @@ class LeaveRequestModel {
     required this.reason, required this.status, this.adminNote,
     this.teacherName = '', this.teacherCode = '',
     this.studentName = '', this.studentCode = '',
+    this.createdAt,
   });
 
   bool get isPending => status == 'pending';
@@ -394,7 +396,16 @@ class LeaveRequestModel {
       teacherCode: d['teacherCode'] ?? '',
       studentName: d['studentName'] ?? '',
       studentCode: d['studentCode'] ?? '',
+      createdAt: d['createdAt'] as Timestamp?,
     );
+  }
+
+  /// 'dd/MM/yyyy(+543) HH:mm' เวลาไทย ที่ส่งใบลา (null = ใบลาเก่าที่ไม่มี timestamp)
+  String? get submittedLabel {
+    if (createdAt == null) return null;
+    final t = createdAt!.toDate().toUtc().add(const Duration(hours: 7));
+    String p(int n) => n.toString().padLeft(2, '0');
+    return '${p(t.day)}/${p(t.month)}/${t.year + 543} ${p(t.hour)}:${p(t.minute)} น.';
   }
 
   bool get hasTeacher => teacherName.isNotEmpty || teacherCode.isNotEmpty;
