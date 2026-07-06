@@ -299,11 +299,28 @@ class _TabContent extends StatelessWidget {
 
   static String _num(double n) => n % 1 == 0 ? n.toInt().toString() : n.toString();
 
-  /// ส่งออกรายการที่กำลังแสดง (ตามตัวกรองค้นหา) เป็นไฟล์ Excel
-  void _export(BuildContext context) {
+  /// เปิด dialog เลือกช่วงวันที่ก่อนส่งออก Excel (เลือก "ทั้งหมด" ได้)
+  void _openExportDialog(BuildContext context) {
     if (entries.isEmpty) {
       ScaffoldMessenger.of(context).showSnackBar(
           const SnackBar(content: Text('ไม่มีรายการให้ส่งออก')));
+      return;
+    }
+    showDialog(
+      context: context,
+      builder: (_) => _ExportRangeDialog(
+        entries: entries,
+        type: type,
+        onExport: (list, range) => _exportList(context, list, range),
+      ),
+    );
+  }
+
+  /// ส่งออกรายการเป็นไฟล์ Excel — list = รายการที่ผ่านตัวกรองแล้ว, range = ช่วงวันที่ (null = ทั้งหมด)
+  void _exportList(BuildContext context, List<dynamic> list, DateTimeRange? range) {
+    if (list.isEmpty) {
+      ScaffoldMessenger.of(context).showSnackBar(
+          const SnackBar(content: Text('ไม่มีรายการในช่วงที่เลือก')));
       return;
     }
     final isTeacher = type == 'teacher';
@@ -316,8 +333,8 @@ class _TabContent extends StatelessWidget {
 
     final rows = <List<dynamic>>[];
     double sumGross = 0, sumDeduct = 0, sumNet = 0, sumSessions = 0;
-    for (var i = 0; i < entries.length; i++) {
-      final e = entries[i];
+    for (var i = 0; i < list.length; i++) {
+      final e = list[i];
       final name = isTeacher ? (e as TeacherPayrollModel).teacherName : (e as AdminPayrollModel).adminName;
       final roles = isTeacher ? (e as TeacherPayrollModel).roles : (e as AdminPayrollModel).roles;
       final deds = isTeacher ? (e as TeacherPayrollModel).deductions : (e as AdminPayrollModel).deductions;
@@ -350,14 +367,17 @@ class _TabContent extends StatelessWidget {
       sumGross, '', sumDeduct, sumNet, '', '',
     ]);
 
+    final suffix = range == null
+        ? todayThaiStr()
+        : '${toStorageDateStr(range.start)}_ถึง_${toStorageDateStr(range.end)}';
     exportXlsx(
-      filename: '${isTeacher ? 'payroll_teacher' : 'payroll_admin'}_${todayThaiStr()}.xlsx',
+      filename: '${isTeacher ? 'payroll_teacher' : 'payroll_admin'}_$suffix.xlsx',
       sheetName: isTeacher ? 'ค่าจ้างครู' : 'ค่าจ้างแอดมิน',
       headers: headers,
       rows: rows,
     );
     ScaffoldMessenger.of(context).showSnackBar(SnackBar(
-      content: Text('ส่งออก ${entries.length} รายการเป็น Excel แล้ว'),
+      content: Text('ส่งออก ${list.length} รายการเป็น Excel แล้ว'),
       backgroundColor: Colors.green,
     ));
   }
@@ -394,7 +414,7 @@ class _TabContent extends StatelessWidget {
         )),
         const SizedBox(width: 8),
         OutlinedButton.icon(
-          onPressed: () => _export(context),
+          onPressed: () => _openExportDialog(context),
           icon: const Icon(Icons.file_download_outlined, size: 18),
           label: const Text('Excel'),
           style: OutlinedButton.styleFrom(
@@ -449,6 +469,116 @@ class _TabContent extends StatelessWidget {
             ),
     ),
   ]);
+}
+
+// ── Export date-range dialog ───────────────────────────────────────────────────
+/// เลือกช่วงวันที่ก่อนส่งออก Excel — กรองรายการที่ช่วงวันจ่าย (dateFrom–dateTo) ทับซ้อนกับช่วงที่เลือก
+class _ExportRangeDialog extends StatefulWidget {
+  final List<dynamic> entries;
+  final String type;
+  final void Function(List<dynamic> list, DateTimeRange? range) onExport;
+  const _ExportRangeDialog({required this.entries, required this.type, required this.onExport});
+  @override
+  State<_ExportRangeDialog> createState() => _ExportRangeDialogState();
+}
+
+class _ExportRangeDialogState extends State<_ExportRangeDialog> {
+  DateTimeRange? _range;
+
+  /// รายการนี้ช่วงวันจ่ายทับซ้อนกับช่วงที่เลือกไหม (ไม่มีวันที่ = ไม่รวมเมื่อกรองช่วง)
+  bool _inRange(dynamic e, DateTimeRange r) {
+    final isT = widget.type == 'teacher';
+    final fromStr = isT ? (e as TeacherPayrollModel).dateFrom : (e as AdminPayrollModel).dateFrom;
+    final toStr = isT ? (e as TeacherPayrollModel).dateTo : (e as AdminPayrollModel).dateTo;
+    final s = parseDateStr(fromStr ?? '') ?? parseDateStr(toStr ?? '');
+    final en = parseDateStr(toStr ?? '') ?? parseDateStr(fromStr ?? '');
+    if (s == null || en == null) return false;
+    return !s.isAfter(r.end) && !en.isBefore(r.start);
+  }
+
+  List<dynamic> get _filtered => _range == null
+      ? widget.entries
+      : widget.entries.where((e) => _inRange(e, _range!)).toList();
+
+  Future<void> _pickRange() async {
+    final now = nowThai();
+    final picked = await showDateRangePicker(
+      context: context,
+      initialDateRange: _range,
+      firstDate: DateTime(now.year - 2),
+      lastDate: DateTime(now.year + 1),
+      helpText: 'เลือกช่วงวันที่ (จาก – ถึง)',
+      saveText: 'ตกลง',
+    );
+    if (picked != null && mounted) {
+      setState(() => _range = DateTimeRange(
+        start: DateTime(picked.start.year, picked.start.month, picked.start.day),
+        end: DateTime(picked.end.year, picked.end.month, picked.end.day),
+      ));
+    }
+  }
+
+  @override
+  Widget build(BuildContext context) {
+    final count = _filtered.length;
+    final rangeLabel = _range == null
+        ? 'ทั้งหมด (ไม่กรองวันที่)'
+        : '${thaiDateFull(_range!.start)}\nถึง ${thaiDateFull(_range!.end)}';
+    return AlertDialog(
+      title: Text('ส่งออก Excel — ${widget.type == 'teacher' ? 'ค่าจ้างครู' : 'ค่าจ้างแอดมิน'}'),
+      content: Column(mainAxisSize: MainAxisSize.min, crossAxisAlignment: CrossAxisAlignment.start, children: [
+        const Text('เลือกช่วงวันที่ที่จะดาวน์โหลด (แตะเพื่อเลือก)',
+            style: TextStyle(fontSize: 13, color: Colors.grey)),
+        const SizedBox(height: 12),
+        InkWell(
+          onTap: _pickRange,
+          borderRadius: BorderRadius.circular(10),
+          child: Container(
+            padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 12),
+            decoration: BoxDecoration(
+              border: Border.all(color: const Color(0xFFF97316)),
+              borderRadius: BorderRadius.circular(10),
+            ),
+            child: Row(children: [
+              const Icon(Icons.date_range, size: 20, color: Color(0xFFF97316)),
+              const SizedBox(width: 10),
+              Expanded(child: Text(rangeLabel,
+                  style: const TextStyle(fontSize: 13, fontWeight: FontWeight.w600))),
+              if (_range != null) InkWell(
+                onTap: () => setState(() => _range = null),
+                child: const Icon(Icons.clear, size: 18, color: Colors.grey),
+              ),
+            ]),
+          ),
+        ),
+        const SizedBox(height: 12),
+        Text('จะส่งออก $count รายการ',
+            style: TextStyle(fontSize: 13, fontWeight: FontWeight.bold,
+                color: count == 0 ? Colors.red : Colors.green.shade700)),
+        if (_range != null)
+          Padding(
+            padding: const EdgeInsets.only(top: 4),
+            child: Text('* รายการที่ไม่ได้ระบุวันที่จะไม่ถูกรวมเมื่อกรองช่วง',
+                style: TextStyle(fontSize: 11, color: Colors.grey.shade600)),
+          ),
+      ]),
+      actions: [
+        TextButton(onPressed: () => Navigator.pop(context), child: const Text('ยกเลิก')),
+        ElevatedButton.icon(
+          onPressed: count == 0 ? null : () {
+            Navigator.pop(context);
+            widget.onExport(_filtered, _range);
+          },
+          icon: const Icon(Icons.file_download_outlined, size: 18),
+          label: const Text('ส่งออก'),
+          style: ElevatedButton.styleFrom(
+            backgroundColor: const Color(0xFFF97316),
+            foregroundColor: Colors.white,
+          ),
+        ),
+      ],
+    );
+  }
 }
 
 class _SumCard extends StatelessWidget {
