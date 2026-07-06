@@ -3,17 +3,18 @@ import '../models/models.dart';
 import '../services/firestore_service.dart';
 import '../screens/package_form_dialog.dart';
 
-/// คัดแพ็กเกจที่ยัง active และคาบ "หมดแล้ว (≤0)" หรือ "ใกล้หมด (1–3)"
+/// คัดแพ็กเกจที่ยัง active และคาบ "เหลือน้อยกว่า 3" (รวมหมดแล้ว ≤0 และใกล้หมด 1–2)
+/// ผู้ใช้กำหนด: แสดงเฉพาะเหลือ < 3 คาบ — ถ้าเรียนต่อ/เพิ่มคาบจนเหลือ ≥ 3 (เช่น 4) จะหลุดจากรายการ
 /// เรียงเหลือน้อยสุดขึ้นก่อน
 List<PackageModel> lowBalancePackages(List<PackageModel> all) {
   return all
-      .where((p) => p.status == 'active' && (p.isExpired || p.isLowBalance))
+      .where((p) => p.status == 'active' && p.remainingSessions < 3)
       .toList()
     ..sort((a, b) => a.remainingSessions.compareTo(b.remainingSessions));
 }
 
 /// รายการ "คาบเรียนใกล้หมด" แบบฝังในหน้า (ไม่ใช่ป๊อปอัป) — แสดงข้อมูลอย่างเดียว copy ชื่อได้
-/// แยกกลุ่ม 🔴 หมดแล้ว(≤0) / 🟠 ใกล้หมด(1–3) เรียงเหลือน้อยสุด
+/// แยกกลุ่ม 🔴 หมดแล้ว(≤0) / 🟠 ใกล้หมด(1–2) เรียงเหลือน้อยสุด
 class LowBalanceList extends StatefulWidget {
   final List<PackageModel> packages;
   final EdgeInsets padding;
@@ -33,10 +34,29 @@ class _LowBalanceListState extends State<LowBalanceList> {
   static const _pageSize = 30;
   int _visible = _pageSize;
 
+  // คำค้นหา (ชื่อ / รหัสนักเรียน / ครู) — เก็บ controller ใน state ครั้งเดียว
+  // (ไม่สร้างใน build ตาม [[gotcha-stream-in-build-focus-loss]]) กันช่องค้นหาหลุดโฟกัส
+  final _searchCtrl = TextEditingController();
+  String _query = '';
+
+  @override
+  void dispose() {
+    _searchCtrl.dispose();
+    super.dispose();
+  }
+
+  /// ตรงกับคำค้นไหม (ชื่อนักเรียน / รหัสนักเรียน / ชื่อครู) — ไม่สนตัวพิมพ์เล็กใหญ่
+  bool _matches(PackageModel p, String q) {
+    return p.studentName.toLowerCase().contains(q) ||
+        p.studentCode.toLowerCase().contains(q) ||
+        p.teacherName.toLowerCase().contains(q);
+  }
+
   @override
   Widget build(BuildContext context) {
-    final pkgs = lowBalancePackages(widget.packages);
-    if (pkgs.isEmpty) {
+    final base = lowBalancePackages(widget.packages);
+    // ยังไม่มีใครคาบใกล้หมดเลย → แสดงสถานะว่างเฉย ๆ (ไม่ต้องมีช่องค้นหา)
+    if (base.isEmpty) {
       return Center(
         child: Column(mainAxisSize: MainAxisSize.min, children: [
           Icon(Icons.check_circle_rounded, size: 56, color: Colors.green.shade300),
@@ -46,7 +66,62 @@ class _LowBalanceListState extends State<LowBalanceList> {
         ]),
       );
     }
-    // pkgs เรียงเหลือน้อยสุดก่อน → หมดแล้ว(≤0) มาก่อน ใกล้หมด(1–3) เสมอ
+
+    final q = _query.trim().toLowerCase();
+    final pkgs = q.isEmpty ? base : base.where((p) => _matches(p, q)).toList();
+
+    return Column(children: [
+      _searchField(base.length),
+      Expanded(child: _buildList(pkgs)),
+    ]);
+  }
+
+  Widget _searchField(int total) => Padding(
+        padding: const EdgeInsets.fromLTRB(12, 8, 12, 4),
+        child: TextField(
+          controller: _searchCtrl,
+          onChanged: (v) => setState(() {
+            _query = v;
+            _visible = _pageSize; // เริ่มนับหน้าใหม่เมื่อเปลี่ยนคำค้น
+          }),
+          decoration: InputDecoration(
+            hintText: 'ค้นหา ชื่อ / รหัสนักเรียน / ครู',
+            prefixIcon: const Icon(Icons.search, size: 20),
+            suffixIcon: _query.isEmpty
+                ? null
+                : IconButton(
+                    icon: const Icon(Icons.clear, size: 20),
+                    onPressed: () => setState(() {
+                      _searchCtrl.clear();
+                      _query = '';
+                      _visible = _pageSize;
+                    }),
+                  ),
+            isDense: true,
+            filled: true,
+            fillColor: Colors.grey.shade100,
+            contentPadding: const EdgeInsets.symmetric(vertical: 10),
+            border: OutlineInputBorder(
+              borderRadius: BorderRadius.circular(12),
+              borderSide: BorderSide.none,
+            ),
+          ),
+        ),
+      );
+
+  Widget _buildList(List<PackageModel> pkgs) {
+    if (pkgs.isEmpty) {
+      // มีรายการอยู่แต่คำค้นไม่ตรงใคร
+      return Center(
+        child: Column(mainAxisSize: MainAxisSize.min, children: [
+          Icon(Icons.search_off_rounded, size: 48, color: Colors.grey.shade400),
+          const SizedBox(height: 10),
+          Text('ไม่พบรายการที่ค้นหา',
+              style: TextStyle(fontSize: 14, color: Colors.grey.shade600)),
+        ]),
+      );
+    }
+    // pkgs เรียงเหลือน้อยสุดก่อน → หมดแล้ว(≤0) มาก่อน ใกล้หมด(1–2) เสมอ
     final allExpired = pkgs.where((p) => p.isExpired).toList();
     final allLow = pkgs.where((p) => p.isLowBalance).toList();
     // แสดงแค่ _visible รายการแรกรวมทั้ง 2 กลุ่ม (กันเครื่องอืดตอนรายการเยอะ)
@@ -60,7 +135,7 @@ class _LowBalanceListState extends State<LowBalanceList> {
         padding: widget.padding,
         children: [
           if (shownExpired.isNotEmpty) _group('🔴 หมดแล้ว', allExpired.length, shownExpired, _red),
-          if (shownLow.isNotEmpty) _group('🟠 ใกล้หมด (1–3 คาบ)', allLow.length, shownLow, _orange),
+          if (shownLow.isNotEmpty) _group('🟠 ใกล้หมด (1–2 คาบ)', allLow.length, shownLow, _orange),
           if (remaining > 0) _loadMore(remaining),
         ],
       ),
