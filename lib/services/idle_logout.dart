@@ -18,12 +18,20 @@ final GlobalKey<ScaffoldMessengerState> appMessengerKey = GlobalKey<ScaffoldMess
 /// - "มีการเคลื่อนไหว" = แตะจอ/เลื่อนจอ/ขยับเมาส์/สกรอลล์/พิมพ์คีย์บอร์ด (ดู [IdleActivityDetector])
 /// - เตือนก่อนหมดเวลา [warnBefore] พร้อมปุ่ม "อยู่ต่อ" กันกำลังกรอกฟอร์มยาว ๆ แล้วโดนเตะออก
 ///
-/// ทำไมเช็คด้วยการเทียบเวลาจริงทุก [_tick] แทนตั้ง Timer ยาว 10 นาทีรวดเดียว:
+/// ทำไมเช็คด้วยการเทียบเวลาจริงทุก [_tick] แทนตั้ง Timer ยาวรวดเดียวจนถึง [timeout]:
 /// เบราว์เซอร์หน่วง timer ของแท็บที่ไม่ได้เปิดอยู่ (และมือถือหยุดเมื่อล็อกจอ)
 /// timer ยาวจึงเพี้ยนได้ แต่การเทียบ timestamp ยังตรงเสมอ
 class IdleLogout {
   /// ไม่ขยับครบเท่านี้ = ออกจากระบบ
-  static const Duration timeout = Duration(minutes: 10);
+  static const Duration timeout = Duration(hours: 1);
+
+  /// ข้อความบอกช่วงเวลาแบบอ่านง่าย (ใช้ใน snackbar) — 60 นาที → "1 ชั่วโมง"
+  static String get timeoutLabel {
+    final m = timeout.inMinutes;
+    if (m % 60 == 0) return '${m ~/ 60} ชั่วโมง';
+    if (m > 60) return '${m ~/ 60} ชั่วโมง ${m % 60} นาที';
+    return '$m นาที';
+  }
 
   /// เตือนล่วงหน้าก่อนหมดเวลาเท่านี้ (นับถอยหลังในกล่องเตือน)
   static const Duration warnBefore = Duration(minutes: 1);
@@ -106,7 +114,7 @@ class IdleLogout {
     appMessengerKey.currentState
       ?..clearSnackBars()
       ..showSnackBar(SnackBar(
-        content: Text('ออกจากระบบอัตโนมัติ — ไม่มีการใช้งานเกิน ${timeout.inMinutes} นาที'),
+        content: Text('ออกจากระบบอัตโนมัติ — ไม่มีการใช้งานเกิน $timeoutLabel'),
         backgroundColor: const Color(0xFF7C2D12),
         duration: const Duration(seconds: 6),
       ));

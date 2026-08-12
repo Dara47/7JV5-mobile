@@ -63,7 +63,7 @@ class _HomeScreenState extends State<HomeScreen> {
   void initState() {
     super.initState();
     if (widget.appUser.isAdmin) {
-      // ไม่มีการใช้งาน 10 นาที = เด้งออกหน้าล็อกอิน (เตือนล่วงหน้า 1 นาที) — เฉพาะแอดมิน
+      // ไม่มีการใช้งาน 1 ชั่วโมง = เด้งออกหน้าล็อกอิน (เตือนล่วงหน้า 1 นาที) — เฉพาะแอดมิน
       IdleLogout.start();
       _leaveSub = FirestoreService.watchLeaveRequests().listen((list) {
         final count = list.where((r) => r.isPending).length;
@@ -462,7 +462,7 @@ class _HomePageState extends State<_HomePage> with SingleTickerProviderStateMixi
                   label: const Text('รีเฟรช', style: TextStyle(fontSize: 13, color: Colors.grey)),
                   style: TextButton.styleFrom(alignment: Alignment.centerLeft),
                 )),
-                Text('Version 5.7.10', style: TextStyle(fontSize: 11, color: Colors.grey.shade400)),
+                Text('Version 5.7.11', style: TextStyle(fontSize: 11, color: Colors.grey.shade400)),
                 const SizedBox(width: 8),
                 TextButton.icon(
                   onPressed: widget.onLogout,

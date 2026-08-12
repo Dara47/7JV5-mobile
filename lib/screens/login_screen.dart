@@ -224,7 +224,7 @@ class _LoginScreenState extends State<LoginScreen> {
                             ),
                           ),
                           const SizedBox(height: 18),
-                          Text('Version 5.7.10',
+                          Text('Version 5.7.11',
                               style: TextStyle(
                                   fontSize: 11,
                                   fontWeight: FontWeight.w600,
