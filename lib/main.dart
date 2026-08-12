@@ -1,5 +1,4 @@
-﻿import 'package:flutter/foundation.dart' show kIsWeb;
-import 'package:flutter/material.dart';
+﻿import 'package:flutter/material.dart';
 import 'package:firebase_core/firebase_core.dart';
 import 'package:firebase_auth/firebase_auth.dart';
 import 'firebase_env.dart';
@@ -13,33 +12,12 @@ void main() async {
   WidgetsFlutterBinding.ensureInitialized();
   try {
     await Firebase.initializeApp(options: firebaseOptionsForEnv);
-    await _forceLoginOnEveryVisit();
     runApp(const JV5App());
   } catch (e) {
     // Firebase init ล้มเหลว (เน็ตหลุด/โดน firewall/เครื่องเก่า) — เดิมจะค้างหน้าโหลดจอขาวเงียบ ๆ
     // ตอนนี้วาดหน้า error ให้ผู้ใช้กด "ลองใหม่" ได้ (runApp ทำให้ flutter-first-frame ยิง → boot-loader หาย)
     runApp(StartupErrorApp(error: e.toString()));
   }
-}
-
-/// กดลิงก์เข้าเว็บ = ต้องเจอหน้าล็อกอินเสมอ ไม่ว่า session เดิมจะยังไม่หมดอายุก็ตาม
-/// (ใช้กฎเดียวกันทุก role — แอดมิน/ครู/นักเรียน)
-///
-/// 1) Persistence.NONE (เว็บ) — เก็บ session ไว้ในหน่วยความจำของหน้าเท่านั้น
-///    ไม่เขียน indexedDB/localStorage → ปิดแท็บ/รีเฟรช/เปิดลิงก์ใหม่ = ไม่มี session ค้างให้ auto-login
-///    (setPersistence รองรับเฉพาะเว็บ — แพลตฟอร์มอื่นโยน exception จึงต้อง guard ด้วย kIsWeb)
-/// 2) signOut() — เคลียร์ session ที่ค้างอยู่แล้วจากตอนที่ยังใช้ persistence แบบ LOCAL
-///    (ทั้งของแอดมิน และ anonymous ของครู/นักเรียน) ไม่งั้นครั้งแรกหลังดีพลอยจะยังหลุดเข้าหน้าหลักได้
-Future<void> _forceLoginOnEveryVisit() async {
-  final auth = FirebaseAuth.instance;
-  if (kIsWeb) {
-    try {
-      await auth.setPersistence(Persistence.NONE);
-    } catch (_) {/* เบราว์เซอร์ไม่รองรับ → ยังมี signOut ด้านล่างกันอยู่ */}
-  }
-  try {
-    await auth.signOut();
-  } catch (_) {/* ไม่มี session อยู่แล้ว */}
 }
 
 /// หน้าจอ error ตอนเปิดแอปไม่สำเร็จ (แทนจอขาว/ค้าง) — มีปุ่มลองใหม่
