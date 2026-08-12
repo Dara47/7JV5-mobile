@@ -4,6 +4,7 @@ import 'package:firebase_auth/firebase_auth.dart';
 import 'firebase_env.dart';
 import 'models/models.dart';
 import 'services/firestore_service.dart';
+import 'services/idle_logout.dart';
 import 'screens/login_screen.dart';
 import 'screens/home_screen.dart';
 import 'widgets/app_watermark.dart';
@@ -74,6 +75,9 @@ class JV5App extends StatelessWidget {
     return MaterialApp(
       title: '7J English',
       debugShowCheckedModeBanner: false,
+      // key กลาง — ให้ IdleLogout เปิดกล่องเตือน/เด้งกลับหน้าล็อกอิน/ขึ้น snackbar ได้จากนอก widget tree
+      navigatorKey: appNavigatorKey,
+      scaffoldMessengerKey: appMessengerKey,
       theme: ThemeData(
         colorScheme: ColorScheme.fromSeed(seedColor: const Color(0xFFF97316)),
         useMaterial3: true,
@@ -84,7 +88,11 @@ class JV5App extends StatelessWidget {
       // ลายน้ำโลโก้ครอบทั้งแอป — จุดเดียว ครบทุกเมนู
       // โหมดทดสอบ (APP_ENV=test) แปะป้าย "TEST" มุมขวาบน กันสับสนกับ production
       builder: (context, child) {
-        Widget app = AppWatermark(child: child ?? const SizedBox.shrink());
+        // IdleActivityDetector: ดักแตะจอ/เลื่อน/เมาส์/คีย์บอร์ด ครอบทุกหน้าจากจุดเดียว
+        // (ทำงานจริงเฉพาะตอน IdleLogout.start() แล้ว = แอดมินล็อกอินอยู่)
+        Widget app = IdleActivityDetector(
+          child: AppWatermark(child: child ?? const SizedBox.shrink()),
+        );
         if (isTestEnv) {
           app = Banner(
             message: 'TEST',
